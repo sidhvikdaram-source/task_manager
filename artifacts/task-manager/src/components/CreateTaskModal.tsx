@@ -26,9 +26,10 @@ interface CreateTaskModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultCalendarDate?: string;
+  onSuccess?: () => void;
 }
 
-export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate }: CreateTaskModalProps) {
+export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuccess }: CreateTaskModalProps) {
   const queryClient = useQueryClient();
   const createTask = useCreateTask();
 
@@ -60,6 +61,7 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate }: Cre
           queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
           form.reset();
           onOpenChange(false);
+          onSuccess?.();
         },
         onError: () => {
           toast.error('Failed to create task');
