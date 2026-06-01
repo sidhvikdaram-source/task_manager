@@ -1,0 +1,31 @@
+Act as a Principal Full-Stack Engineer and Elite UI/UX Designer specializing in modern SaaS platforms. I want to build a highly interactive, advanced, and mature gamified Task Manager web application. 
+
+The stack should use a Python backend (Flask or FastAPI) for core logic, state management, and user data, paired with a React frontend utilizing Tailwind CSS and Framer Motion for smooth, high-fidelity UI animations.
+
+The entire aesthetic must be inspired by premium digital product studios: zero harsh whites or pure blacks. Use a sophisticated, deeply tinted off-white background (#F4F8FF or #F5F7FA), crisp pure white (#FFFFFF) container cards, sharp typography, and deep charcoal slate (#1A1D20) for text. The gamification must feel professional, psychological, and rewarding—like a high-end productivity engine (e.g., Linear, Notion, or Critique AI), completely avoiding anything childish or RPG-cliché.
+
+Please outline the full architectural system and provide clean, modular code for the following components:
+
+### 1. Navigation Structure & System Extensions
+Implement a minimalist, persistent sidebar or top navigation bar containing:
+*   Home (Dashboard Overview)
+*   Calendar (Dynamic Interactive Planner)
+*   Focus Arena (A built-in deep-work zone featuring an advanced Pomodoro/Focus sprint timer that feeds into the gamification loop)
+*   Analytics & Achievements (Data-driven metric screens showing productivity velocities, strike streaks, and milestone charts instead of cringey gaming badges)
+
+### 2. High-Fidelity Professional Gamification Mechanics
+*   Productivity Velocity (XP): Reframe Experience Points as "Velocity Points" (VP). Completing a core task grants +10 VP; finishing a granular checklist item grants +2 VP. 
+*   Efficiency Levels: Reaching 100 VP increments the user's Tier Level.
+*   Focus Multipliers: Maintaining consecutive daily completion streaks or completing tasks within self-allotted Focus Arena blocks activates an efficiency multiplier (e.g., 1.2x VP), visually represented by a subtle, glowing status ring around the profile.
+
+### 3. The Home Page (Dynamic Dashboard Overview)
+*   Hero Entry Animation: Upon page mount, implement an elegant Framer Motion staggering entry where task cards smoothly fade and slide vertically into place, visually organizing themselves into categorized columns (e.g., "Critical Quest", "Active In-Flight", "Backlog").
+*   Interactive Sorting Layout: As the user switches sorting filters (by priority, due date, or VP value), the task cards must fluidly shift, animate, and glide into their new structural positions using layout-id animations (no abrupt snaps).
+*   Scroll-Triggered Feed: As the user scrolls down, upcoming tasks, past milestones, and velocity metrics must elegantly reveal themselves with subtle fade-and-rise entrance animations.
+
+### 4. The Calendar Page (Full-Scale Interactive Planner)
+*   Grid Architecture: A fully rendered monthly grid display built natively in React. Each calendar cell represents a day and must act as a drop-zone for tasks.
+*   Interactivity: Users can click any specific day cell to open a clean, minimalist modal form to inject a task directly into that timeline. 
+*   Gamified Deadlines: Days containing critical milestones should feature a subtle gradient border or micro-indicator ring that shifts color dynamically based on proximity to the due date, visually mapping out high-value productivity days.
+
+Ensure all HTML/JSX elements follow clean structural layout guidelines, all styling properties map to CSS variables or utility classes, and the React frontend safely interfaces with the Python backend routes via API state handlers.

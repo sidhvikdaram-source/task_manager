@@ -1,0 +1,138 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { CheckCircle2, Circle, Clock, MoreVertical, Maximize2 } from 'lucide-react';
+import { Task, useCompleteTask, getListTasksQueryKey, getGetDashboardOverviewQueryKey, getGetUserStatsQueryKey } from '@workspace/api-client-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { format, isPast, parseISO } from 'date-fns';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { TaskDetailsModal } from '@/components/TaskDetailsModal';
+
+interface TaskCardProps {
+  task: Task;
+  layoutId?: string;
+}
+
+const priorityColors = {
+  critical: 'bg-destructive/10 text-destructive border-destructive/20',
+  high: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  medium: 'bg-primary/10 text-primary border-primary/20',
+  low: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+};
+
+export function TaskCard({ task, layoutId }: TaskCardProps) {
+  const queryClient = useQueryClient();
+  const completeTask = useCompleteTask();
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const isCompleted = task.status === 'completed';
+
+  const handleComplete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isCompleted) return;
+
+    completeTask.mutate(
+      { id: task.id },
+      {
+        onSuccess: (result) => {
+          toast.success(`Task completed! +${result.vpAwarded} VP`);
+          if (result.tierUp) {
+            toast('Tier Up!', {
+              description: `You have reached Tier ${result.newTier}!`,
+              icon: '🎉',
+            });
+          }
+          
+          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey() });
+        },
+      }
+    );
+  };
+
+  const isOverdue = task.dueDate && isPast(parseISO(task.dueDate)) && !isCompleted;
+  
+  return (
+    <>
+      <motion.div
+        layoutId={layoutId}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        whileHover={{ scale: 1.02 }}
+        onClick={() => setDetailsOpen(true)}
+        className={`relative group bg-card p-4 rounded-xl border cursor-pointer ${isCompleted ? 'opacity-60 grayscale-[0.5]' : ''} shadow-sm hover:shadow-md transition-shadow`}
+      >
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setDetailsOpen(true); }}>
+            <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <button
+            onClick={handleComplete}
+            disabled={completeTask.isPending || isCompleted}
+            className={`mt-1 flex-shrink-0 text-muted-foreground hover:text-primary transition-colors ${
+              isCompleted ? 'text-primary' : ''
+            }`}
+          >
+            {isCompleted ? (
+              <CheckCircle2 className="w-5 h-5" />
+            ) : (
+              <Circle className="w-5 h-5" />
+            )}
+          </button>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mr-6">
+              <h3 className={`font-medium text-sm leading-tight ${isCompleted ? 'line-through text-muted-foreground' : 'text-card-foreground'}`}>
+                {task.title}
+              </h3>
+              <Badge variant="outline" className={`${priorityColors[task.priority]} whitespace-nowrap text-xs py-0 h-5`}>
+                {task.priority}
+              </Badge>
+            </div>
+            
+            {task.description && (
+              <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                {task.description}
+              </p>
+            )}
+            
+            <div className="mt-3 flex items-center gap-3 text-xs">
+              <Badge variant="secondary" className="font-mono font-medium">
+                +{task.vpValue} VP
+              </Badge>
+              
+              {task.dueDate && (
+                <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                  <Clock className="w-3.5 h-3.5" />
+                  {format(parseISO(task.dueDate), 'MMM d')}
+                </div>
+              )}
+            </div>
+            
+            {(task.checklistCount ?? 0) > 0 && (
+              <div className="mt-3 space-y-1.5">
+                <div className="flex justify-between text-[10px] text-muted-foreground font-medium">
+                  <span>Checklist</span>
+                  <span>{task.checklistCompleted}/{task.checklistCount}</span>
+                </div>
+                <Progress value={((task.checklistCompleted ?? 0) / (task.checklistCount ?? 1)) * 100} className="h-1.5" />
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+
+      <TaskDetailsModal 
+        taskId={task.id} 
+        open={detailsOpen} 
+        onOpenChange={setDetailsOpen} 
+      />
+    </>
+  );
+}

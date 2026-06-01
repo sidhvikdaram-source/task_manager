@@ -1,22 +1,30 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Gamified Task Manager API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: tasks
+    description: Task management
+  - name: checklist
+    description: Task checklist items
+  - name: focus
+    description: Focus sessions
+  - name: user
+    description: User stats and profile
+  - name: analytics
+    description: Analytics and achievements
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +32,333 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List all tasks
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [todo, in_progress, completed]
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [critical, high, medium, low]
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [priority, dueDate, vpValue, createdAt]
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Create a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: Get a task by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateTask
+      tags: [tasks]
+      summary: Update a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+    delete:
+      operationId: deleteTask
+      tags: [tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /tasks/{id}/complete:
+    post:
+      operationId: completeTask
+      tags: [tasks]
+      summary: Mark a task as complete and award VP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Completed task with VP award info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskCompleteResult"
+
+  /tasks/{id}/checklist:
+    get:
+      operationId: listChecklistItems
+      tags: [checklist]
+      summary: List checklist items for a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Checklist items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChecklistItem"
+    post:
+      operationId: createChecklistItem
+      tags: [checklist]
+      summary: Add a checklist item to a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistItemInput"
+      responses:
+        "201":
+          description: Created checklist item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+
+  /checklist/{itemId}:
+    patch:
+      operationId: updateChecklistItem
+      tags: [checklist]
+      summary: Update a checklist item (toggle complete)
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistItemUpdate"
+      responses:
+        "200":
+          description: Updated checklist item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+    delete:
+      operationId: deleteChecklistItem
+      tags: [checklist]
+      summary: Delete a checklist item
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /focus-sessions:
+    get:
+      operationId: listFocusSessions
+      tags: [focus]
+      summary: List focus sessions
+      responses:
+        "200":
+          description: Focus sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FocusSession"
+    post:
+      operationId: createFocusSession
+      tags: [focus]
+      summary: Start a new focus session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FocusSessionInput"
+      responses:
+        "201":
+          description: Created focus session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FocusSession"
+
+  /focus-sessions/{id}/complete:
+    post:
+      operationId: completeFocusSession
+      tags: [focus]
+      summary: Complete a focus session and award bonus VP
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Completed focus session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FocusSession"
+
+  /user/stats:
+    get:
+      operationId: getUserStats
+      tags: [user]
+      summary: Get current user stats (VP, tier, streak, multiplier)
+      responses:
+        "200":
+          description: User stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  /analytics/summary:
+    get:
+      operationId: getAnalyticsSummary
+      tags: [analytics]
+      summary: Get analytics summary (velocity, milestones, streaks)
+      responses:
+        "200":
+          description: Analytics summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsSummary"
+
+  /analytics/velocity:
+    get:
+      operationId: getVelocityChart
+      tags: [analytics]
+      summary: Get daily VP velocity over the past 30 days
+      responses:
+        "200":
+          description: Daily velocity data points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VelocityPoint"
+
+  /analytics/milestones:
+    get:
+      operationId: getMilestones
+      tags: [analytics]
+      summary: Get achieved milestones
+      responses:
+        "200":
+          description: Milestones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Milestone"
+
+  /dashboard/overview:
+    get:
+      operationId: getDashboardOverview
+      tags: [analytics]
+      summary: Get dashboard overview (task counts by status, today's tasks, upcoming deadlines)
+      responses:
+        "200":
+          description: Dashboard overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardOverview"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +366,240 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    Task:
+      type: object
+      required: [id, title, status, priority, vpValue, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [todo, in_progress, completed]
+        priority:
+          type: string
+          enum: [critical, high, medium, low]
+        vpValue:
+          type: integer
+        dueDate:
+          type: ["string", "null"]
+        calendarDate:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        checklistCount:
+          type: integer
+        checklistCompleted:
+          type: integer
+
+    TaskInput:
+      type: object
+      required: [title, priority]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [critical, high, medium, low]
+        dueDate:
+          type: string
+        calendarDate:
+          type: string
+        vpValue:
+          type: integer
+
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        status:
+          type: string
+          enum: [todo, in_progress, completed]
+        priority:
+          type: string
+          enum: [critical, high, medium, low]
+        dueDate:
+          type: string
+        calendarDate:
+          type: string
+        vpValue:
+          type: integer
+
+    TaskCompleteResult:
+      type: object
+      required: [task, vpAwarded, multiplier, newTotal, tierUp]
+      properties:
+        task:
+          $ref: "#/components/schemas/Task"
+        vpAwarded:
+          type: integer
+        multiplier:
+          type: number
+        newTotal:
+          type: integer
+        tierUp:
+          type: boolean
+        newTier:
+          type: ["integer", "null"]
+
+    ChecklistItem:
+      type: object
+      required: [id, taskId, title, completed]
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: integer
+        title:
+          type: string
+        completed:
+          type: boolean
+        createdAt:
+          type: string
+
+    ChecklistItemInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+
+    ChecklistItemUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        completed:
+          type: boolean
+
+    FocusSession:
+      type: object
+      required: [id, durationMinutes, status, createdAt]
+      properties:
+        id:
+          type: integer
+        durationMinutes:
+          type: integer
+        status:
+          type: string
+          enum: [active, completed, abandoned]
+        vpAwarded:
+          type: ["integer", "null"]
+        startedAt:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    FocusSessionInput:
+      type: object
+      required: [durationMinutes]
+      properties:
+        durationMinutes:
+          type: integer
+          minimum: 1
+
+    UserStats:
+      type: object
+      required: [totalVp, tier, tierProgress, streakDays, multiplier, tasksCompleted, focusMinutes]
+      properties:
+        totalVp:
+          type: integer
+        tier:
+          type: integer
+        tierProgress:
+          type: integer
+        streakDays:
+          type: integer
+        multiplier:
+          type: number
+        tasksCompleted:
+          type: integer
+        focusMinutes:
+          type: integer
+
+    AnalyticsSummary:
+      type: object
+      required: [totalVp, tier, streakDays, tasksCompleted, focusMinutes, avgDailyVp, topPriorityCompleted]
+      properties:
+        totalVp:
+          type: integer
+        tier:
+          type: integer
+        streakDays:
+          type: integer
+        tasksCompleted:
+          type: integer
+        focusMinutes:
+          type: integer
+        avgDailyVp:
+          type: number
+        topPriorityCompleted:
+          type: integer
+
+    VelocityPoint:
+      type: object
+      required: [date, vp, tasksCompleted]
+      properties:
+        date:
+          type: string
+        vp:
+          type: integer
+        tasksCompleted:
+          type: integer
+
+    Milestone:
+      type: object
+      required: [id, title, description, achievedAt, vpThreshold]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        achievedAt:
+          type: string
+        vpThreshold:
+          type: integer
+
+    DashboardOverview:
+      type: object
+      required: [totalTasks, todoCount, inProgressCount, completedCount, criticalCount, todayTasks, upcomingTasks, userStats]
+      properties:
+        totalTasks:
+          type: integer
+        todoCount:
+          type: integer
+        inProgressCount:
+          type: integer
+        completedCount:
+          type: integer
+        criticalCount:
+          type: integer
+        todayTasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        upcomingTasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        userStats:
+          $ref: "#/components/schemas/UserStats"
