@@ -24,14 +24,14 @@ import {
 const PRIORITY_COLORS: Record<string, string> = {
   critical: 'text-rose-600 bg-rose-50 border-rose-200',
   high: 'text-amber-600 bg-amber-50 border-amber-200',
-  medium: 'text-blue-600 bg-blue-50 border-blue-200',
+  medium: 'text-zinc-600 bg-zinc-50 border-zinc-200',
   low: 'text-slate-500 bg-slate-50 border-slate-200',
 };
 
 const PRIORITY_DOT: Record<string, string> = {
   critical: 'bg-rose-500',
   high: 'bg-amber-500',
-  medium: 'bg-blue-500',
+  medium: 'bg-zinc-400',
   low: 'bg-slate-400',
 };
 
@@ -223,14 +223,14 @@ export default function Dashboard() {
           {
             label: 'Active Quests',
             value: `${totalActive > 0 ? 1 : 0}/${totalActive}`,
-            icon: <Target className="w-4 h-4 text-blue-500" />,
-            color: 'text-blue-600',
+            icon: <Target className="w-4 h-4 text-foreground" />,
+            color: 'text-foreground',
           },
           {
             label: 'Focus Multiplier',
             value: `${stats.multiplier}×`,
-            icon: <BarChart3 className="w-4 h-4 text-violet-500" />,
-            color: 'text-violet-600',
+            icon: <BarChart3 className="w-4 h-4 text-foreground" />,
+            color: 'text-foreground',
           },
         ].map((stat, i) => (
           <motion.div
