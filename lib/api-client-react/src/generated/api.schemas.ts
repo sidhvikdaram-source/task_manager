@@ -186,6 +186,22 @@ export interface Milestone {
   vpThreshold: number;
 }
 
+export interface DailyHabit {
+  id: number;
+  title: string;
+  sortOrder: number;
+  createdAt: string;
+  completedToday: boolean;
+}
+
+export interface DailyHabitInput {
+  title: string;
+}
+
+export interface ToggleHabitResult {
+  completedToday: boolean;
+}
+
 export interface DashboardOverview {
   totalTasks: number;
   todoCount: number;

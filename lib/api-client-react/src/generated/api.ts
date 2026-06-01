@@ -24,6 +24,8 @@ import type {
   ChecklistItem,
   ChecklistItemInput,
   ChecklistItemUpdate,
+  DailyHabit,
+  DailyHabitInput,
   DashboardOverview,
   FocusSession,
   FocusSessionInput,
@@ -34,6 +36,7 @@ import type {
   TaskCompleteResult,
   TaskInput,
   TaskUpdate,
+  ToggleHabitResult,
   UserStats,
   VelocityPoint
 } from './api.schemas';
@@ -1464,4 +1467,292 @@ export function useGetDashboardOverview<TData = Awaited<ReturnType<typeof getDas
 
 
 
+
+export const getListDailyHabitsUrl = () => {
+
+
+
+
+  return `/api/daily-habits`
+}
+
+/**
+ * @summary List all daily habits with today's completion status
+ */
+export const listDailyHabits = async ( options?: RequestInit): Promise<DailyHabit[]> => {
+
+  return customFetch<DailyHabit[]>(getListDailyHabitsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListDailyHabitsQueryKey = () => {
+    return [
+    `/api/daily-habits`
+    ] as const;
+    }
+
+
+export const getListDailyHabitsQueryOptions = <TData = Awaited<ReturnType<typeof listDailyHabits>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDailyHabits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListDailyHabitsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDailyHabits>>> = ({ signal }) => listDailyHabits({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDailyHabits>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListDailyHabitsQueryResult = NonNullable<Awaited<ReturnType<typeof listDailyHabits>>>
+export type ListDailyHabitsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all daily habits with today's completion status
+ */
+
+export function useListDailyHabits<TData = Awaited<ReturnType<typeof listDailyHabits>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDailyHabits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListDailyHabitsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateDailyHabitUrl = () => {
+
+
+
+
+  return `/api/daily-habits`
+}
+
+/**
+ * @summary Create a new daily habit
+ */
+export const createDailyHabit = async (dailyHabitInput: DailyHabitInput, options?: RequestInit): Promise<DailyHabit> => {
+
+  return customFetch<DailyHabit>(getCreateDailyHabitUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      dailyHabitInput,)
+  }
+);}
+
+
+
+
+export const getCreateDailyHabitMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDailyHabit>>, TError,{data: BodyType<DailyHabitInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createDailyHabit>>, TError,{data: BodyType<DailyHabitInput>}, TContext> => {
+
+const mutationKey = ['createDailyHabit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDailyHabit>>, {data: BodyType<DailyHabitInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createDailyHabit(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateDailyHabitMutationResult = NonNullable<Awaited<ReturnType<typeof createDailyHabit>>>
+    export type CreateDailyHabitMutationBody = BodyType<DailyHabitInput>
+    export type CreateDailyHabitMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new daily habit
+ */
+export const useCreateDailyHabit = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDailyHabit>>, TError,{data: BodyType<DailyHabitInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createDailyHabit>>,
+        TError,
+        {data: BodyType<DailyHabitInput>},
+        TContext
+      > => {
+      return useMutation(getCreateDailyHabitMutationOptions(options));
+    }
+
+export const getToggleDailyHabitUrl = (habitId: number,) => {
+
+
+
+
+  return `/api/daily-habits/${habitId}/toggle`
+}
+
+/**
+ * @summary Toggle today's completion for a habit
+ */
+export const toggleDailyHabit = async (habitId: number, options?: RequestInit): Promise<ToggleHabitResult> => {
+
+  return customFetch<ToggleHabitResult>(getToggleDailyHabitUrl(habitId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getToggleDailyHabitMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleDailyHabit>>, TError,{habitId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleDailyHabit>>, TError,{habitId: number}, TContext> => {
+
+const mutationKey = ['toggleDailyHabit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleDailyHabit>>, {habitId: number}> = (props) => {
+          const {habitId} = props ?? {};
+
+          return  toggleDailyHabit(habitId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleDailyHabitMutationResult = NonNullable<Awaited<ReturnType<typeof toggleDailyHabit>>>
+
+    export type ToggleDailyHabitMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Toggle today's completion for a habit
+ */
+export const useToggleDailyHabit = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleDailyHabit>>, TError,{habitId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleDailyHabit>>,
+        TError,
+        {habitId: number},
+        TContext
+      > => {
+      return useMutation(getToggleDailyHabitMutationOptions(options));
+    }
+
+export const getDeleteDailyHabitUrl = (habitId: number,) => {
+
+
+
+
+  return `/api/daily-habits/${habitId}`
+}
+
+/**
+ * @summary Delete a daily habit
+ */
+export const deleteDailyHabit = async (habitId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteDailyHabitUrl(habitId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteDailyHabitMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDailyHabit>>, TError,{habitId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteDailyHabit>>, TError,{habitId: number}, TContext> => {
+
+const mutationKey = ['deleteDailyHabit'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteDailyHabit>>, {habitId: number}> = (props) => {
+          const {habitId} = props ?? {};
+
+          return  deleteDailyHabit(habitId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteDailyHabitMutationResult = NonNullable<Awaited<ReturnType<typeof deleteDailyHabit>>>
+
+    export type DeleteDailyHabitMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a daily habit
+ */
+export const useDeleteDailyHabit = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDailyHabit>>, TError,{habitId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteDailyHabit>>,
+        TError,
+        {habitId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteDailyHabitMutationOptions(options));
+    }
 

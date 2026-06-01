@@ -5,6 +5,7 @@ import checklistRouter from "./checklist";
 import focusRouter from "./focus";
 import userRouter from "./user";
 import analyticsRouter from "./analytics";
+import habitsRouter from "./habits";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(checklistRouter);
 router.use(focusRouter);
 router.use(userRouter);
 router.use(analyticsRouter);
+router.use(habitsRouter);
 
 export default router;

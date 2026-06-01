@@ -361,3 +361,44 @@ export const GetDashboardOverviewResponse = zod.object({
 })
 
 
+/**
+ * @summary List all daily habits with today's completion status
+ */
+export const ListDailyHabitsResponseItem = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string(),
+  "completedToday": zod.boolean()
+})
+export const ListDailyHabitsResponse = zod.array(ListDailyHabitsResponseItem)
+
+
+/**
+ * @summary Create a new daily habit
+ */
+export const CreateDailyHabitBody = zod.object({
+  "title": zod.string()
+})
+
+
+/**
+ * @summary Toggle today's completion for a habit
+ */
+export const ToggleDailyHabitParams = zod.object({
+  "habitId": zod.coerce.number()
+})
+
+export const ToggleDailyHabitResponse = zod.object({
+  "completedToday": zod.boolean()
+})
+
+
+/**
+ * @summary Delete a daily habit
+ */
+export const DeleteDailyHabitParams = zod.object({
+  "habitId": zod.coerce.number()
+})
+
+

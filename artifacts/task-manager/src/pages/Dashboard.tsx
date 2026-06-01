@@ -13,6 +13,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { TaskDetailsModal } from '@/components/TaskDetailsModal';
 import { IntroAnimation } from '@/components/IntroAnimation';
+import { DailyChecklist } from '@/components/DailyChecklist';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -481,6 +482,9 @@ export default function Dashboard() {
                     </Button>
                   </motion.div>
                 )}
+
+                {/* Daily Habits */}
+                <DailyChecklist />
               </div>
 
               {/* Right Panel */}

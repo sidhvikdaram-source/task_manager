@@ -19,6 +19,8 @@ tags:
     description: User stats and profile
   - name: analytics
     description: Analytics and achievements
+  - name: habits
+    description: Daily recurring habits
 paths:
   /healthz:
     get:
@@ -359,6 +361,72 @@ paths:
               schema:
                 $ref: "#/components/schemas/DashboardOverview"
 
+  /daily-habits:
+    get:
+      operationId: listDailyHabits
+      tags: [habits]
+      summary: List all daily habits with today's completion status
+      responses:
+        "200":
+          description: List of daily habits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DailyHabit"
+    post:
+      operationId: createDailyHabit
+      tags: [habits]
+      summary: Create a new daily habit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailyHabitInput"
+      responses:
+        "201":
+          description: Created habit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyHabit"
+
+  /daily-habits/{habitId}/toggle:
+    post:
+      operationId: toggleDailyHabit
+      tags: [habits]
+      summary: Toggle today's completion for a habit
+      parameters:
+        - name: habitId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Toggle result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToggleHabitResult"
+
+  /daily-habits/{habitId}:
+    delete:
+      operationId: deleteDailyHabit
+      tags: [habits]
+      summary: Delete a daily habit
+      parameters:
+        - name: habitId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     HealthStatus:
@@ -578,6 +646,35 @@ components:
           type: string
         vpThreshold:
           type: integer
+
+    DailyHabit:
+      type: object
+      required: [id, title, sortOrder, createdAt, completedToday]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+        completedToday:
+          type: boolean
+
+    DailyHabitInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+
+    ToggleHabitResult:
+      type: object
+      required: [completedToday]
+      properties:
+        completedToday:
+          type: boolean
 
     DashboardOverview:
       type: object
