@@ -55,13 +55,24 @@ export function useAuth(): AuthState {
     };
   }, []);
 
+  const isEmbedded = window.self !== window.top;
+
   const login = useCallback(() => {
-    window.location.href = "/api/login?returnTo=/";
-  }, []);
+    if (isEmbedded) {
+      window.open(window.location.origin + "/", "_blank", "noopener,noreferrer");
+    } else {
+      window.location.href = "/api/login?returnTo=/";
+    }
+  }, [isEmbedded]);
 
   const logout = useCallback(() => {
-    window.location.href = "/api/logout";
-  }, []);
+    if (isEmbedded) {
+      fetch("/api/auth/session-logout", { method: "POST", credentials: "include" })
+        .finally(() => setUser(null));
+    } else {
+      window.location.href = "/api/logout";
+    }
+  }, [isEmbedded]);
 
   return {
     user,
