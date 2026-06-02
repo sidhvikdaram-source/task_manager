@@ -16,6 +16,9 @@ const queryClient = new QueryClient();
 
 function LoginScreen() {
   const { login } = useAuth();
+  const isEmbedded = window.self !== window.top;
+  const appUrl = window.location.origin + (import.meta.env.BASE_URL ?? "/");
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="text-center space-y-6 max-w-sm px-6">
@@ -31,9 +34,24 @@ function LoginScreen() {
             Complete tasks, earn VP, and level up your productivity.
           </p>
         </div>
-        <Button onClick={login} size="lg" className="w-full">
-          Log in to get started
-        </Button>
+        {isEmbedded ? (
+          <>
+            <Button
+              onClick={() => window.open(appUrl, "_blank", "noopener,noreferrer")}
+              size="lg"
+              className="w-full"
+            >
+              Open Velocity ↗
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Log in there, then come back here — the embed will update automatically.
+            </p>
+          </>
+        ) : (
+          <Button onClick={login} size="lg" className="w-full">
+            Log in to get started
+          </Button>
+        )}
       </div>
     </div>
   );
