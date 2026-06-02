@@ -1,9 +1,10 @@
-import { pgTable, text, serial, timestamp, integer, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, date, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const dailyHabitsTable = pgTable("daily_habits", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id"),
   title: text("title").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

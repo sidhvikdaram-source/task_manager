@@ -4,3 +4,5 @@ export * from "./focus";
 export * from "./user";
 export * from "./milestones";
 export * from "./habits";
+export * from "./projects";
+export * from "./auth";

@@ -12,6 +12,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { TaskDetailsModal } from '@/components/TaskDetailsModal';
+import { OverdueTriageModal } from '@/components/OverdueTriageModal';
 import { IntroAnimation } from '@/components/IntroAnimation';
 import { DailyChecklist } from '@/components/DailyChecklist';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -161,9 +162,28 @@ export default function Dashboard() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [completingId, setCompletingId] = useState<number | null>(null);
+  const [showOverdueTriage, setShowOverdueTriage] = useState(false);
   const [introDone, setIntroDone] = useState(() => {
     try { return sessionStorage.getItem('velocity-intro-seen') === '1'; } catch { return true; }
   });
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const overdueTasks = (allTasks ?? []).filter(
+    (t) => t.status !== 'completed' && t.dueDate && t.dueDate < today
+  );
+
+  useEffect(() => {
+    if (!tasksLoading && overdueTasks.length > 0) {
+      const key = 'velocity-overdue-seen-' + today;
+      try {
+        if (!sessionStorage.getItem(key)) {
+          sessionStorage.setItem(key, '1');
+          setShowOverdueTriage(true);
+        }
+      } catch { /* ignore */ }
+    }
+  }, [tasksLoading]);
 
   const isLoading = overviewLoading || tasksLoading;
 
@@ -654,6 +674,13 @@ export default function Dashboard() {
                 taskId={selectedTask.id}
                 open={!!selectedTask}
                 onOpenChange={(open) => { if (!open) setSelectedTask(null); }}
+              />
+            )}
+            {overdueTasks.length > 0 && (
+              <OverdueTriageModal
+                open={showOverdueTriage}
+                onOpenChange={setShowOverdueTriage}
+                overdueTasks={overdueTasks}
               />
             )}
           </motion.div>

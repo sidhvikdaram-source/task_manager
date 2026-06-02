@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, asc, and } from "drizzle-orm";
-import { db, tasksTable, checklistItemsTable, userStatsTable } from "@workspace/db";
+import { eq, desc, asc, and, inArray } from "drizzle-orm";
+import { db, tasksTable, checklistItemsTable, userStatsTable, milestonesTable } from "@workspace/db";
 import {
   ListTasksQueryParams,
   CreateTaskBody,
@@ -9,19 +9,23 @@ import {
   UpdateTaskBody,
   DeleteTaskParams,
   CompleteTaskParams,
+  BulkRescheduleBody,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
-async function getOrCreateUserStats() {
-  const [stats] = await db.select().from(userStatsTable).limit(1);
+async function getOrCreateUserStats(userId: string) {
+  const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
   if (stats) return stats;
-  const [newStats] = await db.insert(userStatsTable).values({}).returning();
+  const [newStats] = await db.insert(userStatsTable).values({ userId }).returning();
   return newStats;
 }
 
-async function getTaskWithCounts(id: number) {
-  const [task] = await db.select().from(tasksTable).where(eq(tasksTable.id, id));
+async function getTaskWithCounts(id: number, userId: string) {
+  const [task] = await db
+    .select()
+    .from(tasksTable)
+    .where(and(eq(tasksTable.id, id), eq(tasksTable.userId, userId)));
   if (!task) return null;
   const items = await db.select().from(checklistItemsTable).where(eq(checklistItemsTable.taskId, id));
   return {
@@ -32,21 +36,22 @@ async function getTaskWithCounts(id: number) {
 }
 
 router.get("/tasks", async (req, res): Promise<void> => {
-  const parsed = ListTasksQueryParams.safeParse(req.query);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
 
-  const { status, priority, sortBy } = parsed.data;
-  const conditions = [];
+  const parsed = ListTasksQueryParams.safeParse(req.query);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const { status, priority, sortBy, projectId } = parsed.data;
+  const conditions: ReturnType<typeof eq>[] = [eq(tasksTable.userId, userId)];
   if (status) conditions.push(eq(tasksTable.status, status));
   if (priority) conditions.push(eq(tasksTable.priority, priority));
+  if (projectId) conditions.push(eq(tasksTable.projectId, projectId));
 
   const tasks = await db
     .select()
     .from(tasksTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(
       sortBy === "dueDate" ? asc(tasksTable.dueDate) :
       sortBy === "vpValue" ? desc(tasksTable.vpValue) :
@@ -57,21 +62,17 @@ router.get("/tasks", async (req, res): Promise<void> => {
   const allItems = await db.select().from(checklistItemsTable);
   const result = tasks.map((t) => {
     const items = allItems.filter((i) => i.taskId === t.id);
-    return {
-      ...t,
-      checklistCount: items.length,
-      checklistCompleted: items.filter((i) => i.completed).length,
-    };
+    return { ...t, checklistCount: items.length, checklistCompleted: items.filter((i) => i.completed).length };
   });
   res.json(result);
 });
 
 router.post("/tasks", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+
   const parsed = CreateTaskBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const vpValue = parsed.data.vpValue ?? (
     parsed.data.priority === "critical" ? 25 :
@@ -79,89 +80,86 @@ router.post("/tasks", async (req, res): Promise<void> => {
     parsed.data.priority === "medium" ? 10 : 5
   );
 
-  const [task] = await db.insert(tasksTable).values({
-    ...parsed.data,
-    vpValue,
-  }).returning();
-
+  const [task] = await db.insert(tasksTable).values({ ...parsed.data, vpValue, userId }).returning();
   res.status(201).json({ ...task, checklistCount: 0, checklistCompleted: 0 });
 });
 
-router.get("/tasks/:id", async (req, res): Promise<void> => {
-  const params = GetTaskParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+router.patch("/tasks/bulk-reschedule", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
 
-  const task = await getTaskWithCounts(params.data.id);
-  if (!task) {
-    res.status(404).json({ error: "Task not found" });
-    return;
-  }
+  const parsed = BulkRescheduleBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const { taskIds, newDate } = parsed.data;
+  const updated = await db
+    .update(tasksTable)
+    .set({ dueDate: newDate })
+    .where(and(inArray(tasksTable.id, taskIds), eq(tasksTable.userId, userId)))
+    .returning();
+
+  res.json({ updated: updated.length });
+});
+
+router.get("/tasks/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const params = GetTaskParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+
+  const task = await getTaskWithCounts(params.data.id, req.user.id);
+  if (!task) { res.status(404).json({ error: "Task not found" }); return; }
   res.json(task);
 });
 
 router.patch("/tasks/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+
   const params = UpdateTaskParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const parsed = UpdateTaskBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const [task] = await db
     .update(tasksTable)
     .set(parsed.data)
-    .where(eq(tasksTable.id, params.data.id))
+    .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)))
     .returning();
 
-  if (!task) {
-    res.status(404).json({ error: "Task not found" });
-    return;
-  }
-
-  const full = await getTaskWithCounts(task.id);
+  if (!task) { res.status(404).json({ error: "Task not found" }); return; }
+  const full = await getTaskWithCounts(task.id, userId);
   res.json(full);
 });
 
 router.delete("/tasks/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+
   const params = DeleteTaskParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const [task] = await db
     .delete(tasksTable)
-    .where(eq(tasksTable.id, params.data.id))
+    .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)))
     .returning();
 
-  if (!task) {
-    res.status(404).json({ error: "Task not found" });
-    return;
-  }
-
+  if (!task) { res.status(404).json({ error: "Task not found" }); return; }
   res.sendStatus(204);
 });
 
 router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
-  const params = CompleteTaskParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
 
-  const [existing] = await db.select().from(tasksTable).where(eq(tasksTable.id, params.data.id));
-  if (!existing) {
-    res.status(404).json({ error: "Task not found" });
-    return;
-  }
+  const params = CompleteTaskParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+
+  const [existing] = await db
+    .select()
+    .from(tasksTable)
+    .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)));
+  if (!existing) { res.status(404).json({ error: "Task not found" }); return; }
 
   const [task] = await db
     .update(tasksTable)
@@ -169,7 +167,7 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
     .where(eq(tasksTable.id, params.data.id))
     .returning();
 
-  const stats = await getOrCreateUserStats();
+  const stats = await getOrCreateUserStats(userId);
   const multiplier = stats.multiplier ?? 1.0;
   const rawVp = task.vpValue ?? 10;
   const vpAwarded = Math.round(rawVp * multiplier);
@@ -179,20 +177,18 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
   const newTier = stats.tier + tierUps;
   const remainingProgress = newTierProgress % 100;
 
-  // Update streak
   const today = new Date().toDateString();
   const lastActivity = stats.lastActivityDate ? new Date(stats.lastActivityDate).toDateString() : null;
   const yesterday = new Date(Date.now() - 86400000).toDateString();
   let newStreak = stats.streakDays;
   if (lastActivity === today) {
-    // same day, no change
+    // same day, streak unchanged
   } else if (lastActivity === yesterday) {
     newStreak = stats.streakDays + 1;
   } else {
     newStreak = 1;
   }
 
-  // Multiplier: 1.2x at 3 streak days, 1.5x at 7, 2.0x at 14
   let newMultiplier = 1.0;
   if (newStreak >= 14) newMultiplier = 2.0;
   else if (newStreak >= 7) newMultiplier = 1.5;
@@ -209,7 +205,6 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
     updatedAt: new Date(),
   }).where(eq(userStatsTable.id, stats.id));
 
-  // Check for new milestones
   const milestoneThresholds = [50, 100, 250, 500, 1000, 2500, 5000];
   for (const threshold of milestoneThresholds) {
     if (stats.totalVp < threshold && newTotal >= threshold) {
@@ -223,25 +218,12 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
         5000: ["Legendary Status", "5000 VP achieved"],
       };
       const [title, description] = titles[threshold] ?? [`${threshold} VP`, `Reached ${threshold} VP`];
-      const { milestonesTable } = await import("@workspace/db");
-      await db.insert(milestonesTable).values({
-        title,
-        description,
-        vpThreshold: threshold,
-        achievedAt: new Date(),
-      });
+      await db.insert(milestonesTable).values({ title, description, vpThreshold: threshold, achievedAt: new Date(), userId });
     }
   }
 
-  const full = await getTaskWithCounts(task.id);
-  res.json({
-    task: full,
-    vpAwarded,
-    multiplier,
-    newTotal,
-    tierUp: tierUps > 0,
-    newTier: tierUps > 0 ? newTier : null,
-  });
+  const full = await getTaskWithCounts(task.id, userId);
+  res.json({ task: full, vpAwarded, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null });
 });
 
 export default router;

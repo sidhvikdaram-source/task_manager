@@ -28,6 +28,11 @@ export const TaskPriority = {
   low: 'low',
 } as const;
 
+export interface TaskLink {
+  url: string;
+  label?: string;
+}
+
 export interface Task {
   id: number;
   title: string;
@@ -39,10 +44,22 @@ export interface Task {
   /** @nullable */
   dueDate?: string | null;
   /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
   calendarDate?: string | null;
   /** @nullable */
   completedAt?: string | null;
   createdAt: string;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  estimatedMinutes?: number | null;
+  /** @nullable */
+  actualMinutes?: number | null;
+  /** @nullable */
+  links?: TaskLink[] | null;
+  /** @nullable */
+  notes?: string | null;
   checklistCount?: number;
   checklistCompleted?: number;
 }
@@ -63,8 +80,14 @@ export interface TaskInput {
   description?: string;
   priority: TaskInputPriority;
   dueDate?: string;
+  startDate?: string;
   calendarDate?: string;
   vpValue?: number;
+  projectId?: number;
+  /** @minimum 1 */
+  estimatedMinutes?: number;
+  notes?: string;
+  links?: TaskLink[];
 }
 
 export type TaskUpdateStatus = typeof TaskUpdateStatus[keyof typeof TaskUpdateStatus];
@@ -93,8 +116,16 @@ export interface TaskUpdate {
   status?: TaskUpdateStatus;
   priority?: TaskUpdatePriority;
   dueDate?: string;
+  startDate?: string;
   calendarDate?: string;
   vpValue?: number;
+  projectId?: number;
+  /** @minimum 1 */
+  estimatedMinutes?: number;
+  /** @minimum 0 */
+  actualMinutes?: number;
+  notes?: string;
+  links?: TaskLink[];
 }
 
 export interface TaskCompleteResult {
@@ -105,6 +136,16 @@ export interface TaskCompleteResult {
   tierUp: boolean;
   /** @nullable */
   newTier?: number | null;
+}
+
+export interface BulkRescheduleInput {
+  /** @minItems 1 */
+  taskIds: number[];
+  newDate: string;
+}
+
+export interface BulkRescheduleResult {
+  updated: number;
 }
 
 export interface ChecklistItem {
@@ -202,6 +243,41 @@ export interface ToggleHabitResult {
   completedToday: boolean;
 }
 
+export type ProjectType = typeof ProjectType[keyof typeof ProjectType];
+
+
+export const ProjectType = {
+  class: 'class',
+  project: 'project',
+} as const;
+
+export interface Project {
+  id: number;
+  name: string;
+  color: string;
+  type: ProjectType;
+  /** @nullable */
+  emoji?: string | null;
+  createdAt: string;
+  taskCount?: number;
+}
+
+export type ProjectInputType = typeof ProjectInputType[keyof typeof ProjectInputType];
+
+
+export const ProjectInputType = {
+  class: 'class',
+  project: 'project',
+} as const;
+
+export interface ProjectInput {
+  /** @minLength 1 */
+  name: string;
+  color?: string;
+  type?: ProjectInputType;
+  emoji?: string;
+}
+
 export interface DashboardOverview {
   totalTasks: number;
   todoCount: number;
@@ -213,10 +289,57 @@ export interface DashboardOverview {
   userStats: UserStats;
 }
 
+export interface AuthUser {
+  id: string;
+  /** @nullable */
+  email: string | null;
+  /** @nullable */
+  firstName: string | null;
+  /** @nullable */
+  lastName: string | null;
+  /** @nullable */
+  profileImageUrl: string | null;
+}
+
+export interface AuthUserEnvelope {
+  user: AuthUser | null;
+}
+
+export interface MobileTokenExchangeRequest {
+  /** @minLength 1 */
+  code: string;
+  /** @minLength 1 */
+  code_verifier: string;
+  /** @minLength 1 */
+  redirect_uri: string;
+  /** @minLength 1 */
+  state: string;
+  /** @minLength 1 */
+  nonce?: string;
+}
+
+export interface MobileTokenExchangeSuccess {
+  token: string;
+}
+
+export interface LogoutSuccess {
+  success: boolean;
+}
+
+export interface ErrorEnvelope {
+  error: string;
+}
+
+/**
+ * Opaque session token — Bearer <sid>.
+ */
+export type AuthorizationSessionHeaderParameter = string;
+
 export type ListTasksParams = {
 status?: ListTasksStatus;
 priority?: ListTasksPriority;
 sortBy?: ListTasksSortBy;
+projectId?: number;
 };
 
 export type ListTasksStatus = typeof ListTasksStatus[keyof typeof ListTasksStatus];
@@ -247,4 +370,13 @@ export const ListTasksSortBy = {
   vpValue: 'vpValue',
   createdAt: 'createdAt',
 } as const;
+
+export type BeginBrowserLoginParams = {
+returnTo?: string;
+};
+
+export type HandleBrowserLoginCallbackParams = {
+code?: string;
+state?: string;
+};
 

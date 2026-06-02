@@ -21,6 +21,10 @@ tags:
     description: Analytics and achievements
   - name: habits
     description: Daily recurring habits
+  - name: projects
+    description: Projects and classes
+  - name: Auth
+    description: Browser and mobile authentication endpoints.
 paths:
   /healthz:
     get:
@@ -56,6 +60,10 @@ paths:
           schema:
             type: string
             enum: [priority, dueDate, vpValue, createdAt]
+        - name: projectId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of tasks
@@ -82,6 +90,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Task"
+
+  /tasks/bulk-reschedule:
+    patch:
+      operationId: bulkReschedule
+      tags: [tasks]
+      summary: Move multiple tasks to a new due date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRescheduleInput"
+      responses:
+        "200":
+          description: Reschedule result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkRescheduleResult"
 
   /tasks/{id}:
     get:
@@ -427,7 +454,190 @@ paths:
         "204":
           description: Deleted
 
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects and classes
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new project or class
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project (tasks are un-assigned)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the returnTo path on success.
+
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to the OIDC provider logout URL.
+
+  /mobile-auth/token-exchange:
+    post:
+      tags: [Auth]
+      operationId: exchangeMobileAuthorizationCode
+      summary: Exchange a mobile OIDC code for a session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MobileTokenExchangeRequest'
+      responses:
+        '200':
+          description: Session created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MobileTokenExchangeSuccess'
+
+  /mobile-auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logoutMobileSession
+      summary: Delete a mobile session token
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+      responses:
+        '200':
+          description: Logout processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccess'
+
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      description: Opaque session token — Bearer <sid>.
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      description: Browser session cookie.
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
@@ -456,12 +666,26 @@ components:
           type: integer
         dueDate:
           type: ["string", "null"]
+        startDate:
+          type: ["string", "null"]
         calendarDate:
           type: ["string", "null"]
         completedAt:
           type: ["string", "null"]
         createdAt:
           type: string
+        projectId:
+          type: ["integer", "null"]
+        estimatedMinutes:
+          type: ["integer", "null"]
+        actualMinutes:
+          type: ["integer", "null"]
+        links:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/TaskLink"
+        notes:
+          type: ["string", "null"]
         checklistCount:
           type: integer
         checklistCompleted:
@@ -481,10 +705,23 @@ components:
           enum: [critical, high, medium, low]
         dueDate:
           type: string
+        startDate:
+          type: string
         calendarDate:
           type: string
         vpValue:
           type: integer
+        projectId:
+          type: integer
+        estimatedMinutes:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskLink"
 
     TaskUpdate:
       type: object
@@ -502,10 +739,35 @@ components:
           enum: [critical, high, medium, low]
         dueDate:
           type: string
+        startDate:
+          type: string
         calendarDate:
           type: string
         vpValue:
           type: integer
+        projectId:
+          type: integer
+        estimatedMinutes:
+          type: integer
+          minimum: 1
+        actualMinutes:
+          type: integer
+          minimum: 0
+        notes:
+          type: string
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskLink"
+
+    TaskLink:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+        label:
+          type: string
 
     TaskCompleteResult:
       type: object
@@ -523,6 +785,25 @@ components:
           type: boolean
         newTier:
           type: ["integer", "null"]
+
+    BulkRescheduleInput:
+      type: object
+      required: [taskIds, newDate]
+      properties:
+        taskIds:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+        newDate:
+          type: string
+
+    BulkRescheduleResult:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
 
     ChecklistItem:
       type: object
@@ -676,6 +957,41 @@ components:
         completedToday:
           type: boolean
 
+    Project:
+      type: object
+      required: [id, name, color, type, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+        type:
+          type: string
+          enum: [class, project]
+        emoji:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        taskCount:
+          type: integer
+
+    ProjectInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        color:
+          type: string
+        type:
+          type: string
+          enum: [class, project]
+        emoji:
+          type: string
+
     DashboardOverview:
       type: object
       required: [totalTasks, todoCount, inProgressCount, completedCount, criticalCount, todayTasks, upcomingTasks, userStats]
@@ -700,3 +1016,68 @@ components:
             $ref: "#/components/schemas/Task"
         userStats:
           $ref: "#/components/schemas/UserStats"
+
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: ["string", "null"]
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+
+    MobileTokenExchangeRequest:
+      type: object
+      required: [code, code_verifier, redirect_uri, state]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        code_verifier:
+          type: string
+          minLength: 1
+        redirect_uri:
+          type: string
+          minLength: 1
+        state:
+          type: string
+          minLength: 1
+        nonce:
+          type: string
+          minLength: 1
+
+    MobileTokenExchangeSuccess:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    LogoutSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

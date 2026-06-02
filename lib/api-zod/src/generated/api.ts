@@ -22,7 +22,8 @@ export const HealthCheckResponse = zod.object({
 export const ListTasksQueryParams = zod.object({
   "status": zod.enum(['todo', 'in_progress', 'completed']).optional(),
   "priority": zod.enum(['critical', 'high', 'medium', 'low']).optional(),
-  "sortBy": zod.enum(['priority', 'dueDate', 'vpValue', 'createdAt']).optional()
+  "sortBy": zod.enum(['priority', 'dueDate', 'vpValue', 'createdAt']).optional(),
+  "projectId": zod.coerce.number().optional()
 })
 
 export const ListTasksResponseItem = zod.object({
@@ -33,9 +34,18 @@ export const ListTasksResponseItem = zod.object({
   "priority": zod.enum(['critical', 'high', 'medium', 'low']),
   "vpValue": zod.number(),
   "dueDate": zod.string().nullish(),
+  "startDate": zod.string().nullish(),
   "calendarDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "projectId": zod.number().nullish(),
+  "estimatedMinutes": zod.number().nullish(),
+  "actualMinutes": zod.number().nullish(),
+  "links": zod.array(zod.object({
+  "url": zod.string(),
+  "label": zod.string().optional()
+})).nullish(),
+  "notes": zod.string().nullish(),
   "checklistCount": zod.number().optional(),
   "checklistCompleted": zod.number().optional()
 })
@@ -48,13 +58,38 @@ export const ListTasksResponse = zod.array(ListTasksResponseItem)
 
 
 
+
 export const CreateTaskBody = zod.object({
   "title": zod.string().min(1),
   "description": zod.string().optional(),
   "priority": zod.enum(['critical', 'high', 'medium', 'low']),
   "dueDate": zod.string().optional(),
+  "startDate": zod.string().optional(),
   "calendarDate": zod.string().optional(),
-  "vpValue": zod.number().optional()
+  "vpValue": zod.number().optional(),
+  "projectId": zod.number().optional(),
+  "estimatedMinutes": zod.number().min(1).optional(),
+  "notes": zod.string().optional(),
+  "links": zod.array(zod.object({
+  "url": zod.string(),
+  "label": zod.string().optional()
+})).optional()
+})
+
+
+/**
+ * @summary Move multiple tasks to a new due date
+ */
+
+
+
+export const BulkRescheduleBody = zod.object({
+  "taskIds": zod.array(zod.number()).min(1),
+  "newDate": zod.string()
+})
+
+export const BulkRescheduleResponse = zod.object({
+  "updated": zod.number()
 })
 
 
@@ -73,9 +108,18 @@ export const GetTaskResponse = zod.object({
   "priority": zod.enum(['critical', 'high', 'medium', 'low']),
   "vpValue": zod.number(),
   "dueDate": zod.string().nullish(),
+  "startDate": zod.string().nullish(),
   "calendarDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "projectId": zod.number().nullish(),
+  "estimatedMinutes": zod.number().nullish(),
+  "actualMinutes": zod.number().nullish(),
+  "links": zod.array(zod.object({
+  "url": zod.string(),
+  "label": zod.string().optional()
+})).nullish(),
+  "notes": zod.string().nullish(),
   "checklistCount": zod.number().optional(),
   "checklistCompleted": zod.number().optional()
 })
@@ -90,6 +134,9 @@ export const UpdateTaskParams = zod.object({
 
 
 
+export const updateTaskBodyActualMinutesMin = 0;
+
+
 
 export const UpdateTaskBody = zod.object({
   "title": zod.string().min(1).optional(),
@@ -97,8 +144,17 @@ export const UpdateTaskBody = zod.object({
   "status": zod.enum(['todo', 'in_progress', 'completed']).optional(),
   "priority": zod.enum(['critical', 'high', 'medium', 'low']).optional(),
   "dueDate": zod.string().optional(),
+  "startDate": zod.string().optional(),
   "calendarDate": zod.string().optional(),
-  "vpValue": zod.number().optional()
+  "vpValue": zod.number().optional(),
+  "projectId": zod.number().optional(),
+  "estimatedMinutes": zod.number().min(1).optional(),
+  "actualMinutes": zod.number().min(updateTaskBodyActualMinutesMin).optional(),
+  "notes": zod.string().optional(),
+  "links": zod.array(zod.object({
+  "url": zod.string(),
+  "label": zod.string().optional()
+})).optional()
 })
 
 export const UpdateTaskResponse = zod.object({
@@ -109,9 +165,18 @@ export const UpdateTaskResponse = zod.object({
   "priority": zod.enum(['critical', 'high', 'medium', 'low']),
   "vpValue": zod.number(),
   "dueDate": zod.string().nullish(),
+  "startDate": zod.string().nullish(),
   "calendarDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "projectId": zod.number().nullish(),
+  "estimatedMinutes": zod.number().nullish(),
+  "actualMinutes": zod.number().nullish(),
+  "links": zod.array(zod.object({
+  "url": zod.string(),
+  "label": zod.string().optional()
+})).nullish(),
+  "notes": zod.string().nullish(),
   "checklistCount": zod.number().optional(),
   "checklistCompleted": zod.number().optional()
 })
@@ -141,9 +206,18 @@ export const CompleteTaskResponse = zod.object({
   "priority": zod.enum(['critical', 'high', 'medium', 'low']),
   "vpValue": zod.number(),
   "dueDate": zod.string().nullish(),
+  "startDate": zod.string().nullish(),
   "calendarDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "projectId": zod.number().nullish(),
+  "estimatedMinutes": zod.number().nullish(),
+  "actualMinutes": zod.number().nullish(),
+  "links": zod.array(zod.object({
+  "url": zod.string(),
+  "label": zod.string().optional()
+})).nullish(),
+  "notes": zod.string().nullish(),
   "checklistCount": zod.number().optional(),
   "checklistCompleted": zod.number().optional()
 }),
@@ -329,9 +403,18 @@ export const GetDashboardOverviewResponse = zod.object({
   "priority": zod.enum(['critical', 'high', 'medium', 'low']),
   "vpValue": zod.number(),
   "dueDate": zod.string().nullish(),
+  "startDate": zod.string().nullish(),
   "calendarDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "projectId": zod.number().nullish(),
+  "estimatedMinutes": zod.number().nullish(),
+  "actualMinutes": zod.number().nullish(),
+  "links": zod.array(zod.object({
+  "url": zod.string(),
+  "label": zod.string().optional()
+})).nullish(),
+  "notes": zod.string().nullish(),
   "checklistCount": zod.number().optional(),
   "checklistCompleted": zod.number().optional()
 })),
@@ -343,9 +426,18 @@ export const GetDashboardOverviewResponse = zod.object({
   "priority": zod.enum(['critical', 'high', 'medium', 'low']),
   "vpValue": zod.number(),
   "dueDate": zod.string().nullish(),
+  "startDate": zod.string().nullish(),
   "calendarDate": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "projectId": zod.number().nullish(),
+  "estimatedMinutes": zod.number().nullish(),
+  "actualMinutes": zod.number().nullish(),
+  "links": zod.array(zod.object({
+  "url": zod.string(),
+  "label": zod.string().optional()
+})).nullish(),
+  "notes": zod.string().nullish(),
   "checklistCount": zod.number().optional(),
   "checklistCompleted": zod.number().optional()
 })),
@@ -399,6 +491,149 @@ export const ToggleDailyHabitResponse = zod.object({
  */
 export const DeleteDailyHabitParams = zod.object({
   "habitId": zod.coerce.number()
+})
+
+
+/**
+ * @summary List all projects and classes
+ */
+export const ListProjectsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "color": zod.string(),
+  "type": zod.enum(['class', 'project']),
+  "emoji": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "taskCount": zod.number().optional()
+})
+export const ListProjectsResponse = zod.array(ListProjectsResponseItem)
+
+
+/**
+ * @summary Create a new project or class
+ */
+
+
+
+export const CreateProjectBody = zod.object({
+  "name": zod.string().min(1),
+  "color": zod.string().optional(),
+  "type": zod.enum(['class', 'project']).optional(),
+  "emoji": zod.string().optional()
+})
+
+
+/**
+ * @summary Update a project
+ */
+export const UpdateProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateProjectBody = zod.object({
+  "name": zod.string().min(1),
+  "color": zod.string().optional(),
+  "type": zod.enum(['class', 'project']).optional(),
+  "emoji": zod.string().optional()
+})
+
+export const UpdateProjectResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "color": zod.string(),
+  "type": zod.enum(['class', 'project']),
+  "emoji": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "taskCount": zod.number().optional()
+})
+
+
+/**
+ * @summary Delete a project (tasks are un-assigned)
+ */
+export const DeleteProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Get the currently authenticated user
+ */
+export const GetCurrentAuthUserHeader = zod.object({
+  "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
+})
+
+export const GetCurrentAuthUserResponse = zod.object({
+  "user": zod.union([zod.object({
+  "id": zod.string(),
+  "email": zod.string().nullable(),
+  "firstName": zod.string().nullable(),
+  "lastName": zod.string().nullable(),
+  "profileImageUrl": zod.string().nullable()
+}),zod.null()])
+})
+
+
+/**
+ * @summary Start the browser OIDC login flow
+ */
+export const BeginBrowserLoginQueryParams = zod.object({
+  "returnTo": zod.coerce.string().optional()
+})
+
+
+/**
+ * @summary Complete the browser OIDC login flow
+ */
+export const HandleBrowserLoginCallbackQueryParams = zod.object({
+  "code": zod.coerce.string().optional(),
+  "state": zod.coerce.string().optional()
+})
+
+
+/**
+ * @summary Clear the session and begin OIDC logout
+ */
+export const LogoutBrowserSessionHeader = zod.object({
+  "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
+})
+
+
+/**
+ * @summary Exchange a mobile OIDC code for a session token
+ */
+
+
+
+
+
+
+
+export const ExchangeMobileAuthorizationCodeBody = zod.object({
+  "code": zod.string().min(1),
+  "code_verifier": zod.string().min(1),
+  "redirect_uri": zod.string().min(1),
+  "state": zod.string().min(1),
+  "nonce": zod.string().min(1).optional()
+})
+
+export const ExchangeMobileAuthorizationCodeResponse = zod.object({
+  "token": zod.string()
+})
+
+
+/**
+ * @summary Delete a mobile session token
+ */
+export const LogoutMobileSessionHeader = zod.object({
+  "Authorization": zod.string().optional().describe('Opaque session token — Bearer <sid>.')
+})
+
+export const LogoutMobileSessionResponse = zod.object({
+  "success": zod.boolean()
 })
 
 

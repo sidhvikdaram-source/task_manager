@@ -5,6 +5,7 @@
  * Gamified Task Manager API
  * OpenAPI spec version: 0.1.0
  */
+import type { TaskLink } from './taskLink';
 import type { TaskPriority } from './taskPriority';
 import type { TaskStatus } from './taskStatus';
 
@@ -19,10 +20,22 @@ export interface Task {
   /** @nullable */
   dueDate?: string | null;
   /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
   calendarDate?: string | null;
   /** @nullable */
   completedAt?: string | null;
   createdAt: string;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  estimatedMinutes?: number | null;
+  /** @nullable */
+  actualMinutes?: number | null;
+  /** @nullable */
+  links?: TaskLink[] | null;
+  /** @nullable */
+  notes?: string | null;
   checklistCount?: number;
   checklistCompleted?: number;
 }

@@ -5,6 +5,7 @@
  * Gamified Task Manager API
  * OpenAPI spec version: 0.1.0
  */
+import type { TaskLink } from './taskLink';
 import type { TaskUpdatePriority } from './taskUpdatePriority';
 import type { TaskUpdateStatus } from './taskUpdateStatus';
 
@@ -15,6 +16,14 @@ export interface TaskUpdate {
   status?: TaskUpdateStatus;
   priority?: TaskUpdatePriority;
   dueDate?: string;
+  startDate?: string;
   calendarDate?: string;
   vpValue?: number;
+  projectId?: number;
+  /** @minimum 1 */
+  estimatedMinutes?: number;
+  /** @minimum 0 */
+  actualMinutes?: number;
+  notes?: string;
+  links?: TaskLink[];
 }

@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { TaskInputPriority } from './taskInputPriority';
+import type { TaskLink } from './taskLink';
 
 export interface TaskInput {
   /** @minLength 1 */
@@ -13,6 +14,12 @@ export interface TaskInput {
   description?: string;
   priority: TaskInputPriority;
   dueDate?: string;
+  startDate?: string;
   calendarDate?: string;
   vpValue?: number;
+  projectId?: number;
+  /** @minimum 1 */
+  estimatedMinutes?: number;
+  notes?: string;
+  links?: TaskLink[];
 }

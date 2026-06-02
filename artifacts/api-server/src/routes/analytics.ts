@@ -1,20 +1,25 @@
 import { Router, type IRouter } from "express";
 import { eq, gte, desc, and } from "drizzle-orm";
-import { db, tasksTable, userStatsTable, milestonesTable, focusSessionsTable } from "@workspace/db";
+import { db, tasksTable, userStatsTable, milestonesTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
-router.get("/analytics/summary", async (_req, res): Promise<void> => {
-  let [stats] = await db.select().from(userStatsTable).limit(1);
-  if (!stats) {
-    const [newStats] = await db.insert(userStatsTable).values({}).returning();
-    stats = newStats;
-  }
+async function getOrCreateUserStats(userId: string) {
+  const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
+  if (stats) return stats;
+  const [newStats] = await db.insert(userStatsTable).values({ userId }).returning();
+  return newStats;
+}
+
+router.get("/analytics/summary", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+  const stats = await getOrCreateUserStats(userId);
 
   const criticalCompleted = await db
     .select()
     .from(tasksTable)
-    .where(and(eq(tasksTable.status, "completed"), eq(tasksTable.priority, "critical")));
+    .where(and(eq(tasksTable.userId, userId), eq(tasksTable.status, "completed"), eq(tasksTable.priority, "critical")));
 
   res.json({
     totalVp: stats.totalVp,
@@ -27,14 +32,16 @@ router.get("/analytics/summary", async (_req, res): Promise<void> => {
   });
 });
 
-router.get("/analytics/velocity", async (_req, res): Promise<void> => {
+router.get("/analytics/velocity", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const completed = await db
     .select()
     .from(tasksTable)
-    .where(and(eq(tasksTable.status, "completed"), gte(tasksTable.completedAt, thirtyDaysAgo)));
+    .where(and(eq(tasksTable.userId, userId), eq(tasksTable.status, "completed"), gte(tasksTable.completedAt, thirtyDaysAgo)));
 
-  // Build day-by-day map
   const dayMap: Record<string, { vp: number; tasksCompleted: number }> = {};
   for (let i = 29; i >= 0; i--) {
     const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
@@ -51,20 +58,30 @@ router.get("/analytics/velocity", async (_req, res): Promise<void> => {
     }
   }
 
-  const result = Object.entries(dayMap).map(([date, data]) => ({ date, ...data }));
-  res.json(result);
+  res.json(Object.entries(dayMap).map(([date, data]) => ({ date, ...data })));
 });
 
-router.get("/analytics/milestones", async (_req, res): Promise<void> => {
+router.get("/analytics/milestones", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+
   const milestones = await db
     .select()
     .from(milestonesTable)
+    .where(eq(milestonesTable.userId, userId))
     .orderBy(desc(milestonesTable.achievedAt));
   res.json(milestones);
 });
 
-router.get("/dashboard/overview", async (_req, res): Promise<void> => {
-  const allTasks = await db.select().from(tasksTable).orderBy(desc(tasksTable.createdAt));
+router.get("/dashboard/overview", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const userId = req.user.id;
+
+  const allTasks = await db
+    .select()
+    .from(tasksTable)
+    .where(eq(tasksTable.userId, userId))
+    .orderBy(desc(tasksTable.createdAt));
 
   const today = new Date().toISOString().split("T")[0];
   const todayTasks = allTasks.filter((t) => t.calendarDate === today || t.dueDate === today);
@@ -72,11 +89,7 @@ router.get("/dashboard/overview", async (_req, res): Promise<void> => {
     .filter((t) => t.status !== "completed" && t.dueDate && t.dueDate > today)
     .slice(0, 5);
 
-  let [stats] = await db.select().from(userStatsTable).limit(1);
-  if (!stats) {
-    const [newStats] = await db.insert(userStatsTable).values({}).returning();
-    stats = newStats;
-  }
+  const stats = await getOrCreateUserStats(userId);
 
   res.json({
     totalTasks: allTasks.length,

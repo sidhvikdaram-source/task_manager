@@ -1,0 +1,2 @@
+- [Lib build order](lib-build-order.md) — composite libs must be built with `typecheck:libs` before any leaf-package typecheck runs.
+- [Replit Auth UI naming](replit-auth-ui.md) — never use "Replit" or "Replit Auth" in user-facing copy; use generic "Log in"/"Log out".

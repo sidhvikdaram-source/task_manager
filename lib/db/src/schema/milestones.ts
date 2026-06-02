@@ -1,9 +1,10 @@
-import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const milestonesTable = pgTable("milestones", {
   id: serial("id").primaryKey(),
+  userId: varchar("user_id"),
   title: text("title").notNull(),
   description: text("description").notNull(),
   vpThreshold: integer("vp_threshold").notNull(),

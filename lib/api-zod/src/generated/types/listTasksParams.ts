@@ -13,4 +13,5 @@ export type ListTasksParams = {
 status?: ListTasksStatus;
 priority?: ListTasksPriority;
 sortBy?: ListTasksSortBy;
+projectId?: number;
 };
