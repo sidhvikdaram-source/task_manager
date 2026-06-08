@@ -1,18 +1,10 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "artifacts/api-server/package.json",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["artifacts/api-server/dist/**"]
-      }
-    }
-  ],
+  "outputDirectory": "artifacts/api-server/dist",
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "artifacts/api-server/package.json"
+      "dest": "artifacts/api-server/dist/index.mjs"
     }
   ]
 }
