@@ -1,8 +1,8 @@
-import express, { type Express, type Request, type Response } from "express"; // 1. Imported explicit Request & Response types
+import express, { type Express, type Request, type Response } from "express"; 
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { pinoHttp } from "pino-http"; // 2. Changed to a named destructured import
-import router from "./routes";
+import { pinoHttp } from "pino-http"; 
+import router from "./routes/index.js"; // 🎯 Fixed: Added explicit /index.js path
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
 
@@ -12,7 +12,6 @@ app.use(
   pinoHttp({
     logger,
     serializers: {
-      // 3. Added explicit types to req and res variables to satisfy strict TS rules
       req(req: Request) {
         return { id: req.id, method: req.method, url: req.url?.split("?")[0] };
       },
