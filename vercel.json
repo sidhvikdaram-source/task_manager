@@ -1,19 +1,19 @@
 {
   "version": 2,
-  "outputDirectory": "public",
-  "functions": {
-    "artifacts/api-server/dist/index.mjs": {
-      "runtime": "vercel-node@latest"
+  "builds": [
+    {
+      "src": "artifacts/api-server/package.json",
+      "use": "@vercel/node"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "artifacts/api-server/dist/index.mjs"
+      "dest": "artifacts/api-server/package.json"
     },
     {
       "src": "/(.*)",
-      "dest": "artifacts/api-server/dist/index.mjs"
+      "dest": "artifacts/api-server/package.json"
     }
   ]
 }
