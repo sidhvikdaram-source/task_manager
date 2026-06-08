@@ -2,14 +2,17 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/index.mjs",
-      "use": "@vercel/node"
+      "src": "artifacts/api-server/package.json",
+      "use": "@vercel/node",
+      "config": {
+        "distDir": "artifacts/api-server/dist"
+      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "dist/index.mjs"
+      "dest": "artifacts/api-server/src/app.ts"
     }
   ]
 }
