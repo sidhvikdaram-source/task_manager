@@ -1,7 +1,7 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response } from "express"; // 1. Imported explicit Request & Response types
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import pinoHttp from "pino-http";
+import { pinoHttp } from "pino-http"; // 2. Changed to a named destructured import
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
@@ -12,10 +12,11 @@ app.use(
   pinoHttp({
     logger,
     serializers: {
-      req(req) {
+      // 3. Added explicit types to req and res variables to satisfy strict TS rules
+      req(req: Request) {
         return { id: req.id, method: req.method, url: req.url?.split("?")[0] };
       },
-      res(res) {
+      res(res: Response) {
         return { statusCode: res.statusCode };
       },
     },
