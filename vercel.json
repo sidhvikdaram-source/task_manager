@@ -3,17 +3,18 @@
   "outputDirectory": "public",
   "builds": [
     {
-      "src": "artifacts/api-server/package.json",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["artifacts/api-server/dist/**"]
-      }
+      "src": "artifacts/api-server/dist/index.mjs",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "artifacts/api-server/package.json"
+      "dest": "artifacts/api-server/dist/index.mjs"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "artifacts/api-server/dist/index.mjs"
     }
   ]
 }
