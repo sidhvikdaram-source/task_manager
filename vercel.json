@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "outputDirectory": "artifacts/api-server/dist",
+  "outputDirectory": "dist",
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "artifacts/api-server/dist/index.mjs"
+      "dest": "dist/index.mjs"
     }
   ]
 }
