@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "buildCommand": "pnpm --filter @workspace/task-manager run build",
   "outputDirectory": "artifacts/task-manager/dist/public",
   "rewrites": [
@@ -6,7 +7,6 @@
       "source": "/:path((?!.*\\.).*)",
       "destination": "/index.html"
     }
-  ]
   ],
   "headers": [
     {
@@ -18,4 +18,5 @@
         }
       ]
     }
+  ]
 }
