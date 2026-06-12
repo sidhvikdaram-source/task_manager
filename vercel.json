@@ -1,22 +1,18 @@
 {
   "version": 2,
-  "buildCommand": "pnpm --filter @workspace/task-manager run build",
-  "outputDirectory": "artifacts/task-manager/dist/public",
-  "rewrites": [
+  "builds": [
     {
-      "source": "/:path((?!.*\\.).*)",
-      "destination": "/index.html"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "artifacts/task-manager/dist/public"
+      }
     }
   ],
-  "headers": [
+  "rewrites": [
     {
-      "source": "/assets/:path*",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
+      "source": "^/(.*)$",
+      "destination": "/index.html"
     }
   ]
 }
