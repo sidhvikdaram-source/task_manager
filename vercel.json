@@ -1,7 +1,7 @@
 {
   "buildCommand": "pnpm --filter @workspace/task-manager run build",
   "outputDirectory": "artifacts/task-manager/dist/public",
-  "framework": "other",
+  "framework": "react-router",
   "rewrites": [
     {
       "source": "/:path((?!.*\\.).*)",
