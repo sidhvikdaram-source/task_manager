@@ -1,19 +1,11 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "dist/index.mjs",
-      "use": "@vercel/node"
-    }
-  ],
+  "buildCommand": "pnpm --filter @workspace/task-manager run build",
+  "outputDirectory": "artifacts/task-manager/dist/public",
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "dist/index.mjs"
-    },
-    {
       "src": "/(.*)",
-      "dest": "dist/index.mjs"
+      "dest": "/$1"
     }
   ]
 }
