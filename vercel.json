@@ -2,10 +2,10 @@
   "version": 2,
   "buildCommand": "pnpm --filter @workspace/task-manager run build",
   "outputDirectory": "artifacts/task-manager/dist/public",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "source": "/:path((?!.*\\.).*)",
+      "destination": "/index.html"
     }
   ]
 }
