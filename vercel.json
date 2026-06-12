@@ -1,11 +1,21 @@
 {
   "buildCommand": "pnpm --filter @workspace/task-manager run build",
   "outputDirectory": "artifacts/task-manager/dist/public",
-  "framework": "react-router",
   "rewrites": [
     {
       "source": "/:path((?!.*\\.).*)",
       "destination": "/index.html"
     }
   ]
+  ],
+  "headers": [
+    {
+      "source": "/assets/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
 }
