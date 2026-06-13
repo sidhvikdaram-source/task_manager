@@ -22,10 +22,11 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: OIDC_ISSUER_URL
-        value: https://replit.com/oidc
+        value: https://accounts.google.com
       - key: OIDC_CLIENT_ID
         sync: false
-      # OIDC_CLIENT_SECRET — add this manually in Render dashboard
+      - key: OIDC_CLIENT_SECRET
+        sync: false
 
 databases:
   - name: task-manager-db

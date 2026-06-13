@@ -57,13 +57,21 @@ function getSafeReturnTo(value: unknown): string {
   return value;
 }
 
+function getClaim<T>(claims: Record<string, unknown>, ...keys: string[]): T | null {
+  for (const key of keys) {
+    const val = claims[key];
+    if (val !== undefined && val !== null) return val as T;
+  }
+  return null;
+}
+
 async function upsertUser(claims: Record<string, unknown>) {
   const userData = {
     id: claims.sub as string,
-    email: (claims.email as string) || null,
-    firstName: (claims.first_name as string) || null,
-    lastName: (claims.last_name as string) || null,
-    profileImageUrl: (claims.profile_image_url || claims.picture) as
+    email: getClaim<string>(claims, "email") || null,
+    firstName: getClaim<string>(claims, "first_name", "given_name") || null,
+    lastName: getClaim<string>(claims, "last_name", "family_name") || null,
+    profileImageUrl: getClaim<string>(claims, "profile_image_url", "picture") as
       | string
       | null,
   };
