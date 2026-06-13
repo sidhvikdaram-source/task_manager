@@ -5,7 +5,7 @@ import { db, sessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import type { AuthUser } from "@workspace/api-zod";
 
-export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
+export const ISSUER_URL = process.env.OIDC_ISSUER_URL ?? "https://replit.com/oidc";
 export const SESSION_COOKIE = "sid";
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
@@ -20,10 +20,14 @@ let oidcConfig: client.Configuration | null = null;
 
 export async function getOidcConfig(): Promise<client.Configuration> {
   if (!oidcConfig) {
-    oidcConfig = await client.discovery(
-      new URL(ISSUER_URL),
-      process.env.REPL_ID!,
-    );
+    const clientId = process.env.OIDC_CLIENT_ID ?? process.env.REPL_ID;
+    if (!clientId) {
+      throw new Error(
+        "OIDC_CLIENT_ID environment variable is required. " +
+        "Set it to your OIDC application's client ID.",
+      );
+    }
+    oidcConfig = await client.discovery(new URL(ISSUER_URL), clientId);
   }
   return oidcConfig;
 }
