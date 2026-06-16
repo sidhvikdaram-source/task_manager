@@ -8,7 +8,7 @@ services:
     repo: https://github.com/sidhvikdaram-source/task_manager.git
     branch: main
     plan: free
-    buildCommand: NODE_ENV=development pnpm install && pnpm run render-build
+    buildCommand: pnpm install --prod=false && pnpm run render-build
     startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
     envVars:
       - key: NODE_ENV

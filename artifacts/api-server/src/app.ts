@@ -47,7 +47,7 @@ if (isProduction) {
     "public",
   );
   app.use(express.static(frontendDist));
-  app.get("*", (_req: Request, res: Response) => {
+  app.get(/^(?!\/api).*/, (_req: Request, res: Response) => {
     res.sendFile(path.join(frontendDist, "index.html"));
   });
 }
