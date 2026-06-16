@@ -24,10 +24,12 @@ const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 const router: IRouter = Router();
 
 function getOrigin(req: Request): string {
-  const proto = req.headers["x-forwarded-proto"] || "https";
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
   const host =
     req.headers["x-forwarded-host"] || req.headers["host"] || "localhost";
-  return `${proto}://${host}`;
+  // x-forwarded-proto can be a string like "https" or an array like ["https", "http"]
+  const safeProto = Array.isArray(proto) ? proto[0] : String(proto);
+  return `${safeProto}://${host}`;
 }
 
 function setSessionCookie(res: Response, sid: string) {
@@ -138,6 +140,7 @@ router.get("/callback", async (req: Request, res: Response) => {
   const expectedState = req.cookies?.state;
 
   if (!codeVerifier || !expectedState) {
+    req.log.warn("Missing codeVerifier or expectedState cookies — redirecting to login");
     res.redirect("/api/login");
     return;
   }
@@ -154,7 +157,8 @@ router.get("/callback", async (req: Request, res: Response) => {
       expectedState,
       idTokenExpected: true,
     });
-  } catch {
+  } catch (err) {
+    req.log.error({ err }, "OIDC token exchange failed — redirecting to login");
     res.redirect("/api/login");
     return;
   }
