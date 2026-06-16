@@ -12,6 +12,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app: Express = express();
 
+// Render sits behind a proxy — trust so Express uses x-forwarded-* headers
+app.set("trust proxy", true);
+
 app.use(
   pinoHttp({
     logger,
