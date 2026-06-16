@@ -21,13 +21,18 @@ let oidcConfig: client.Configuration | null = null;
 export async function getOidcConfig(): Promise<client.Configuration> {
   if (!oidcConfig) {
     const clientId = process.env.OIDC_CLIENT_ID ?? process.env.REPL_ID;
+    const clientSecret = process.env.OIDC_CLIENT_SECRET;
     if (!clientId) {
       throw new Error(
         "OIDC_CLIENT_ID environment variable is required. " +
         "Set it to your OIDC application's client ID.",
       );
     }
-    oidcConfig = await client.discovery(new URL(ISSUER_URL), clientId);
+    oidcConfig = await client.discovery(
+      new URL(ISSUER_URL),
+      clientId,
+      clientSecret,
+    );
   }
   return oidcConfig;
 }
