@@ -23,10 +23,6 @@ services:
         generateValue: true
       - key: OIDC_ISSUER_URL
         value: https://accounts.google.com
-      - key: OIDC_CLIENT_ID
-        sync: false
-      - key: OIDC_CLIENT_SECRET
-        sync: false
 
 databases:
   - name: task-manager-db
