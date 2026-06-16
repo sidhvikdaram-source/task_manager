@@ -84,7 +84,10 @@ async function upsertUser(claims: Record<string, unknown>) {
     .onConflictDoUpdate({
       target: usersTable.id,
       set: {
-        ...userData,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        profileImageUrl: userData.profileImageUrl,
         updatedAt: new Date(),
       },
     })
