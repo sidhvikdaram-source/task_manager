@@ -12,11 +12,16 @@ import {
 
 declare global {
   namespace Express {
-    interface User extends AuthUser {}
+    interface User {
+      id: string;
+      email: string | null;
+      firstName: string | null;
+      lastName: string | null;
+      profileImageUrl: string | null;
+    }
 
     interface Request {
       isAuthenticated(): this is AuthedRequest;
-
       user?: User | undefined;
     }
 
@@ -64,6 +69,14 @@ export async function authMiddleware(
 
   const sid = getSessionId(req);
   if (!sid) {
+    // No session — use a demo user so the app works without OIDC
+    req.user = {
+      id: "demo-user",
+      email: "demo@example.com",
+      firstName: "Demo",
+      lastName: "User",
+      profileImageUrl: null,
+    };
     next();
     return;
   }
@@ -71,6 +84,14 @@ export async function authMiddleware(
   const session = await getSession(sid);
   if (!session?.user?.id) {
     await clearSession(res, sid);
+    // Still grant demo access
+    req.user = {
+      id: "demo-user",
+      email: "demo@example.com",
+      firstName: "Demo",
+      lastName: "User",
+      profileImageUrl: null,
+    };
     next();
     return;
   }
@@ -78,6 +99,13 @@ export async function authMiddleware(
   const refreshed = await refreshIfExpired(sid, session);
   if (!refreshed) {
     await clearSession(res, sid);
+    req.user = {
+      id: "demo-user",
+      email: "demo@example.com",
+      firstName: "Demo",
+      lastName: "User",
+      profileImageUrl: null,
+    };
     next();
     return;
   }
