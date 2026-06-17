@@ -47,7 +47,13 @@ export default function Calendar() {
 
   const getDayTasks = (date: Date) => {
     if (!tasks) return [];
-    return tasks.filter(t => t.calendarDate && t.calendarDate.startsWith(format(date, 'yyyy-MM-dd')));
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return tasks.filter(t => 
+      t.status !== 'completed' && (
+        (t.calendarDate && t.calendarDate.startsWith(dateStr)) ||
+        (t.dueDate && t.dueDate.startsWith(dateStr))
+      )
+    );
   };
 
   const getProximityColor = (date: Date, dayTasks: Task[]) => {

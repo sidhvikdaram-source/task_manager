@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Target, Zap, Bell, Plus, LogOut, LogIn } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn } from 'lucide-react';
 import { useGetUserStats } from '@workspace/api-client-react';
 import { useState, useRef, useEffect } from 'react';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
@@ -43,7 +43,7 @@ export function TopNav() {
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-              <Target className="w-4 h-4" />
+              <Zap className="w-4 h-4 fill-primary-foreground" />
             </div>
             <span className="font-bold text-lg tracking-tight">Velocity</span>
           </motion.div>

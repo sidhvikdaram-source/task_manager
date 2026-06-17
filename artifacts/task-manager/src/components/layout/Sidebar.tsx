@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Target, FolderOpen, Plus, LogOut, ChevronDown, Folder, BookOpen, X } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, FolderOpen, Plus, LogOut, ChevronDown, Folder, BookOpen, X } from 'lucide-react';
 import { useGetUserStats, useListProjects, useCreateProject } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Progress } from '@/components/ui/progress';
@@ -48,12 +48,12 @@ export function Sidebar() {
 
   return (
     <div className="w-64 border-r bg-sidebar flex flex-col h-full shrink-0">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-          <Target className="w-5 h-5" />
+        <div className="p-6 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
+            <Zap className="w-5 h-5 fill-primary-foreground" />
+          </div>
+          <span className="font-bold text-xl tracking-tight text-sidebar-foreground">Velocity</span>
         </div>
-        <span className="font-bold text-xl tracking-tight text-sidebar-foreground">Velocity</span>
-      </div>
 
       <div className="px-4 pb-6 border-b border-sidebar-border">
         {stats && (
