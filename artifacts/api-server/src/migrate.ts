@@ -131,5 +131,26 @@ export async function runMigrations(): Promise<void> {
     );
   `);
 
+  // Create daily_habits table
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "daily_habits" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" varchar,
+      "title" text NOT NULL,
+      "sort_order" integer DEFAULT 0 NOT NULL,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL
+    );
+  `);
+
+  // Create daily_habit_completions table
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "daily_habit_completions" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "habit_id" integer NOT NULL REFERENCES "daily_habits"("id") ON DELETE CASCADE,
+      "completed_date" date NOT NULL,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL
+    );
+  `);
+
   console.log("[migrate] Schema migration complete!");
 }

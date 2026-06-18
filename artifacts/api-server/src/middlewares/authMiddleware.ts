@@ -67,6 +67,20 @@ export async function authMiddleware(
     return this.user != null;
   } as Request["isAuthenticated"];
 
+  // If OIDC is not configured, use demo user so the app works without Google Auth
+  const oidcClientId = process.env.OIDC_CLIENT_ID;
+  if (!oidcClientId) {
+    req.user = {
+      id: "demo-user",
+      email: "demo@velocity.app",
+      firstName: "Velocity",
+      lastName: "User",
+      profileImageUrl: null,
+    };
+    next();
+    return;
+  }
+
   const sid = getSessionId(req);
   if (!sid) {
     next();
