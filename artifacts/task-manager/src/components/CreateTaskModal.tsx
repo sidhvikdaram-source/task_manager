@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useCreateTask, getListTasksQueryKey, getGetDashboardOverviewQueryKey, useListProjects } from '@workspace/api-client-react';
+import { useCreateTask, useListProjects } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -75,8 +75,11 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
       {
         onSuccess: () => {
           toast.success('Task created');
-          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+          // Invalidate all task/overview/stats queries so every view refreshes
+          queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/overview'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/user/stats'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/daily-habits'] });
           form.reset();
           onOpenChange(false);
           onSuccess?.();
