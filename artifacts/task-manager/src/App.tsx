@@ -15,8 +15,8 @@ import { Button } from "@/components/ui/button";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes before refetching
-      gcTime: 1000 * 60 * 30, // 30 minutes in garbage collection
+      staleTime: 0, // Always refetch when component mounts or query is invalidated
+      gcTime: 1000 * 60 * 5, // 5 minutes keep data in cache for fast back-nav
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     },

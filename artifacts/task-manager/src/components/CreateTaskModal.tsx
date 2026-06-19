@@ -82,11 +82,13 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
       {
         onSuccess: () => {
           toast.success('Task created');
-          // Invalidate all task/overview/stats queries so every view refreshes
-          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getListDailyHabitsQueryKey() });
+          // Invalidate AND refetch all API queries immediately
+          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(), refetchType: 'all' });
+          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey(), refetchType: 'all' });
+          queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey(), refetchType: 'all' });
+          queryClient.invalidateQueries({ queryKey: getListDailyHabitsQueryKey(), refetchType: 'all' });
+          // Also refetch by partial key for any sorted/filtered variants
+          queryClient.refetchQueries({ queryKey: ['/api/tasks'] });
           form.reset();
           onOpenChange(false);
           onSuccess?.();
