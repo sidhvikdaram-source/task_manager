@@ -331,6 +331,9 @@ export async function customFetch<T = unknown>(
 
   const method = resolveMethod(input, init.method);
 
+  // Always include credentials for session cookie auth
+  init.credentials = "include";
+
   if (init.body != null && (method === "GET" || method === "HEAD")) {
     throw new TypeError(`customFetch: ${method} requests cannot have a body.`);
   }

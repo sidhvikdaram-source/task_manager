@@ -91,7 +91,10 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
           onOpenChange(false);
           onSuccess?.();
         },
-        onError: () => toast.error('Failed to create task'),
+        onError: (error) => {
+          console.error('Task creation failed:', error);
+          toast.error('Failed to create task');
+        },
       }
     );
   }
