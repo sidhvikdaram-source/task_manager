@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  isSameMonth, 
-  isToday, 
-  isSameDay, 
-  addMonths, 
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameMonth,
+  isToday,
+  isSameDay,
+  addMonths,
   subMonths,
   startOfWeek,
   endOfWeek,
@@ -16,11 +16,12 @@ import {
   isPast,
   differenceInDays
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, CircleAlert as AlertCircle } from 'lucide-react';
 import { useListTasks, Task } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 export default function Calendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -157,22 +158,34 @@ export default function Calendar() {
 
                 <div className="space-y-1">
                   {dayTasks.slice(0, 3).map(task => (
-                    <div 
-                      key={task.id} 
-                      className={`
-                        text-xs px-1.5 py-0.5 rounded truncate
-                        ${task.status === 'completed' ? 'line-through opacity-50 bg-muted text-muted-foreground' : 
-                          task.priority === 'critical' ? 'bg-destructive/10 text-destructive font-medium' :
-                          task.priority === 'high' ? 'bg-amber-500/10 text-amber-700 font-medium' :
-                          'bg-primary/10 text-primary'
-                        }
-                      `}
+                    <motion.div
+                      key={task.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className={cn(
+                        "text-xs px-2 py-1 rounded-md truncate font-medium border-l-2 transition-all",
+                        "shadow-sm hover:shadow-md hover:translate-x-0.5 cursor-pointer",
+                        task.status === 'completed'
+                          ? "line-through opacity-50 bg-muted/50 border-muted-foreground/30 text-muted-foreground"
+                          : task.priority === 'critical'
+                          ? "bg-gradient-to-r from-red-500/15 to-red-500/5 border-red-500 text-red-700"
+                          : task.priority === 'high'
+                          ? "bg-gradient-to-r from-amber-500/15 to-amber-500/5 border-amber-500 text-amber-800"
+                          : task.priority === 'medium'
+                          ? "bg-gradient-to-r from-blue-500/15 to-blue-500/5 border-blue-500 text-blue-700"
+                          : "bg-gradient-to-r from-slate-500/15 to-slate-500/5 border-slate-400 text-slate-600"
+                      )}
                     >
-                      {task.title}
-                    </div>
+                      <div className="flex items-center gap-1">
+                        {task.priority === 'critical' && !task.status.startsWith('compl') && (
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                        )}
+                        <span className="truncate">{task.title}</span>
+                      </div>
+                    </motion.div>
                   ))}
                   {dayTasks.length > 3 && (
-                    <div className="text-[10px] text-muted-foreground font-medium text-center">
+                    <div className="text-[10px] text-muted-foreground font-medium text-center bg-muted/30 rounded px-1 py-0.5">
                       +{dayTasks.length - 3} more
                     </div>
                   )}

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, FolderOpen, Plus, LogOut, ChevronDown, Folder, BookOpen, X } from 'lucide-react';
-import { useGetUserStats, useListProjects, useCreateProject } from '@workspace/api-client-react';
+import { LayoutDashboard, CalendarDays, Timer, ChartLine as LineChart, Zap, FolderOpen, Plus, LogOut, ChevronDown, Folder, BookOpen, X } from 'lucide-react';
+import { useGetUserStats, useListProjects, useCreateProject, getListProjectsQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ export function Sidebar() {
       { data: { name: newProjectName.trim(), color: newProjectColor, type: newProjectType } },
       {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: ['listProjects'] });
+          qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
           setNewProjectName('');
           setShowNewProject(false);
         },
