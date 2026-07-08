@@ -6,6 +6,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node"],
+    "typeRoots": ["./node_modules/@types", "../../types"],
     
     "noEmit": false,
     "noEmitOnError": false,

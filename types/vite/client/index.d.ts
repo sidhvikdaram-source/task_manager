@@ -1,4 +1,6 @@
-declare module "vite/client" {
+declare module "vite/client" {}
+
+declare global {
   interface ImportMetaEnv {
     readonly [key: string]: string | undefined;
   }
@@ -6,3 +8,5 @@ declare module "vite/client" {
     readonly env: ImportMetaEnv;
   }
 }
+
+export {};

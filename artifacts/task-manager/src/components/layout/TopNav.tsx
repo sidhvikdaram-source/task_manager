@@ -34,7 +34,7 @@ export function TopNav() {
 
   return (
     <>
-      <header className="h-14 border-b bg-card/80 backdrop-blur-sm flex items-center px-6 gap-6 shrink-0 sticky top-0 z-40">
+      <header className="h-16 border-b neon-rule bg-background/78 backdrop-blur-xl flex items-center px-4 sm:px-6 gap-4 sm:gap-6 shrink-0 sticky top-0 z-40 shadow-[0_12px_40px_rgba(0,0,0,0.32)]">
         <Link href="/">
           <motion.div
             className="flex items-center gap-2.5 mr-2 cursor-pointer"
@@ -42,21 +42,21 @@ export function TopNav() {
             whileTap={{ scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
+            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-[0_0_24px_rgba(0,213,255,0.36)]">
               <Zap className="w-4 h-4 fill-primary-foreground" />
             </div>
-            <span className="font-bold text-lg tracking-tight">Velocity</span>
+            <span className="tech-title text-lg">Velocity</span>
           </motion.div>
         </Link>
 
-        <nav className="flex items-center gap-1 flex-1">
+        <nav className="hidden md:flex items-center gap-1 flex-1">
           {links.map((link) => {
             const isActive = location === link.href;
             return (
               <Link key={link.href} href={link.href}>
                 <motion.div
                   data-testid={`nav-link-${link.label.toLowerCase().replace(' ', '-')}`}
-                  className={`relative flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
+                  className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-colors ${
                     isActive ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                   whileTap={{ scale: 0.96 }}
@@ -64,13 +64,13 @@ export function TopNav() {
                   {isActive && (
                     <motion.div
                       layoutId="nav-active-pill"
-                      className="absolute inset-0 bg-primary rounded-lg shadow-sm"
+                      className="absolute inset-0 bg-primary rounded-xl shadow-[0_0_28px_rgba(0,213,255,0.28)]"
                       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                     />
                   )}
                   {!isActive && (
                     <motion.div
-                      className="absolute inset-0 rounded-lg bg-muted opacity-0"
+                      className="absolute inset-0 rounded-xl bg-muted opacity-0"
                       whileHover={{ opacity: 1 }}
                       transition={{ duration: 0.15 }}
                     />
@@ -85,7 +85,7 @@ export function TopNav() {
 
         <div className="flex items-center gap-3">
           <motion.button
-            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            className="w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors border border-border/70"
             data-testid="button-notifications"
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
@@ -99,7 +99,7 @@ export function TopNav() {
               onClick={() => setAccountOpen((o) => !o)}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.94 }}
-              className="w-8 h-8 rounded-full ring-2 ring-transparent hover:ring-primary/30 transition-all overflow-hidden flex items-center justify-center bg-muted text-xs font-bold text-muted-foreground"
+              className="w-9 h-9 rounded-xl ring-2 ring-transparent hover:ring-primary/40 transition-all overflow-hidden flex items-center justify-center bg-muted text-xs font-bold text-muted-foreground border border-border/70"
               title="Account"
             >
               {user?.profileImageUrl ? (
@@ -116,7 +116,7 @@ export function TopNav() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.95 }}
                   transition={{ duration: 0.13 }}
-                  className="absolute right-0 top-10 w-48 bg-popover border rounded-xl shadow-lg z-50 py-1 overflow-hidden"
+                  className="absolute right-0 top-11 w-48 bg-popover border rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
                 >
                   {user && (
                     <div className="px-3 py-2 border-b">
@@ -156,7 +156,7 @@ export function TopNav() {
                 initial={{ opacity: 0, scale: 0.85, x: 8 }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 transition={{ type: 'spring', stiffness: 380, damping: 24 }}
-                className="flex items-center gap-2 bg-primary/8 border border-primary/20 rounded-lg px-3 py-1.5"
+                className="hidden sm:flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-3 py-2 shadow-[0_0_24px_rgba(0,213,255,0.12)]"
               >
                 {stats.multiplier > 1.0 && (
                   <motion.div
@@ -185,7 +185,7 @@ export function TopNav() {
           <motion.button
             onClick={() => setIsCreateModalOpen(true)}
             data-testid="button-new-task-nav"
-            className="flex items-center gap-1.5 bg-primary text-primary-foreground text-sm font-medium px-3 py-1.5 rounded-lg shadow-sm"
+            className="flex items-center gap-1.5 bg-secondary text-secondary-foreground text-sm font-extrabold px-3 py-2 rounded-xl shadow-[0_0_26px_rgba(255,111,26,0.24)]"
             whileHover={{ scale: 1.03, boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}
             whileTap={{ scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}

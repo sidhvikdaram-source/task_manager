@@ -11,6 +11,7 @@
     "esModuleInterop": true,
     "allowImportingTsExtensions": true,
     "types": ["node", "vite/client"],
+    "typeRoots": ["./node_modules/@types", "../../types"],
     "paths": {
       "@/*": ["./src/*"]
     }

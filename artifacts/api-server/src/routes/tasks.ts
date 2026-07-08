@@ -35,6 +35,21 @@ async function getTaskWithCounts(id: number, userId: string) {
   };
 }
 
+function withChecklistCounts<T extends { id: number }>(tasks: T[], items: Array<{ taskId: number; completed: boolean }>) {
+  const countMap = new Map<number, { total: number; completed: number }>();
+  for (const item of items) {
+    const counts = countMap.get(item.taskId) ?? { total: 0, completed: 0 };
+    counts.total += 1;
+    if (item.completed) counts.completed += 1;
+    countMap.set(item.taskId, counts);
+  }
+
+  return tasks.map((task) => {
+    const counts = countMap.get(task.id) ?? { total: 0, completed: 0 };
+    return { ...task, checklistCount: counts.total, checklistCompleted: counts.completed };
+  });
+}
+
 router.get("/tasks", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
@@ -59,12 +74,20 @@ router.get("/tasks", async (req, res): Promise<void> => {
       desc(tasksTable.createdAt)
     );
 
-  const allItems = await db.select().from(checklistItemsTable);
-  const result = tasks.map((t) => {
-    const items = allItems.filter((i) => i.taskId === t.id);
-    return { ...t, checklistCount: items.length, checklistCompleted: items.filter((i) => i.completed).length };
-  });
-  res.json(result);
+  if (tasks.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const checklistItems = await db
+    .select({
+      taskId: checklistItemsTable.taskId,
+      completed: checklistItemsTable.completed,
+    })
+    .from(checklistItemsTable)
+    .where(inArray(checklistItemsTable.taskId, tasks.map((task) => task.id)));
+
+  res.json(withChecklistCounts(tasks, checklistItems));
 });
 
 router.post("/tasks", async (req, res): Promise<void> => {
@@ -164,7 +187,7 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
   const [task] = await db
     .update(tasksTable)
     .set({ status: "completed", completedAt: new Date() })
-    .where(eq(tasksTable.id, params.data.id))
+    .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)))
     .returning();
 
   const stats = await getOrCreateUserStats(userId);

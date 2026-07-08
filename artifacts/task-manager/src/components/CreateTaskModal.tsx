@@ -84,6 +84,7 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
           toast.success('Task created');
           // Invalidate AND refetch all API queries immediately
           queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(), refetchType: 'all' });
+          queryClient.invalidateQueries({ queryKey: ['/api/tasks'], refetchType: 'all' });
           queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey(), refetchType: 'all' });
           queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey(), refetchType: 'all' });
           queryClient.invalidateQueries({ queryKey: getListDailyHabitsQueryKey(), refetchType: 'all' });
@@ -169,14 +170,17 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Project</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
+                        value={field.value || 'none'}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="None" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {projects.map((p) => (
                             <SelectItem key={p.id} value={String(p.id)}>
                               {p.name}

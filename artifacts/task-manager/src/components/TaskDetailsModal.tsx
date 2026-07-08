@@ -175,12 +175,12 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Project</label>
                 <Select
-                  value={task.projectId ? String(task.projectId) : ''}
-                  onValueChange={(val) => handleUpdate('projectId', val ? parseInt(val, 10) : null)}
+                  value={task.projectId ? String(task.projectId) : 'none'}
+                  onValueChange={(val) => handleUpdate('projectId', val === 'none' ? null : parseInt(val, 10))}
                 >
                   <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {projects.map((p) => (
                       <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
                     ))}

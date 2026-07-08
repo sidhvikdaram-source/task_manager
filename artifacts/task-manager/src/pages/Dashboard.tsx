@@ -291,7 +291,7 @@ export default function Dashboard() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="space-y-7"
+            className="space-y-6"
           >
             {/* Greeting */}
             <motion.div
@@ -299,10 +299,11 @@ export default function Dashboard() {
               
               initial="hidden"
               animate="visible"
-              className="flex items-start justify-between"
+              className="bento-card relative overflow-hidden p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
             >
+              <div className="absolute right-10 top-0 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                <h1 className="tech-title text-3xl sm:text-5xl text-foreground">
                   {getHourGreeting()}.
                 </h1>
                 <p className="text-muted-foreground text-sm mt-0.5">
@@ -315,7 +316,7 @@ export default function Dashboard() {
                 <Button
                   onClick={() => setIsCreateModalOpen(true)}
                   size="sm"
-                  className="h-9 shadow-sm"
+                  className="h-10 rounded-xl bg-secondary text-secondary-foreground shadow-[0_0_26px_rgba(255,111,26,0.24)]"
                   data-testid="button-start-focus"
                 >
                   <Target className="w-4 h-4 mr-1.5" />
@@ -342,9 +343,9 @@ export default function Dashboard() {
                   
                   initial="hidden"
                   animate="visible"
-                  className="bg-card border rounded-xl shadow-sm overflow-hidden"
+                  className="bento-card bento-card-hot overflow-hidden"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                  <div className="flex items-center justify-between px-4 py-3 border-b neon-rule bg-white/[0.035]">
                     <div className="flex items-center gap-2">
                       <motion.div
                         className="w-2 h-2 rounded-full bg-rose-500"
@@ -403,9 +404,9 @@ export default function Dashboard() {
                   
                   initial="hidden"
                   animate="visible"
-                  className="bg-card border rounded-xl shadow-sm overflow-hidden"
+                  className="bento-card overflow-hidden"
                 >
-                  <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                  <div className="flex items-center justify-between px-4 py-3 border-b neon-rule bg-white/[0.035]">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-amber-500" />
                       <span className="font-semibold text-sm">Active In-Flight</span>
@@ -451,9 +452,9 @@ export default function Dashboard() {
                       initial="hidden"
                       animate="visible"
                       exit={{ opacity: 0, y: 8 }}
-                      className="bg-card border rounded-xl shadow-sm overflow-hidden"
+                      className="bento-card overflow-hidden"
                     >
-                      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                      <div className="flex items-center justify-between px-4 py-3 border-b neon-rule bg-white/[0.035]">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-slate-400" />
                           <span className="font-semibold text-sm">Backlog</span>
@@ -487,7 +488,7 @@ export default function Dashboard() {
                     initial={{ opacity: 0, scale: 0.97 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.35, type: 'spring', stiffness: 300, damping: 24 }}
-                    className="text-center py-16 bg-card border border-dashed rounded-xl"
+                    className="bento-card text-center py-16 border-dashed"
                   >
                     <motion.div
                       animate={{ rotate: [0, 8, -8, 0], scale: [1, 1.05, 1] }}
@@ -515,7 +516,7 @@ export default function Dashboard() {
                   
                   initial="hidden"
                   animate="visible"
-                  className="bg-card border rounded-xl shadow-sm p-5"
+                  className="bento-card p-5"
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -573,7 +574,7 @@ export default function Dashboard() {
                   
                   initial="hidden"
                   animate="visible"
-                  className="bg-card border rounded-xl shadow-sm p-5"
+                  className="bento-card p-5"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Recent Achievements</span>
@@ -634,7 +635,7 @@ export default function Dashboard() {
                   
                   initial="hidden"
                   animate="visible"
-                  className="bg-card border rounded-xl shadow-sm p-5"
+                  className="bento-card p-5"
                 >
                   <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Overview</span>
                   <div className="mt-3 space-y-2.5">
@@ -717,7 +718,7 @@ function StatCard({ stat, index, ready }: StatCardProps) {
       }}
       whileHover={{ y: -3, boxShadow: '0 8px 24px rgba(0,0,0,0.08)' }}
       whileTap={{ scale: 0.97 }}
-      className="bg-card border rounded-xl p-4 shadow-sm cursor-default"
+      className="bento-card p-4 cursor-default"
     >
       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
         {stat.icon}

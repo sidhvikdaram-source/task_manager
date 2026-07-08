@@ -1,1 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#1A1D20"/><path d="M17 5L9 17.5h5.5L12 27l10-13H16l2-9h-1z" fill="#FFFFFF"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Velocity">
+  <defs>
+    <linearGradient id="g" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00D5FF"/>
+      <stop offset="0.55" stop-color="#101827"/>
+      <stop offset="1" stop-color="#FF6F1A"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.8" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0 0 0 0 0 0.835 0 0 0 0 1 0 0 0 .75 0"/>
+      <feBlend in="SourceGraphic"/>
+    </filter>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="#050914"/>
+  <rect x="6" y="6" width="52" height="52" rx="14" fill="url(#g)" opacity="0.94"/>
+  <rect x="10" y="10" width="44" height="44" rx="11" fill="#050914" opacity="0.84"/>
+  <path filter="url(#glow)" d="M35.5 12 18 35.4h11.8L26.9 52 46 27.7H33.7L35.5 12Z" fill="#F8FDFF"/>
+  <path d="M16 16h13.5" stroke="#00D5FF" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M38 48h10" stroke="#FF6F1A" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
