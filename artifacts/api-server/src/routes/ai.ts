@@ -9,6 +9,8 @@ const systemPrompt = [
   "Keep responses crisp, actionable, and helpful.",
 ].join(" ");
 
+const defaultGroqModels = ["llama-3.1-8b-instant", "llama3-8b-8192"];
+
 const weekdays = [
   "sunday",
   "monday",
@@ -135,21 +137,41 @@ async function generateAssistantReply(message: string, taskContext: string) {
   }
 
   const client = new Groq({ apiKey });
-  const response = await client.chat.completions.create({
-    model: process.env.GROQ_MODEL ?? "llama3-8b-8192",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "system", content: taskContext },
-      { role: "user", content: message },
-    ],
-  });
+  const models = process.env.GROQ_MODEL
+    ? [process.env.GROQ_MODEL, ...defaultGroqModels.filter((model) => model !== process.env.GROQ_MODEL)]
+    : defaultGroqModels;
 
-  const text = response.choices[0]?.message?.content;
-  if (!text) {
-    throw new Error("Groq returned an empty response");
+  let lastError: unknown;
+  for (const model of models) {
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "system", content: taskContext },
+          { role: "user", content: message },
+        ],
+      });
+
+      const text = response.choices[0]?.message?.content;
+      if (!text) {
+        throw new Error(`Groq returned an empty response for ${model}`);
+      }
+
+      return text;
+    } catch (err) {
+      lastError = err;
+    }
   }
 
-  return Array.isArray(text) ? text.map((part) => (typeof part === "string" ? part : "")).join("") : text;
+  throw lastError instanceof Error ? lastError : new Error("Groq request failed");
+}
+
+function formatGroqError(err: unknown) {
+  if (!(err instanceof Error)) return "Groq request failed.";
+  return err.message
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [redacted]")
+    .slice(0, 400);
 }
 
 router.post("/ai/chat", async (req, res): Promise<void> => {
@@ -203,7 +225,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     req.log?.error({ err }, "AI chat request failed");
     const message = err instanceof Error && err.message === "GROQ_API_KEY is not configured"
       ? "Velocity Assistant is not connected yet. Set GROQ_API_KEY on the server."
-      : "Velocity Assistant could not reach Groq. Please try again.";
+      : `Velocity Assistant could not reach Groq: ${formatGroqError(err)}`;
     res.status(500).json({
       error: message,
     });
