@@ -8,6 +8,7 @@ import userRouter from "./user";
 import analyticsRouter from "./analytics";
 import habitsRouter from "./habits";
 import projectsRouter from "./projects";
+import aiRouter from "./ai";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(userRouter);
 router.use(analyticsRouter);
 router.use(habitsRouter);
 router.use(projectsRouter);
+router.use(aiRouter);
 
 export default router;

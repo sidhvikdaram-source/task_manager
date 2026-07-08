@@ -15,6 +15,7 @@ import { TaskDetailsModal } from '@/components/TaskDetailsModal';
 import { OverdueTriageModal } from '@/components/OverdueTriageModal';
 import { IntroAnimation } from '@/components/IntroAnimation';
 import { DailyChecklist } from '@/components/DailyChecklist';
+import { VelocityAssistantCard } from '@/components/VelocityAssistantCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -331,6 +332,8 @@ export default function Dashboard() {
                 <StatCard key={stat.label} stat={stat} index={i} ready={introDone} />
               ))}
             </div>
+
+            <VelocityAssistantCard />
 
             {/* Main Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
