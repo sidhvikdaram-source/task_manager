@@ -1,14 +1,14 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { Router, type IRouter } from "express";
 import { db, tasksTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
 const systemPrompt = [
-  "You are Velocity Assistant, a hyper-focused productivity agent embedded in the Velocity dashboard.",
-  "Keep responses concise, practical, and action-oriented.",
-  "When a task has been created by the system, confirm it clearly and suggest the next useful step.",
-  "Do not claim you changed data unless the backend task creation result says it succeeded.",
+  "You are Velocity Assistant, a highly efficient, intelligent productivity engine for a task manager dashboard.",
+  "You can answer general questions, give productivity tips, and help structure the user's day.",
+  "Keep your responses crisp, direct, and helpful.",
+  "If the backend created a task from the user's message, acknowledge that real task creation and include the task title/date when useful.",
 ].join(" ");
 
 const weekdays = [
@@ -130,20 +130,27 @@ function parseTaskCommand(message: string): ParsedTaskCommand | null {
   };
 }
 
-async function generateAssistantReply(message: string, taskCreated: boolean, fallback: string) {
-  const apiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
-  if (!apiKey) return fallback;
-
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL ?? "gemini-1.5-flash" });
-    const result = await model.generateContent([
-      `${systemPrompt}\nTask creation status: ${taskCreated ? "created" : "not created"}.\nUser: ${message}`,
-    ]);
-    return result.response.text().trim() || fallback;
-  } catch {
-    return fallback;
+async function generateAssistantReply(message: string, taskContext: string) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured");
   }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.generateContent({
+    model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
+    contents: `${taskContext}\n\nUser message:\n${message}`,
+    config: {
+      systemInstruction: systemPrompt,
+    },
+  });
+
+  const text = response.text?.trim();
+  if (!text) {
+    throw new Error("Gemini returned an empty response");
+  }
+
+  return text;
 }
 
 router.post("/ai/chat", async (req, res): Promise<void> => {
@@ -183,11 +190,10 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       createdTask = { ...task, checklistCount: 0, checklistCompleted: 0 };
     }
 
-    const fallback = createdTask
-      ? `Task created: ${createdTask.title}${createdTask.calendarDate ? ` for ${createdTask.calendarDate}` : ""}.`
-      : "I can help plan, triage, or create tasks. Try: Remind me to study math next Tuesday at 4 PM.";
-
-    const reply = await generateAssistantReply(message, Boolean(createdTask), fallback);
+    const taskContext = createdTask
+      ? `Backend action completed: created task "${createdTask.title}"${createdTask.calendarDate ? ` for ${createdTask.calendarDate}` : ""}.`
+      : "Backend action completed: no task was created for this message.";
+    const reply = await generateAssistantReply(message, taskContext);
 
     res.json({
       reply,
@@ -196,8 +202,11 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     });
   } catch (err) {
     req.log?.error({ err }, "AI chat request failed");
+    const message = err instanceof Error && err.message === "GEMINI_API_KEY is not configured"
+      ? "Velocity Assistant is not connected yet. Set GEMINI_API_KEY on the server."
+      : "Velocity Assistant could not reach Gemini. Please try again.";
     res.status(500).json({
-      error: "Velocity Assistant hit a snag. Please try again.",
+      error: message,
     });
   }
 });
