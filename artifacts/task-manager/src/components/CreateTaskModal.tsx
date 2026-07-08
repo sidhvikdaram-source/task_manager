@@ -15,6 +15,8 @@ import {
   getGetDashboardOverviewQueryKey,
   getGetUserStatsQueryKey,
   getListDailyHabitsQueryKey,
+  type ListTasksParams,
+  type Task,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -30,6 +32,58 @@ const formSchema = z.object({
   estimatedMinutes: z.string().optional(),
   notes: z.string().optional(),
 });
+
+const priorityRank: Record<Task['priority'], number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+function taskMatchesParams(task: Task, params?: ListTasksParams) {
+  if (!params) return true;
+  if (params.status && task.status !== params.status) return false;
+  if (params.priority && task.priority !== params.priority) return false;
+  if (params.projectId && task.projectId !== params.projectId) return false;
+  return true;
+}
+
+function sortTasksForParams(tasks: Task[], params?: ListTasksParams) {
+  const sorted = [...tasks];
+  if (params?.sortBy === 'dueDate') {
+    return sorted.sort((a, b) => (a.dueDate ?? '9999-12-31').localeCompare(b.dueDate ?? '9999-12-31'));
+  }
+  if (params?.sortBy === 'vpValue') {
+    return sorted.sort((a, b) => b.vpValue - a.vpValue);
+  }
+  if (params?.sortBy === 'priority') {
+    return sorted.sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]);
+  }
+  return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+function seedCreatedTask(queryClient: ReturnType<typeof useQueryClient>, task: Task) {
+  const taskQueries = queryClient.getQueryCache().findAll({ queryKey: ['/api/tasks'] });
+
+  if (taskQueries.length === 0) {
+    queryClient.setQueryData(getListTasksQueryKey(), [task]);
+    return;
+  }
+
+  for (const query of taskQueries) {
+    const queryKey = query.queryKey;
+    const params = Array.isArray(queryKey) ? queryKey[1] as ListTasksParams | undefined : undefined;
+
+    queryClient.setQueryData<Task[]>(queryKey, (current) => {
+      if (!Array.isArray(current)) return current;
+
+      const withoutDuplicate = current.filter((existing) => existing.id !== task.id);
+      if (!taskMatchesParams(task, params)) return withoutDuplicate;
+
+      return sortTasksForParams([task, ...withoutDuplicate], params);
+    });
+  }
+}
 
 interface CreateTaskModalProps {
   open: boolean;
@@ -80,8 +134,9 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
     createTask.mutate(
       { data: payload as never },
       {
-        onSuccess: () => {
+        onSuccess: (createdTask) => {
           toast.success('Task created');
+          seedCreatedTask(queryClient, createdTask);
           // Invalidate AND refetch all API queries immediately
           queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(), refetchType: 'all' });
           queryClient.invalidateQueries({ queryKey: ['/api/tasks'], refetchType: 'all' });

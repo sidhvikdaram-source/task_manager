@@ -1,16 +1,18 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette } from 'lucide-react';
 import { useGetUserStats } from '@workspace/api-client-react';
 import { useState, useRef, useEffect } from 'react';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { useAuth } from '@workspace/replit-auth-web';
+import { themes, useTheme, type ThemeId } from '@/theme';
 
 export function TopNav() {
   const [location] = useLocation();
   const { data: stats } = useGetUserStats();
   const { user, logout, login, isAuthenticated } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -42,7 +44,7 @@ export function TopNav() {
             whileTap={{ scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-[0_0_24px_rgba(0,213,255,0.36)]">
+            <div className="logo-mark w-8 h-8 bg-primary flex items-center justify-center text-primary-foreground">
               <Zap className="w-4 h-4 fill-primary-foreground" />
             </div>
             <span className="tech-title text-lg">Velocity</span>
@@ -84,6 +86,22 @@ export function TopNav() {
         </nav>
 
         <div className="flex items-center gap-3">
+          <label className="hidden lg:flex h-9 items-center gap-2 rounded-xl border border-border/70 bg-muted/60 px-2.5 text-muted-foreground">
+            <Palette className="h-4 w-4" />
+            <select
+              aria-label="Theme"
+              value={theme}
+              onChange={(event) => setTheme(event.target.value as ThemeId)}
+              className="h-full bg-transparent text-xs font-bold text-foreground outline-none"
+            >
+              {themes.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <motion.button
             className="w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors border border-border/70"
             data-testid="button-notifications"

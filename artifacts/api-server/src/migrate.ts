@@ -56,9 +56,9 @@ export async function runMigrations(): Promise<void> {
       "status" varchar DEFAULT 'todo' NOT NULL,
       "priority" varchar DEFAULT 'medium' NOT NULL,
       "vp_value" integer DEFAULT 10 NOT NULL,
-      "due_date" timestamp with time zone,
-      "start_date" timestamp with time zone,
-      "calendar_date" timestamp with time zone,
+      "due_date" text,
+      "start_date" text,
+      "calendar_date" text,
       "completed_at" timestamp with time zone,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL,
       "project_id" integer,
@@ -67,6 +67,42 @@ export async function runMigrations(): Promise<void> {
       "links" jsonb,
       "notes" varchar
     );
+  `);
+
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "description" varchar;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "due_date" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "start_date" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "calendar_date" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "project_id" integer;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "estimated_minutes" integer;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "actual_minutes" integer;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "links" jsonb;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "notes" varchar;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'tasks' AND column_name = 'due_date' AND data_type <> 'text'
+      ) THEN
+        ALTER TABLE "tasks" ALTER COLUMN "due_date" TYPE text USING "due_date"::date::text;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'tasks' AND column_name = 'start_date' AND data_type <> 'text'
+      ) THEN
+        ALTER TABLE "tasks" ALTER COLUMN "start_date" TYPE text USING "start_date"::date::text;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'tasks' AND column_name = 'calendar_date' AND data_type <> 'text'
+      ) THEN
+        ALTER TABLE "tasks" ALTER COLUMN "calendar_date" TYPE text USING "calendar_date"::date::text;
+      END IF;
+    END $$;
   `);
 
   // Create projects table
@@ -84,13 +120,32 @@ export async function runMigrations(): Promise<void> {
 
   // Create checklist table
   await db.execute(sql`
-    CREATE TABLE IF NOT EXISTS "checklist" (
+    CREATE TABLE IF NOT EXISTS "checklist_items" (
       "id" serial PRIMARY KEY NOT NULL,
-      "task_id" integer NOT NULL,
-      "title" varchar NOT NULL,
+      "task_id" integer NOT NULL REFERENCES "tasks"("id") ON DELETE CASCADE,
+      "title" text NOT NULL,
       "completed" boolean DEFAULT false NOT NULL,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL
     );
+  `);
+
+  await db.execute(sql`
+    DO $$
+    BEGIN
+      IF to_regclass('public.checklist') IS NOT NULL THEN
+        EXECUTE '
+          INSERT INTO "checklist_items" ("id", "task_id", "title", "completed", "created_at")
+          SELECT "id", "task_id", "title", "completed", "created_at"
+          FROM "checklist"
+          ON CONFLICT ("id") DO NOTHING
+        ';
+        PERFORM setval(
+          pg_get_serial_sequence('checklist_items', 'id'),
+          COALESCE((SELECT MAX("id") FROM "checklist_items"), 1),
+          true
+        );
+      END IF;
+    END $$;
   `);
 
   // Create focus_sessions table
