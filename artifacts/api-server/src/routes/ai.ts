@@ -1,14 +1,12 @@
-import { GoogleGenAI } from "@google/genai";
+import Groq from "groq-sdk";
 import { Router, type IRouter } from "express";
 import { db, tasksTable } from "@workspace/db";
 
 const router: IRouter = Router();
 
 const systemPrompt = [
-  "You are Velocity Assistant, a highly efficient, intelligent productivity engine for a task manager dashboard.",
-  "You can answer general questions, give productivity tips, and help structure the user's day.",
-  "Keep your responses crisp, direct, and helpful.",
-  "If the backend created a task from the user's message, acknowledge that real task creation and include the task title/date when useful.",
+  "You are Velocity Assistant, a hyper-focused, lightning-fast productivity engine.",
+  "Keep responses crisp, actionable, and helpful.",
 ].join(" ");
 
 const weekdays = [
@@ -131,26 +129,27 @@ function parseTaskCommand(message: string): ParsedTaskCommand | null {
 }
 
 async function generateAssistantReply(message: string, taskContext: string) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured");
+    throw new Error("GROQ_API_KEY is not configured");
   }
 
-  const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
-    contents: `${taskContext}\n\nUser message:\n${message}`,
-    config: {
-      systemInstruction: systemPrompt,
-    },
+  const client = new Groq({ apiKey });
+  const response = await client.chat.completions.create({
+    model: process.env.GROQ_MODEL ?? "llama3-8b-8192",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "system", content: taskContext },
+      { role: "user", content: message },
+    ],
   });
 
-  const text = response.text?.trim();
+  const text = response.choices[0]?.message?.content;
   if (!text) {
-    throw new Error("Gemini returned an empty response");
+    throw new Error("Groq returned an empty response");
   }
 
-  return text;
+  return Array.isArray(text) ? text.map((part) => (typeof part === "string" ? part : "")).join("") : text;
 }
 
 router.post("/ai/chat", async (req, res): Promise<void> => {
@@ -202,9 +201,9 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     });
   } catch (err) {
     req.log?.error({ err }, "AI chat request failed");
-    const message = err instanceof Error && err.message === "GEMINI_API_KEY is not configured"
-      ? "Velocity Assistant is not connected yet. Set GEMINI_API_KEY on the server."
-      : "Velocity Assistant could not reach Gemini. Please try again.";
+    const message = err instanceof Error && err.message === "GROQ_API_KEY is not configured"
+      ? "Velocity Assistant is not connected yet. Set GROQ_API_KEY on the server."
+      : "Velocity Assistant could not reach Groq. Please try again.";
     res.status(500).json({
       error: message,
     });
