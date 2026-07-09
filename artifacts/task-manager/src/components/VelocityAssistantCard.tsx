@@ -33,10 +33,11 @@ const priorityRank: Record<Task['priority'], number> = {
   low: 3,
 };
 
-function AssistantLogo({ className }: { className?: string }) {
+function AssistantLogo({ className, circular = false }: { className?: string; circular?: boolean }) {
   return (
     <span className={cn(
       'logo-mark inline-flex h-8 w-8 shrink-0 items-center justify-center bg-primary text-primary-foreground',
+      circular && 'rounded-full',
       className,
     )}>
       <Zap className="h-4 w-4 fill-primary-foreground" />
@@ -236,7 +237,7 @@ export function VelocityAssistantCard() {
               message.role === 'user' && 'justify-end',
             )}
           >
-            {message.role === 'assistant' && <AssistantLogo className="mt-0.5 h-6 w-6 rounded-lg [&_svg]:h-3 [&_svg]:w-3" />}
+            {message.role === 'assistant' && <AssistantLogo circular className="mt-0.5 h-6 w-6 [&_svg]:h-3 [&_svg]:w-3" />}
             <div
               className={cn(
                 'max-w-[82%] rounded-2xl border px-3 py-2 text-sm leading-relaxed',

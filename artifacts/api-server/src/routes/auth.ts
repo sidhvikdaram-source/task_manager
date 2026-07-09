@@ -39,7 +39,7 @@ function getOrigin(req: Request): string {
 function setSessionCookie(res: Response, sid: string) {
   res.cookie(SESSION_COOKIE, sid, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL,
@@ -310,13 +310,19 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
   const origin = getOrigin(req);
 
   const sid = getSessionId(req);
   await clearSession(res, sid);
 
-  const clientId = process.env.OIDC_CLIENT_ID ?? process.env.REPL_ID ?? "";
+  const clientId = process.env.OIDC_CLIENT_ID ?? process.env.REPL_ID;
+  if (!clientId) {
+    res.redirect("/");
+    return;
+  }
+
+  const config = await getOidcConfig();
+
   const endSessionUrl = oidc.buildEndSessionUrl(config, {
     client_id: clientId,
     post_logout_redirect_uri: origin,

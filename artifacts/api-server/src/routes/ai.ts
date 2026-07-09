@@ -1,3 +1,4 @@
+import { GoogleGenAI } from "@google/genai";
 import Groq from "groq-sdk";
 import { Router, type IRouter } from "express";
 import { db, tasksTable } from "@workspace/db";
@@ -5,19 +6,27 @@ import { db, tasksTable } from "@workspace/db";
 const router: IRouter = Router();
 
 const systemPrompt = [
-  "You are Velocity Assistant. Your output must be perfectly clean, highly professional, and devoid of messy formatting or conversational fluff.",
-  "CRITICAL TASK HANDLING:",
-  "- If a user specifies a time without a task name, never name the task Task at 4 or Something tomorrow.",
-  "- Use contextual intelligence to generate a smart, logical placeholder name like Afternoon Focus Session, Morning Catch-up, or Project Sync based on the time frame.",
-  "- Explicitly support relative time markers like tomorrow, next Monday, in two hours, or Friday afternoon.",
-  "- Parse dates into clear, human-readable schedule references before returning confirmations.",
-  "- Return structured Markdown only, with short bullets or bold labels when useful.",
+  "You are Velocity Assistant.",
+  "Track 1: General Utility - Solve math, code, planning, writing, and everyday tasks cleanly with Markdown.",
+  "Track 2: Tasks - Time is strictly optional; never force a deadline or invent one when the user did not ask for it.",
+  "If a user sets a time without a task name, such as remind me at 4, generate a smart title like Afternoon Focus Block instead of Task at 4.",
+  "Handle relative dates like tomorrow, next Monday, Friday afternoon, in two hours, and in three days accurately.",
+  "Infer intent from short user phrases, but do not pretend to complete actions that the backend did not report as completed.",
+  "When the backend created a task, confirm the title and schedule reference first.",
+  "When no task was created, answer the user normally and do not mention backend internals.",
+  "Keep responses brief, professional, and free of filler.",
+  "Use structured Markdown only: short paragraphs, bullets, bold labels, and code fences when useful.",
+  "Do not include malformed tables, decorative characters, fake JSON, or hidden chain-of-thought.",
 ].join(" ");
 
 // qwen/qwen3-32b is the official Velocity model because its free-tier 60 RPM gives
 // more concurrency cushion than openai/gpt-oss-120b and qwen/qwen3.6-27b at 30 RPM.
+const velocityGeminiModel = "gemini-2.5-flash";
 const velocityGroqModel = "qwen/qwen3-32b";
 const groqMinRequestIntervalMs = 1_100;
+const geminiMinRequestIntervalMs = 700;
+let geminiQueue: Promise<unknown> = Promise.resolve();
+let lastGeminiRequestAt = 0;
 let groqQueue: Promise<unknown> = Promise.resolve();
 let lastGroqRequestAt = 0;
 
@@ -32,6 +41,10 @@ const weekdays = [
 ] as const;
 
 type Priority = "critical" | "high" | "medium" | "low";
+
+interface AssistantLogger {
+  warn: (obj: unknown, msg?: string) => void;
+}
 
 interface ParsedTaskCommand {
   title: string;
@@ -259,7 +272,48 @@ async function scheduleGroqRequest<T>(operation: () => Promise<T>) {
   return queued;
 }
 
-async function generateAssistantReply(message: string, taskContext: string) {
+async function scheduleGeminiRequest<T>(operation: () => Promise<T>) {
+  const run = async () => {
+    const elapsed = Date.now() - lastGeminiRequestAt;
+    if (elapsed < geminiMinRequestIntervalMs) {
+      await wait(geminiMinRequestIntervalMs - elapsed);
+    }
+
+    lastGeminiRequestAt = Date.now();
+    return operation();
+  };
+
+  const queued = geminiQueue.then(run, run);
+  geminiQueue = queued.catch(() => undefined);
+  return queued;
+}
+
+async function generateGeminiReply(message: string, taskContext: string) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured");
+  }
+
+  const client = new GoogleGenAI({ apiKey });
+  const response = await scheduleGeminiRequest(() => client.models.generateContent({
+    model: velocityGeminiModel,
+    contents: message,
+    config: {
+      systemInstruction: `${systemPrompt} ${taskContext}`,
+      maxOutputTokens: 360,
+      temperature: 0.35,
+    },
+  }));
+
+  const text = response.text;
+  if (!text) {
+    throw new Error(`Gemini returned an empty response for ${velocityGeminiModel}`);
+  }
+
+  return text;
+}
+
+async function generateGroqReply(message: string, taskContext: string) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error("GROQ_API_KEY is not configured");
@@ -286,6 +340,21 @@ async function generateAssistantReply(message: string, taskContext: string) {
   return text;
 }
 
+async function generateAssistantReply(message: string, taskContext: string, log?: AssistantLogger) {
+  try {
+    return {
+      provider: "gemini" as const,
+      reply: await generateGeminiReply(message, taskContext),
+    };
+  } catch (geminiError) {
+    log?.warn?.({ err: geminiError }, "Gemini assistant request failed; falling back to Groq");
+    return {
+      provider: "groq" as const,
+      reply: await generateGroqReply(message, taskContext),
+    };
+  }
+}
+
 function getGroqStatus(err: unknown) {
   if (typeof err === "object" && err !== null && "status" in err) {
     const status = (err as { status?: unknown }).status;
@@ -304,6 +373,14 @@ function formatGroqError(err: unknown) {
   }
   return err.message
     .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [redacted]")
+    .slice(0, 400);
+}
+
+function formatAiError(err: unknown) {
+  if (!(err instanceof Error)) return "AI request failed.";
+  return err.message
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [redacted]")
+    .replace(/key=[A-Za-z0-9._-]+/g, "key=[redacted]")
     .slice(0, 400);
 }
 
@@ -351,18 +428,19 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
         "Respond in clean Markdown with a short confirmation and no extra chatter.",
       ].filter(Boolean).join(" ")
       : "Backend action completed: no task was created for this message.";
-    const reply = await generateAssistantReply(message, taskContext);
+    const { reply, provider } = await generateAssistantReply(message, taskContext, req.log);
 
     res.json({
       reply,
+      provider,
       taskCreated: Boolean(createdTask),
       task: createdTask,
     });
   } catch (err) {
     req.log?.error({ err }, "AI chat request failed");
     const message = err instanceof Error && err.message === "GROQ_API_KEY is not configured"
-      ? "Velocity Assistant is not connected yet. Set GROQ_API_KEY on the server."
-      : `Velocity Assistant could not reach Groq: ${formatGroqError(err)}`;
+      ? "Velocity Assistant is not connected yet. Set GEMINI_API_KEY or GROQ_API_KEY on the server."
+      : `Velocity Assistant could not reach its AI providers: ${formatAiError(err)}`;
     res.status(500).json({
       error: message,
     });
