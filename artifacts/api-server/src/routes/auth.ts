@@ -154,8 +154,8 @@ router.post("/auth/register", async (req: Request, res: Response): Promise<void>
   const password = normalizePassword(req.body?.password);
   const firstName = typeof req.body?.firstName === "string" ? req.body.firstName.trim() : "";
 
-  if (!email || !email.includes("@") || password.length < 8) {
-    res.status(400).json({ error: "Enter a valid email and a password with at least 8 characters." });
+  if (!email || !email.includes("@") || password.length < 6) {
+    res.status(400).json({ error: "Enter a valid email and a password with at least 6 characters." });
     return;
   }
 
@@ -175,7 +175,7 @@ router.post("/auth/register", async (req: Request, res: Response): Promise<void>
         .returning()
       : await db
         .insert(usersTable)
-        .values({ email, passwordHash, firstName: firstName || null })
+        .values({ id: crypto.randomUUID(), email, passwordHash, firstName: firstName || null })
         .returning();
 
     const sessionUser = await createLocalSession(res, user);

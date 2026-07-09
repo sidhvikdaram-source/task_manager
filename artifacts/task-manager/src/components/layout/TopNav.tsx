@@ -1,12 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, Search, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle } from 'lucide-react';
 import {
-  getGetDashboardOverviewQueryKey,
-  getGetUserStatsQueryKey,
   getListTasksQueryKey,
-  useCreateTask,
   useGetUserStats,
   useListTasks,
   type Task,
@@ -15,100 +12,6 @@ import { useState, useRef, useEffect } from 'react';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { useAuth } from '@workspace/replit-auth-web';
 import { themes, useTheme, type ThemeId } from '@/theme';
-import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-
-type Priority = 'critical' | 'high' | 'medium' | 'low';
-
-const projectTagPattern = /#([a-z0-9_-]+)/i;
-const priorityTagPattern = /@(critical|urgent|high|medium|low|important)/i;
-
-function formatDate(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function nextWeekday(day: number) {
-  const date = new Date();
-  let delta = day - date.getDay();
-  if (delta <= 0) delta += 7;
-  date.setDate(date.getDate() + delta);
-  return formatDate(date);
-}
-
-function parseQuickDate(text: string) {
-  const lower = text.toLowerCase();
-  if (/\btoday\b/.test(lower)) return formatDate(new Date());
-  if (/\btomorrow\b/.test(lower)) {
-    const date = new Date();
-    date.setDate(date.getDate() + 1);
-    return formatDate(date);
-  }
-  const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  const weekday = weekdays.findIndex((day) => new RegExp(`\\b(next\\s+)?${day}\\b`, 'i').test(text));
-  if (weekday >= 0) return nextWeekday(weekday);
-  const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
-  return iso?.[1];
-}
-
-function parseQuickTime(text: string) {
-  const lower = text.toLowerCase();
-  if (/\bmorning\b/.test(lower)) return '9:00 AM';
-  if (/\bafternoon\b/.test(lower)) return '2:00 PM';
-  if (/\bevening\b/.test(lower)) return '6:00 PM';
-  if (/\btonight\b|\bnight\b/.test(lower)) return '8:00 PM';
-  const match = text.match(/\b(?:at|@)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
-  if (!match) return undefined;
-  const hasCue = Boolean(match[2] || match[3] || /(?:^|\s)(at|@)\s*\d/i.test(text));
-  if (!hasCue) return undefined;
-  const hour = Number(match[1]);
-  if (hour < 1 || hour > 23) return undefined;
-  const suffix = match[3]?.toUpperCase() ?? (hour >= 7 && hour <= 11 ? 'AM' : 'PM');
-  const displayHour = hour > 12 ? hour - 12 : hour;
-  return `${displayHour}:${match[2] ?? '00'} ${suffix}`;
-}
-
-function parseQuickPriority(text: string): Priority {
-  const match = text.match(priorityTagPattern);
-  const value = match?.[1]?.toLowerCase();
-  if (value === 'critical' || value === 'urgent') return 'critical';
-  if (value === 'high' || value === 'important') return 'high';
-  if (value === 'low') return 'low';
-  return 'medium';
-}
-
-function cleanQuickTitle(text: string) {
-  const cleaned = text
-    .replace(priorityTagPattern, '')
-    .replace(projectTagPattern, '')
-    .replace(/\b(today|tomorrow|next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi, '')
-    .replace(/\b(morning|afternoon|evening|tonight|night)\b/gi, '')
-    .replace(/\b(20\d{2}-\d{2}-\d{2})\b/g, '')
-    .replace(/\b(?:at|@)\s*\d{1,2}(?::\d{2})?\s*(am|pm)?\b/gi, '')
-    .replace(/\b\d{1,2}:\d{2}\s*(am|pm)?\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return cleaned || 'Quick Capture';
-}
-
-function parseQuickCapture(text: string) {
-  const dueDate = parseQuickDate(text);
-  const time = parseQuickTime(text);
-  const projectTag = text.match(projectTagPattern)?.[1];
-  const notes = [
-    'Captured from quick bar',
-    time ? `Time: ${time}` : '',
-    projectTag ? `Tag: #${projectTag}` : '',
-  ].filter(Boolean).join('\n');
-
-  return {
-    title: cleanQuickTitle(text),
-    priority: parseQuickPriority(text),
-    dueDate,
-    calendarDate: dueDate,
-    description: time ? `Time: ${time}` : undefined,
-    notes,
-  };
-}
 
 function daysUntil(date?: string | null) {
   if (!date) return null;
@@ -127,7 +30,6 @@ function notificationLabel(task: Task) {
 
 export function TopNav() {
   const [location] = useLocation();
-  const queryClient = useQueryClient();
   const { data: stats } = useGetUserStats();
   const { data: tasks } = useListTasks(
     { sortBy: 'dueDate' },
@@ -135,12 +37,9 @@ export function TopNav() {
   );
   const { user, logout, login, isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
-  const createTask = useCreateTask();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [quickText, setQuickText] = useState('');
-  const quickInputRef = useRef<HTMLInputElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
 
@@ -157,17 +56,6 @@ export function TopNav() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  useEffect(() => {
-    function handleShortcut(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        quickInputRef.current?.focus();
-      }
-    }
-    window.addEventListener('keydown', handleShortcut);
-    return () => window.removeEventListener('keydown', handleShortcut);
-  }, []);
-
   const links = [
     { href: '/', label: 'Home', icon: LayoutDashboard },
     { href: '/calendar', label: 'Calendar', icon: CalendarDays },
@@ -181,28 +69,6 @@ export function TopNav() {
     .filter((item): item is { task: Task; days: number } => item.days !== null && item.days >= 0 && item.days <= 2)
     .slice(0, 8);
 
-  function submitQuickCapture(event: React.FormEvent) {
-    event.preventDefault();
-    const text = quickText.trim();
-    if (!text || createTask.isPending) return;
-
-    const parsed = parseQuickCapture(text);
-    createTask.mutate(
-      { data: parsed as never },
-      {
-        onSuccess: () => {
-          setQuickText('');
-          toast.success('Captured', { description: parsed.title });
-          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(), refetchType: 'all' });
-          queryClient.invalidateQueries({ queryKey: ['/api/tasks'], refetchType: 'all' });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey(), refetchType: 'all' });
-          queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey(), refetchType: 'all' });
-        },
-        onError: () => toast.error('Could not capture task'),
-      },
-    );
-  }
-
   return (
     <>
       <header className="h-16 border-b neon-rule bg-background/78 backdrop-blur-xl flex items-center px-4 sm:px-6 gap-4 sm:gap-6 shrink-0 sticky top-0 z-40 shadow-[0_12px_40px_rgba(0,0,0,0.32)]">
@@ -213,10 +79,10 @@ export function TopNav() {
             whileTap={{ scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
-            <div className="logo-mark w-8 h-8 bg-primary flex items-center justify-center text-primary-foreground">
-              <Zap className="w-4 h-4 fill-primary-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-[1.15rem] bg-[#141414] text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+              <Zap className="h-5 w-5 fill-white text-white" />
             </div>
-            <span className="tech-title text-lg">Velocity</span>
+            <span className="text-xl font-black tracking-tight text-foreground">Velocity</span>
           </motion.div>
         </Link>
 
@@ -254,26 +120,7 @@ export function TopNav() {
           })}
         </nav>
 
-        <form onSubmit={submitQuickCapture} className="hidden xl:flex h-9 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-xl border border-border/70 bg-muted/50 px-3">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <input
-            ref={quickInputRef}
-            value={quickText}
-            onChange={(event) => setQuickText(event.target.value)}
-            placeholder='Quick capture: Call mom Sunday afternoon @High #Personal'
-            className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-            aria-label="Quick capture task"
-          />
-          <button
-            type="submit"
-            disabled={!quickText.trim() || createTask.isPending}
-            className="rounded-lg bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground disabled:opacity-40"
-          >
-            Add
-          </button>
-        </form>
-
-        <div className="flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-3">
           <label className="hidden lg:flex h-9 items-center gap-2 rounded-xl border border-border/70 bg-muted/60 px-2.5 text-muted-foreground">
             <Palette className="h-4 w-4" />
             <select

@@ -277,7 +277,7 @@
   }
 
   .logo-mark {
-    border-radius: 9999px;
+    border-radius: 1rem;
     box-shadow: var(--logo-glow);
   }
 }

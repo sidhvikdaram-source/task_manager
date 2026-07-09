@@ -30,11 +30,30 @@ function parseVelocityType(notes?: string | null) {
   return { symbol: match[1], label: match[2] };
 }
 
-function playCompletionSound() {
-  const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextClass) return;
+let completionAudioContext: AudioContext | null = null;
 
-  const ctx = new AudioContextClass();
+function getCompletionAudioContext() {
+  const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return null;
+
+  completionAudioContext ??= new AudioContextClass();
+  return completionAudioContext;
+}
+
+function primeCompletionSound() {
+  const ctx = getCompletionAudioContext();
+  if (ctx?.state === 'suspended') {
+    void ctx.resume();
+  }
+}
+
+function playCompletionSound() {
+  const ctx = getCompletionAudioContext();
+  if (!ctx) return;
+
+  if (ctx.state === 'suspended') {
+    void ctx.resume();
+  }
   [523.25, 659.25, 783.99].forEach((frequency, index) => {
     const oscillator = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -49,7 +68,6 @@ function playCompletionSound() {
     oscillator.start(start);
     oscillator.stop(start + 0.2);
   });
-  window.setTimeout(() => void ctx.close(), 700);
 }
 
 export function TaskCard({ task, layoutId }: TaskCardProps) {
@@ -65,6 +83,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
     e.stopPropagation();
     if (isCompleted) return;
 
+    primeCompletionSound();
     completeTask.mutate(
       { id: task.id },
       {

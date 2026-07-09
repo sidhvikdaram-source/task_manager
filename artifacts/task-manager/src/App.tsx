@@ -131,7 +131,7 @@ function LoginScreen() {
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Password"
+                  placeholder={mode === "register" ? "Password (6+ characters)" : "Password"}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   required
