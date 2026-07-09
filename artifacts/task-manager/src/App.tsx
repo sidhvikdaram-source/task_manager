@@ -33,7 +33,7 @@ function LoginScreen() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="text-center space-y-6 max-w-sm px-6">
         <div className="flex items-center justify-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+          <div className="logo-mark flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
             <Zap className="w-6 h-6 text-primary-foreground fill-primary-foreground" />
           </div>
           <span className="font-bold text-2xl tracking-tight">Velocity</span>

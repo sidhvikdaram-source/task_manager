@@ -5,11 +5,18 @@ import { db, tasksTable } from "@workspace/db";
 const router: IRouter = Router();
 
 const systemPrompt = [
-  "You are Velocity Assistant, a hyper-focused, lightning-fast productivity engine.",
-  "Keep responses crisp, actionable, and helpful.",
+  "You are Velocity Assistant, a precise productivity engine inside a task manager dashboard.",
+  "Answer regular questions, give practical productivity advice, and acknowledge task actions clearly.",
+  "Keep every response concise, structured, non-rambling, and directly useful.",
+  "If a backend action was completed, state the result first.",
 ].join(" ");
 
-const defaultGroqModels = ["llama-3.1-8b-instant", "llama3-8b-8192"];
+// qwen/qwen3-32b is the official Velocity model because its free-tier 60 RPM gives
+// more concurrency cushion than openai/gpt-oss-120b and qwen/qwen3.6-27b at 30 RPM.
+const velocityGroqModel = "qwen/qwen3-32b";
+const groqMinRequestIntervalMs = 1_100;
+let groqQueue: Promise<unknown> = Promise.resolve();
+let lastGroqRequestAt = 0;
 
 const weekdays = [
   "sunday",
@@ -130,6 +137,26 @@ function parseTaskCommand(message: string): ParsedTaskCommand | null {
   };
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function scheduleGroqRequest<T>(operation: () => Promise<T>) {
+  const run = async () => {
+    const elapsed = Date.now() - lastGroqRequestAt;
+    if (elapsed < groqMinRequestIntervalMs) {
+      await wait(groqMinRequestIntervalMs - elapsed);
+    }
+
+    lastGroqRequestAt = Date.now();
+    return operation();
+  };
+
+  const queued = groqQueue.then(run, run);
+  groqQueue = queued.catch(() => undefined);
+  return queued;
+}
+
 async function generateAssistantReply(message: string, taskContext: string) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -137,38 +164,42 @@ async function generateAssistantReply(message: string, taskContext: string) {
   }
 
   const client = new Groq({ apiKey });
-  const models = process.env.GROQ_MODEL
-    ? [process.env.GROQ_MODEL, ...defaultGroqModels.filter((model) => model !== process.env.GROQ_MODEL)]
-    : defaultGroqModels;
 
-  let lastError: unknown;
-  for (const model of models) {
-    try {
-      const response = await client.chat.completions.create({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "system", content: taskContext },
-          { role: "user", content: message },
-        ],
-      });
+  const response = await scheduleGroqRequest(() => client.chat.completions.create({
+    model: velocityGroqModel,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "system", content: taskContext },
+      { role: "user", content: message },
+    ],
+    max_tokens: 360,
+    temperature: 0.35,
+  }));
 
-      const text = response.choices[0]?.message?.content;
-      if (!text) {
-        throw new Error(`Groq returned an empty response for ${model}`);
-      }
+  const text = response.choices[0]?.message?.content;
+  if (!text) {
+    throw new Error(`Groq returned an empty response for ${velocityGroqModel}`);
+  }
 
-      return text;
-    } catch (err) {
-      lastError = err;
+  return text;
+}
+
+function getGroqStatus(err: unknown) {
+  if (typeof err === "object" && err !== null && "status" in err) {
+    const status = (err as { status?: unknown }).status;
+    if (typeof status === "number") {
+      return status;
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Groq request failed");
+  return undefined;
 }
 
 function formatGroqError(err: unknown) {
   if (!(err instanceof Error)) return "Groq request failed.";
+  if (getGroqStatus(err) === 429) {
+    return "Groq is temporarily rate limited. The Velocity request queue is active; try again in a moment.";
+  }
   return err.message
     .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [redacted]")
     .slice(0, 400);

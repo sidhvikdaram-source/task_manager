@@ -92,7 +92,7 @@ export function VelocityAssistantCard() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'How can I speed up your day? Try: “Remind me to study math next Tuesday at 4 PM.”',
+      content: 'How can I speed up your day? Try: "Remind me to study math next Tuesday at 4 PM."',
     },
   ]);
   const [input, setInput] = useState('');
@@ -215,7 +215,7 @@ export function VelocityAssistantCard() {
               )}
             >
               {message.content || (message.typing ? '...' : '')}
-              {message.typing && <span className="ml-0.5 animate-pulse text-primary">▌</span>}
+              {message.typing && <span className="ml-0.5 animate-pulse text-primary">|</span>}
             </div>
           </div>
         ))}
