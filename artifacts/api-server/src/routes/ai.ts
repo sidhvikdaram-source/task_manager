@@ -21,8 +21,9 @@ const systemPrompt = [
 
 // qwen/qwen3-32b is the official Velocity model because its free-tier 60 RPM gives
 // more concurrency cushion than openai/gpt-oss-120b and qwen/qwen3.6-27b at 30 RPM.
-const velocityGeminiModel = "gemini-2.5-flash";
-const velocityGroqModel = "qwen/qwen3-32b";
+const velocityGeminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+const velocityGroqModels = ["qwen/qwen3-32b", "openai/gpt-oss-120b"];
+const assistantMaxOutputTokens = 720;
 const groqMinRequestIntervalMs = 1_100;
 const geminiMinRequestIntervalMs = 700;
 let geminiQueue: Promise<unknown> = Promise.resolve();
@@ -327,12 +328,42 @@ function looksLikeTask(input: string, date?: string, time?: string) {
 }
 
 function normalizeTitle(title: string) {
-  const trimmed = title
+  const corrections: Array<[RegExp, string]> = [
+    [/\bspanisn\b/gi, "Spanish"],
+    [/\bspansih\b/gi, "Spanish"],
+    [/\bspainish\b/gi, "Spanish"],
+    [/\benglsh\b/gi, "English"],
+    [/\bengish\b/gi, "English"],
+    [/\bmat\b/gi, "math"],
+    [/\bmth\b/gi, "math"],
+    [/\bsciene\b/gi, "science"],
+    [/\bhistry\b/gi, "history"],
+    [/\bchem\b/gi, "chemistry"],
+    [/\bbio\b/gi, "biology"],
+    [/\bgeo\b/gi, "geometry"],
+    [/\bcalc\b/gi, "calculus"],
+  ];
+
+  let trimmed = title
     .replace(/^to\s+/i, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  for (const [pattern, replacement] of corrections) {
+    trimmed = trimmed.replace(pattern, replacement);
+  }
+
   if (!trimmed) return "";
-  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return trimmed
+    .split(" ")
+    .map((word, index) => {
+      if (/^(spanish|english|french|math|science|history|biology|chemistry|geometry|calculus|algebra)$/i.test(word)) {
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      }
+      if (index === 0) return word.charAt(0).toUpperCase() + word.slice(1);
+      return word;
+    })
+    .join(" ");
 }
 
 function formatScheduleLabel(date?: string, time?: string) {
@@ -364,7 +395,7 @@ function buildTaskDescription(command: ParsedTaskCommand) {
   const parts = [];
   if (command.time) parts.push(`Time: ${command.time}`);
   if (command.taskType !== "regular") parts.push(`${taskTypeSymbols[command.taskType]} ${taskTypeLabels[command.taskType]}`);
-  return parts.join(" • ") || undefined;
+  return parts.join(" | ") || undefined;
 }
 
 function parseTaskCommand(message: string): ParsedTaskCommand | null {
@@ -430,22 +461,32 @@ async function generateGeminiReply(message: string, taskContext: string) {
   }
 
   const client = new GoogleGenAI({ apiKey });
-  const response = await scheduleGeminiRequest(() => client.models.generateContent({
-    model: velocityGeminiModel,
-    contents: message,
-    config: {
-      systemInstruction: `${systemPrompt} ${taskContext}`,
-      maxOutputTokens: 360,
-      temperature: 0.35,
-    },
-  }));
+  let lastError: unknown;
 
-  const text = response.text;
-  if (!text) {
-    throw new Error(`Gemini returned an empty response for ${velocityGeminiModel}`);
+  for (const model of velocityGeminiModels) {
+    try {
+      const response = await scheduleGeminiRequest(() => client.models.generateContent({
+        model,
+        contents: message,
+        config: {
+          systemInstruction: `${systemPrompt} ${taskContext}`,
+          maxOutputTokens: assistantMaxOutputTokens,
+          temperature: 0.35,
+        },
+      }));
+
+      const text = response.text;
+      if (!text) {
+        throw new Error(`Gemini returned an empty response for ${model}`);
+      }
+
+      return text;
+    } catch (err) {
+      lastError = err;
+    }
   }
 
-  return text;
+  throw lastError instanceof Error ? lastError : new Error("Gemini request failed");
 }
 
 async function generateGroqReply(message: string, taskContext: string) {
@@ -456,23 +497,33 @@ async function generateGroqReply(message: string, taskContext: string) {
 
   const client = new Groq({ apiKey });
 
-  const response = await scheduleGroqRequest(() => client.chat.completions.create({
-    model: velocityGroqModel,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "system", content: taskContext },
-      { role: "user", content: message },
-    ],
-    max_tokens: 360,
-    temperature: 0.35,
-  }));
+  let lastError: unknown;
 
-  const text = response.choices[0]?.message?.content;
-  if (!text) {
-    throw new Error(`Groq returned an empty response for ${velocityGroqModel}`);
+  for (const model of velocityGroqModels) {
+    try {
+      const response = await scheduleGroqRequest(() => client.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "system", content: taskContext },
+          { role: "user", content: message },
+        ],
+        max_tokens: assistantMaxOutputTokens,
+        temperature: 0.35,
+      }));
+
+      const text = response.choices[0]?.message?.content;
+      if (!text) {
+        throw new Error(`Groq returned an empty response for ${model}`);
+      }
+
+      return text;
+    } catch (err) {
+      lastError = err;
+    }
   }
 
-  return text;
+  throw lastError instanceof Error ? lastError : new Error("Groq request failed");
 }
 
 async function generateAssistantReply(message: string, taskContext: string, log?: AssistantLogger) {
