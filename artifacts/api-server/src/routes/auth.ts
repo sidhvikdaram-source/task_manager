@@ -1,4 +1,6 @@
 import * as oidc from "openid-client";
+import crypto from "node:crypto";
+import { promisify } from "node:util";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   GetCurrentAuthUserResponse,
@@ -7,6 +9,7 @@ import {
   LogoutMobileSessionResponse,
 } from "@workspace/api-zod";
 import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   clearSession,
   getOidcConfig,
@@ -20,6 +23,7 @@ import {
 } from "../lib/auth";
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
+const scryptAsync = promisify(crypto.scrypt);
 
 const router: IRouter = Router();
 
@@ -40,6 +44,48 @@ function setSessionCookie(res: Response, sid: string) {
     path: "/",
     maxAge: SESSION_TTL,
   });
+}
+
+function normalizeEmail(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function normalizePassword(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+async function hashPassword(password: string) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = await scryptAsync(password, salt, 64) as Buffer;
+  return `scrypt:${salt}:${derived.toString("hex")}`;
+}
+
+async function verifyPassword(password: string, storedHash: string | null) {
+  if (!storedHash) return false;
+  const [method, salt, expected] = storedHash.split(":");
+  if (method !== "scrypt" || !salt || !expected) return false;
+
+  const derived = await scryptAsync(password, salt, 64) as Buffer;
+  const expectedBuffer = Buffer.from(expected, "hex");
+  return expectedBuffer.length === derived.length && crypto.timingSafeEqual(derived, expectedBuffer);
+}
+
+async function createLocalSession(res: Response, user: typeof usersTable.$inferSelect) {
+  const sessionData: SessionData = {
+    user: {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      profileImageUrl: user.profileImageUrl,
+    },
+    access_token: "local",
+    expires_at: Math.floor((Date.now() + SESSION_TTL) / 1000),
+  };
+
+  const sid = await createSession(sessionData);
+  setSessionCookie(res, sid);
+  return sessionData.user;
 }
 
 function setOidcCookie(res: Response, name: string, value: string) {
@@ -101,6 +147,67 @@ router.get("/auth/user", (req: Request, res: Response) => {
       user: req.isAuthenticated() ? req.user : null,
     }),
   );
+});
+
+router.post("/auth/register", async (req: Request, res: Response): Promise<void> => {
+  const email = normalizeEmail(req.body?.email);
+  const password = normalizePassword(req.body?.password);
+  const firstName = typeof req.body?.firstName === "string" ? req.body.firstName.trim() : "";
+
+  if (!email || !email.includes("@") || password.length < 8) {
+    res.status(400).json({ error: "Enter a valid email and a password with at least 8 characters." });
+    return;
+  }
+
+  try {
+    const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    if (existingUser?.passwordHash) {
+      res.status(409).json({ error: "An account with this email already exists. Sign in instead." });
+      return;
+    }
+
+    const passwordHash = await hashPassword(password);
+    const [user] = existingUser
+      ? await db
+        .update(usersTable)
+        .set({ passwordHash, firstName: firstName || existingUser.firstName, updatedAt: new Date() })
+        .where(eq(usersTable.id, existingUser.id))
+        .returning()
+      : await db
+        .insert(usersTable)
+        .values({ email, passwordHash, firstName: firstName || null })
+        .returning();
+
+    const sessionUser = await createLocalSession(res, user);
+    res.json({ user: sessionUser });
+  } catch (err) {
+    req.log?.error({ err }, "Local registration failed");
+    res.status(500).json({ error: "Could not create that account. Please try again." });
+  }
+});
+
+router.post("/auth/login", async (req: Request, res: Response): Promise<void> => {
+  const email = normalizeEmail(req.body?.email);
+  const password = normalizePassword(req.body?.password);
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Email and password are required." });
+    return;
+  }
+
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      res.status(401).json({ error: "Invalid email or password." });
+      return;
+    }
+
+    const sessionUser = await createLocalSession(res, user);
+    res.json({ user: sessionUser });
+  } catch (err) {
+    req.log?.error({ err }, "Local login failed");
+    res.status(500).json({ error: "Could not sign in. Please try again." });
+  }
 });
 
 router.get("/login", async (req: Request, res: Response) => {

@@ -67,9 +67,8 @@ export async function authMiddleware(
     return this.user != null;
   } as Request["isAuthenticated"];
 
-  // If OIDC is not configured, use demo user so the app works without Google Auth
-  const oidcClientId = process.env.OIDC_CLIENT_ID;
-  if (!oidcClientId) {
+  // Demo auth is opt-in so production always shows the real login portal.
+  if (process.env.ENABLE_DEMO_AUTH === "true") {
     req.user = {
       id: "demo-user",
       email: "demo@velocity.app",

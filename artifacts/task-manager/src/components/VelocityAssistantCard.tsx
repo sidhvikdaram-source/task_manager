@@ -44,6 +44,37 @@ function AssistantLogo({ className }: { className?: string }) {
   );
 }
 
+function renderInlineMarkdown(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={`${part}-${index}`}>{part.slice(2, -2)}</strong>;
+    }
+    return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+  });
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
+
+  return (
+    <div className="space-y-1.5">
+      {lines.map((line, index) => {
+        const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+        if (bullet?.[1]) {
+          return (
+            <div key={`${line}-${index}`} className="flex gap-2">
+              <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-primary" />
+              <span>{renderInlineMarkdown(bullet[1])}</span>
+            </div>
+          );
+        }
+        return <p key={`${line}-${index}`}>{renderInlineMarkdown(line)}</p>;
+      })}
+    </div>
+  );
+}
+
 function taskMatchesParams(task: Task, params?: ListTasksParams) {
   if (!params) return true;
   if (params.status && task.status !== params.status) return false;
@@ -214,7 +245,7 @@ export function VelocityAssistantCard() {
                   : 'border-secondary/30 bg-secondary/15 text-foreground',
               )}
             >
-              {message.content || (message.typing ? '...' : '')}
+              {message.content ? <MarkdownMessage content={message.content} /> : (message.typing ? '...' : '')}
               {message.typing && <span className="ml-0.5 animate-pulse text-primary">|</span>}
             </div>
           </div>

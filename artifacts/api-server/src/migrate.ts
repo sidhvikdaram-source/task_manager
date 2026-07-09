@@ -9,12 +9,17 @@ export async function runMigrations(): Promise<void> {
     CREATE TABLE IF NOT EXISTS "users" (
       "id" varchar PRIMARY KEY NOT NULL,
       "email" varchar UNIQUE,
+      "password_hash" varchar,
       "first_name" varchar,
       "last_name" varchar,
       "profile_image_url" varchar,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL,
       "updated_at" timestamp with time zone DEFAULT now() NOT NULL
     );
+  `);
+
+  await db.execute(sql`
+    ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password_hash" varchar;
   `);
 
   // Create sessions table

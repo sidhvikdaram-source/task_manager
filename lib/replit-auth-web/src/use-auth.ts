@@ -8,6 +8,8 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: () => void;
+  loginWithPassword: (email: string, password: string) => Promise<void>;
+  registerWithPassword: (email: string, password: string, firstName?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -65,6 +67,35 @@ export function useAuth(): AuthState {
     }
   }, [isEmbedded]);
 
+  const submitLocalAuth = useCallback(async (
+    path: "/api/auth/login" | "/api/auth/register",
+    email: string,
+    password: string,
+    firstName?: string,
+  ) => {
+    const res = await fetch(path, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, firstName }),
+    });
+
+    const data = await res.json() as { user?: AuthUser; error?: string };
+    if (!res.ok || !data.user) {
+      throw new Error(data.error ?? "Authentication failed.");
+    }
+
+    setUser(data.user);
+  }, []);
+
+  const loginWithPassword = useCallback((email: string, password: string) => (
+    submitLocalAuth("/api/auth/login", email, password)
+  ), [submitLocalAuth]);
+
+  const registerWithPassword = useCallback((email: string, password: string, firstName?: string) => (
+    submitLocalAuth("/api/auth/register", email, password, firstName)
+  ), [submitLocalAuth]);
+
   const logout = useCallback(() => {
     if (isEmbedded) {
       fetch("/api/auth/session-logout", { method: "POST", credentials: "include" })
@@ -79,6 +110,8 @@ export function useAuth(): AuthState {
     isLoading,
     isAuthenticated: !!user,
     login,
+    loginWithPassword,
+    registerWithPassword,
     logout,
   };
 }
