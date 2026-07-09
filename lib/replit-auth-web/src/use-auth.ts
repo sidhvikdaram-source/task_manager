@@ -3,6 +3,8 @@ import type { AuthUser } from "@workspace/api-client-react";
 
 export type { AuthUser };
 
+const AUTH_CHANGED_EVENT = "velocity-auth-changed";
+
 interface AuthState {
   user: AuthUser | null;
   isLoading: boolean;
@@ -29,6 +31,14 @@ export function useAuth(): AuthState {
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
     const isEmbedded = window.self !== window.top;
 
+    const handleAuthChanged = (event: Event) => {
+      const detail = (event as CustomEvent<AuthUser | null>).detail ?? null;
+      setUser(detail);
+      setIsLoading(false);
+    };
+
+    window.addEventListener(AUTH_CHANGED_EVENT, handleAuthChanged);
+
     const check = () => {
       fetchUser()
         .then((u) => {
@@ -53,6 +63,7 @@ export function useAuth(): AuthState {
 
     return () => {
       cancelled = true;
+      window.removeEventListener(AUTH_CHANGED_EVENT, handleAuthChanged);
       if (pollTimer) clearTimeout(pollTimer);
     };
   }, []);
@@ -86,6 +97,7 @@ export function useAuth(): AuthState {
     }
 
     setUser(data.user);
+    window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT, { detail: data.user }));
   }, []);
 
   const loginWithPassword = useCallback((email: string, password: string) => (
@@ -100,6 +112,7 @@ export function useAuth(): AuthState {
     fetch("/api/session-logout", { method: "POST", credentials: "include" })
       .finally(() => {
         setUser(null);
+        window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT, { detail: null }));
         if (isEmbedded) return;
         window.location.href = "/";
       });

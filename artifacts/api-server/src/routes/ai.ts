@@ -16,7 +16,8 @@ const systemPrompt = [
   "When no task was created, answer the user normally and do not mention backend internals.",
   "Keep responses brief, professional, and free of filler.",
   "Use structured Markdown only: short paragraphs, bullets, bold labels, and code fences when useful.",
-  "For math, do not use raw LaTeX delimiters or commands. Write readable plain-text math, for example x = (-4 +/- sqrt(-104)) / 10, then explain each step.",
+  "For math, use clean readable Markdown with plain-text equations. Do not use raw LaTeX delimiters, backslash commands, or dollar signs. Prefer forms like x = (-4 +/- sqrt(-104)) / 10 and bullet each step clearly.",
+  "Never create a task for a math expression, equation, solve request, essay request, explanation request, or general homework help unless the user explicitly says to remind, schedule, add a task, create a todo, or set a deadline.",
   "Do not include malformed tables, decorative characters, fake JSON, or hidden chain-of-thought.",
 ].join(" ");
 
@@ -144,7 +145,7 @@ const taskIntentPatterns = [
   /\b(add|create|set|schedule|plan|put|make|start|finish|complete|do|work on|handle|take care of|prep|prepare)\b/i,
   /\b(call|email|text|message|reply|follow up|ping|meet|book|reserve|submit|turn in|send)\b/i,
   /\b(study|homework|assignment|project|worksheet|review|practice|read|write|draft|design|code|debug|deploy|test|pay|buy|pick up|clean|wash|workout|exercise)\b/i,
-  /\b(due|deadline|by|before|appointment|meeting|event|todo|task)\b/i,
+  /\b(due|deadline|before|appointment|meeting|event|todo|task)\b/i,
 ];
 
 const taskTypePatterns: Array<[TaskType, RegExp]> = [
@@ -382,8 +383,12 @@ function cleanAssistantReply(reply: string) {
     .replace(/\\times/g, "x")
     .replace(/\\cdot/g, "*")
     .replace(/\\sqrt\{([^{}]+)\}/g, "sqrt($1)")
+    .replace(/\\quad/g, " ")
+    .replace(/\\text\{([^{}]+)\}/g, "$1")
+    .replace(/\\[a-zA-Z]+/g, "")
     .replace(/\\left|\\right/g, "")
     .replace(/\{([^{}]+)\}/g, "$1")
+    .replace(/\s+([,.;:])/g, "$1")
     .replace(/[ \t]+\n/g, "\n")
     .trim();
 }
@@ -424,6 +429,7 @@ function inferTaskType(input: string, title: string): TaskType {
 }
 
 function looksLikeTask(input: string, date?: string, time?: string) {
+  if (looksLikeMathRequest(input) && !hasExplicitTaskCue(input)) return false;
   if (looksLikeGeneralCreationRequest(input) && !hasExplicitTaskCue(input) && !date && !time) return false;
   if (taskIntentPatterns.some((pattern) => pattern.test(input))) return true;
   if (time && input.trim().length <= 12) return true;
@@ -435,11 +441,20 @@ function looksLikeTask(input: string, date?: string, time?: string) {
 }
 
 function hasExplicitTaskCue(input: string) {
-  return /\b(remind me|remember to|don't forget|dont forget|add (a )?(task|todo)|create (a )?(task|todo)|set (a )?(task|reminder)|schedule|due|deadline|by|before|at \d|@\d)\b/i.test(input);
+  return /\b(remind me|remember to|don't forget|dont forget|add (a )?(task|todo)|create (a )?(task|todo)|set (a )?(task|reminder)|schedule|due|deadline|before|at \d|@\d)\b/i.test(input);
 }
 
 function looksLikeGeneralCreationRequest(input: string) {
   return /\b(write|create|make|draft|generate|compose)\s+(an?\s+|the\s+)?(essay|poem|story|paragraph|report|article|summary|speech|letter|email|blog|script|outline)\b/i.test(input);
+}
+
+function looksLikeMathRequest(input: string) {
+  const text = input.toLowerCase();
+  return (
+    /\b(solve|simplify|factor|expand|evaluate|derive|differentiate|integrate|quadratic|equation|expression|step by step)\b/i.test(text) ||
+    /(?:^|\s)-?\d*[a-z]\^?\d*/i.test(input) ||
+    /[=+\-*/^]/.test(input) && /\d/.test(input)
+  );
 }
 
 function normalizeTitle(title: string) {

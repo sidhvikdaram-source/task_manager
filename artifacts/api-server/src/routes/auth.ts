@@ -161,16 +161,15 @@ router.post("/auth/register", async (req: Request, res: Response): Promise<void>
 
   try {
     const [existingUser] = await db.select().from(usersTable).where(eq(usersTable.email, email));
-    if (existingUser?.passwordHash) {
-      res.status(409).json({ error: "An account with this email already exists. Sign in instead." });
-      return;
-    }
-
     const passwordHash = await hashPassword(password);
     const [user] = existingUser
       ? await db
         .update(usersTable)
-        .set({ passwordHash, firstName: firstName || existingUser.firstName, updatedAt: new Date() })
+        .set({
+          passwordHash,
+          firstName: firstName || existingUser.firstName,
+          updatedAt: new Date(),
+        })
         .where(eq(usersTable.id, existingUser.id))
         .returning()
       : await db
