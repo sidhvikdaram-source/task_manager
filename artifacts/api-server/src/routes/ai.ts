@@ -51,8 +51,76 @@ interface ParsedTaskCommand {
   date?: string;
   time?: string;
   scheduleLabel?: string;
+  taskType: TaskType;
+  keywords: string[];
   priority: Priority;
 }
+
+type TaskType =
+  | "focus"
+  | "appointment"
+  | "follow-up"
+  | "deadline"
+  | "study"
+  | "errand"
+  | "health"
+  | "finance"
+  | "chore"
+  | "creative"
+  | "code"
+  | "regular";
+
+const taskTypeLabels: Record<TaskType, string> = {
+  focus: "Focus Block",
+  appointment: "Appointment",
+  "follow-up": "Follow-up",
+  deadline: "Deadline",
+  study: "Study",
+  errand: "Errand",
+  health: "Health",
+  finance: "Finance",
+  chore: "Chore",
+  creative: "Creative",
+  code: "Code",
+  regular: "Regular",
+};
+
+const taskTypeSymbols: Record<TaskType, string> = {
+  focus: "[F]",
+  appointment: "[A]",
+  "follow-up": "[R]",
+  deadline: "[!]",
+  study: "[S]",
+  errand: "[E]",
+  health: "[H]",
+  finance: "[$]",
+  chore: "[C]",
+  creative: "[*]",
+  code: "[DEV]",
+  regular: "[T]",
+};
+
+const taskIntentPatterns = [
+  /\b(remind me|remember to|don't let me forget|dont let me forget|make sure i|i need to|need to|have to|gotta|should)\b/i,
+  /\b(add|create|set|schedule|plan|put|make|start|finish|complete|do|work on|handle|take care of|prep|prepare)\b/i,
+  /\b(call|email|text|message|reply|follow up|ping|meet|book|reserve|submit|turn in|send)\b/i,
+  /\b(study|review|practice|read|write|draft|design|code|debug|deploy|test|pay|buy|pick up|clean|wash|workout|exercise)\b/i,
+  /\b(due|deadline|by|before|appointment|meeting|event|todo|task)\b/i,
+];
+
+const taskTypePatterns: Array<[TaskType, RegExp]> = [
+  ["deadline", /\b(deadline|due|submit|turn in|final|exam|test|before|by)\b/i],
+  ["appointment", /\b(appointment|meeting|meet|doctor|dentist|interview|reservation|book|call with|session with)\b/i],
+  ["follow-up", /\b(follow up|follow-up|reply|respond|email|text|message|ping|call back|check in)\b/i],
+  ["study", /\b(study|homework|review|practice|read|quiz|class|lecture|assignment|math|science|english|history)\b/i],
+  ["code", /\b(code|debug|deploy|ship|build|fix bug|typescript|javascript|api|backend|frontend|database|repo|github)\b/i],
+  ["health", /\b(workout|exercise|run|gym|walk|medicine|meds|doctor|therapy|stretch|sleep)\b/i],
+  ["finance", /\b(pay|bill|invoice|budget|bank|tax|rent|subscription|renewal|money)\b/i],
+  ["errand", /\b(buy|pick up|pickup|drop off|groceries|store|mail|package|return|deliver)\b/i],
+  ["chore", /\b(clean|laundry|wash|dishes|trash|organize|vacuum|room|desk)\b/i],
+  ["creative", /\b(write|draft|design|edit|record|film|post|sketch|brainstorm|outline)\b/i],
+  ["focus", /\b(focus|deep work|work block|focus block|pomodoro|grind|work on|study block)\b/i],
+];
 
 function formatDate(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -96,6 +164,19 @@ function parseNumberWord(value: string) {
     twelve: 12,
   };
   return words[value] ?? Number(value);
+}
+
+function matchedKeywords(input: string) {
+  const matches = [
+    "remind me", "remember", "don't forget", "dont forget", "need to", "have to", "gotta",
+    "add", "create", "set", "schedule", "plan", "todo", "task", "deadline", "due",
+    "call", "email", "text", "message", "reply", "follow up", "meet", "book", "submit",
+    "finish", "complete", "study", "review", "practice", "read", "write", "draft",
+    "code", "debug", "deploy", "pay", "buy", "pick up", "clean", "workout", "exercise",
+    "morning", "afternoon", "evening", "tonight", "tomorrow", "next", "today",
+  ];
+  const lower = input.toLowerCase();
+  return matches.filter((keyword) => lower.includes(keyword));
 }
 
 function parseDate(input: string) {
@@ -159,11 +240,14 @@ function parseTime(input: string) {
   if (/\bevening\b/.test(text)) return "6:00 PM";
   if (/\btonight\b|\bnight\b/.test(text)) return "8:00 PM";
 
-  const match = input.match(/\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+  const match = input.match(/\b(?:(at|by|before|around|@)\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   if (!match) return undefined;
-  const hour = Number(match[1]);
-  const minutes = match[2] ?? "00";
-  const explicitSuffix = match[3]?.toUpperCase();
+  const hasTimeCue = Boolean(match[1] || match[3] || match[4] || /(^|\s)\d{1,2}:\d{2}\b/.test(input));
+  if (!hasTimeCue) return undefined;
+
+  const hour = Number(match[2]);
+  const minutes = match[3] ?? "00";
+  const explicitSuffix = match[4]?.toUpperCase();
   if (hour < 1 || hour > 23) return undefined;
   if (explicitSuffix) return `${hour}:${minutes} ${explicitSuffix}`;
   if (hour === 0) return `12:${minutes} AM`;
@@ -182,13 +266,15 @@ function parsePriority(input: string): Priority {
 
 function cleanTitle(input: string) {
   return input
-    .replace(/^\s*(please\s+)?(remind me to|remind me|set(?: a)? task(?: to)?|add(?: a)? task to|add(?: a)? task|create(?: a)? task to|create(?: a)? task|schedule|todo)\s*/i, "")
+    .replace(/^\s*(please\s+)?(can you\s+)?(remind me to|remind me|remember to|don't let me forget to|dont let me forget to|don't forget to|dont forget to|i need to|need to|i have to|have to|gotta|set(?: a)? task(?: to)?|add(?: a)? task to|add(?: a)? task|create(?: a)? task to|create(?: a)? task|schedule|todo|plan to|plan|make sure i|make sure to)\s*/i, "")
     .replace(/\bin\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(hours?|days?)\b/gi, "")
     .replace(/\b(next\s+)?(today|tomorrow|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi, "")
     .replace(/\b(morning|afternoon|evening|tonight|night)\b/gi, "")
     .replace(/\b20\d{2}-\d{2}-\d{2}\b/g, "")
     .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, "")
-    .replace(/\b(?:at\s*)?\d{1,2}(?::\d{2})?\s*(am|pm)?\b/gi, "")
+    .replace(/\b(?:at|by|before|around|@)\s*\d{1,2}(?::\d{2})?\s*(am|pm)?\b/gi, "")
+    .replace(/\b\d{1,2}:\d{2}\s*(am|pm)?\b/gi, "")
+    .replace(/\b\d{1,2}\s*(am|pm)\b/gi, "")
     .replace(/\b(critical|urgent|asap|high priority|low priority|important|whenever)\b/gi, "")
     .replace(/\b(at|by|on|for)\b/gi, "")
     .replace(/\s+/g, " ")
@@ -210,12 +296,43 @@ function getSmartPlaceholderTitle(time?: string, input = "") {
   const text = input.toLowerCase();
   const hour = getHourFromTime(time);
   if (/\b(meeting|sync|call)\b/.test(text)) return "Project Sync";
-  if (hour !== undefined && hour < 12) return "Morning Catch-up";
-  if (hour !== undefined && hour < 17) return "Afternoon Focus Session";
+  if (/\b(study|homework|review|practice|read|class)\b/.test(text)) return "Study Block";
+  if (/\b(workout|gym|exercise|run)\b/.test(text)) return "Workout Session";
+  if (/\b(errand|buy|pick up|store)\b/.test(text)) return "Errand Run";
+  if (/\b(email|reply|text|message|follow up)\b/.test(text)) return "Follow-up";
+  if (/\b(code|debug|build|deploy|fix)\b/.test(text)) return "Development Block";
+  if (hour !== undefined && hour < 12) return "Morning Focus Block";
+  if (hour !== undefined && hour < 17) return "Afternoon Focus Block";
   if (hour !== undefined && hour < 20) return "Project Sync";
   if (hour !== undefined) return "Evening Planning Block";
   if (/\btomorrow\b|\bnext\b/.test(text)) return "Planning Check-in";
   return "Focus Session";
+}
+
+function inferTaskType(input: string, title: string): TaskType {
+  const text = `${input} ${title}`;
+  for (const [type, pattern] of taskTypePatterns) {
+    if (pattern.test(text)) return type;
+  }
+  return "regular";
+}
+
+function looksLikeTask(input: string, date?: string, time?: string) {
+  if (taskIntentPatterns.some((pattern) => pattern.test(input))) return true;
+  if (time && input.trim().length <= 12) return true;
+  if ((date || time) && /\b(i|me|my|tomorrow|today|next|at|by|before|morning|afternoon|evening|tonight)\b/i.test(input)) {
+    return true;
+  }
+  return false;
+}
+
+function normalizeTitle(title: string) {
+  const trimmed = title
+    .replace(/^to\s+/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!trimmed) return "";
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 }
 
 function formatScheduleLabel(date?: string, time?: string) {
@@ -233,21 +350,39 @@ function formatScheduleLabel(date?: string, time?: string) {
   return parts.join(" at ");
 }
 
-function parseTaskCommand(message: string): ParsedTaskCommand | null {
-  const lower = message.toLowerCase();
-  const hasCommand = /\b(remind me to|remind me|set(?: a)? task|add(?: a)? task|create(?: a)? task|schedule|todo)\b/.test(lower);
-  if (!hasCommand) return null;
+function buildTaskNotes(command: ParsedTaskCommand) {
+  const notes = [
+    `Velocity Type: ${taskTypeSymbols[command.taskType]} ${taskTypeLabels[command.taskType]}`,
+  ];
+  if (command.time) notes.push(`Time: ${command.time}`);
+  if (command.scheduleLabel) notes.push(`Schedule: ${command.scheduleLabel}`);
+  if (command.keywords.length > 0) notes.push(`Detected: ${command.keywords.slice(0, 8).join(", ")}`);
+  return notes.join("\n");
+}
 
+function buildTaskDescription(command: ParsedTaskCommand) {
+  const parts = [];
+  if (command.time) parts.push(`Time: ${command.time}`);
+  if (command.taskType !== "regular") parts.push(`${taskTypeSymbols[command.taskType]} ${taskTypeLabels[command.taskType]}`);
+  return parts.join(" • ") || undefined;
+}
+
+function parseTaskCommand(message: string): ParsedTaskCommand | null {
   const date = parseDate(message);
   const time = parseTime(message);
-  const cleanedTitle = cleanTitle(message);
+  if (!looksLikeTask(message, date, time)) return null;
+
+  const cleanedTitle = normalizeTitle(cleanTitle(message));
   const title = cleanedTitle || getSmartPlaceholderTitle(time, message);
+  const taskType = inferTaskType(message, title);
 
   return {
     title,
     date,
     time,
     scheduleLabel: formatScheduleLabel(date, time),
+    taskType,
+    keywords: matchedKeywords(message),
     priority: parsePriority(message),
   };
 }
@@ -401,15 +536,15 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     let createdTask = null;
 
     if (parsedCommand) {
-      const notes = parsedCommand.time ? `Requested time: ${parsedCommand.time}` : undefined;
       const [task] = await db
         .insert(tasksTable)
         .values({
           title: parsedCommand.title,
+          description: buildTaskDescription(parsedCommand),
           priority: parsedCommand.priority,
           dueDate: parsedCommand.date,
           calendarDate: parsedCommand.date,
-          notes,
+          notes: buildTaskNotes(parsedCommand),
           userId: req.user.id,
           vpValue:
             parsedCommand.priority === "critical" ? 25 :
@@ -424,7 +559,9 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     const taskContext = createdTask
       ? [
         `Backend action completed: created task "${createdTask.title}".`,
+        parsedCommand ? `Task type: ${taskTypeSymbols[parsedCommand.taskType]} ${taskTypeLabels[parsedCommand.taskType]}.` : "",
         parsedCommand?.scheduleLabel ? `Schedule reference: ${parsedCommand.scheduleLabel}.` : "",
+        parsedCommand?.time ? `Time captured: ${parsedCommand.time}.` : "",
         "Respond in clean Markdown with a short confirmation and no extra chatter.",
       ].filter(Boolean).join(" ")
       : "Backend action completed: no task was created for this message.";

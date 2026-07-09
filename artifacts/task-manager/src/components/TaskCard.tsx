@@ -22,11 +22,19 @@ const priorityColors = {
   low: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
 };
 
+function parseVelocityType(notes?: string | null) {
+  if (!notes) return null;
+  const match = notes.match(/^Velocity Type:\s*(\[[^\]]+\])\s*(.+)$/m);
+  if (!match?.[1] || !match?.[2]) return null;
+  return { symbol: match[1], label: match[2] };
+}
+
 export function TaskCard({ task, layoutId }: TaskCardProps) {
   const queryClient = useQueryClient();
   const completeTask = useCompleteTask();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const isCompleted = task.status === 'completed';
+  const velocityType = parseVelocityType(task.notes);
 
   const handleComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -88,9 +96,18 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
           
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mr-6">
-              <h3 className={`font-medium text-sm leading-tight ${isCompleted ? 'line-through text-muted-foreground' : 'text-card-foreground'}`}>
-                {task.title}
-              </h3>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  {velocityType && !isCompleted && (
+                    <Badge variant="outline" className="h-5 shrink-0 border-primary/25 bg-primary/10 px-1.5 font-mono text-[10px] text-primary" title={velocityType.label}>
+                      {velocityType.symbol}
+                    </Badge>
+                  )}
+                  <h3 className={`font-medium text-sm leading-tight ${isCompleted ? 'line-through text-muted-foreground' : 'text-card-foreground'}`}>
+                    {task.title}
+                  </h3>
+                </div>
+              </div>
               <Badge variant="outline" className={`${priorityColors[task.priority]} whitespace-nowrap text-xs py-0 h-5`}>
                 {task.priority}
               </Badge>
