@@ -37,7 +37,7 @@ function AssistantLogo({ className, circular = false }: { className?: string; ci
   return (
     <span className={cn(
       'logo-mark inline-flex h-8 w-8 shrink-0 items-center justify-center bg-primary text-primary-foreground',
-      circular && '!rounded-full',
+      circular && '!rounded-full bg-[#141414] text-white shadow-[0_8px_18px_rgba(0,0,0,0.18)] [&_svg]:fill-white [&_svg]:text-white',
       className,
     )}>
       <Zap className="h-4 w-4 fill-primary-foreground" />
@@ -140,12 +140,19 @@ export function VelocityAssistantCard() {
   }, [messages]);
 
   async function animateAssistantMessage(id: string, content: string) {
-    for (let i = 1; i <= content.length; i += 2) {
+    if (content.length > 1200) {
+      setMessages((current) => current.map((message) => (
+        message.id === id ? { ...message, content, typing: false } : message
+      )));
+      return;
+    }
+
+    for (let i = 1; i <= content.length; i += 8) {
       const partial = content.slice(0, i);
       setMessages((current) => current.map((message) => (
         message.id === id ? { ...message, content: partial, typing: i < content.length } : message
       )));
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 4));
     }
     setMessages((current) => current.map((message) => (
       message.id === id ? { ...message, content, typing: false } : message
@@ -163,6 +170,10 @@ export function VelocityAssistantCard() {
       content: text,
     };
     const assistantId = `assistant-${Date.now()}`;
+    const history = messages
+      .filter((message) => message.id !== 'welcome' && !message.typing && message.content.trim())
+      .slice(-8)
+      .map((message) => ({ role: message.role, content: message.content }));
 
     setInput('');
     setIsSending(true);
@@ -177,7 +188,7 @@ export function VelocityAssistantCard() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, history }),
       });
 
       const data = await response.json() as AssistantResponse;
@@ -213,7 +224,7 @@ export function VelocityAssistantCard() {
 
       <div className="relative flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <AssistantLogo className="h-10 w-10" />
+          <AssistantLogo circular className="h-10 w-10 [&_svg]:h-5 [&_svg]:w-5" />
           <div>
             <div className="flex items-center gap-2">
               <h2 className="tech-title text-lg">Velocity Assistant</h2>

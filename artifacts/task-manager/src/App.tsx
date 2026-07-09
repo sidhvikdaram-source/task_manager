@@ -58,10 +58,10 @@ function LoginScreen() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
       <div className="bento-card w-full max-w-md p-6 sm:p-7">
         <div className="mb-6 flex items-center justify-center gap-3">
-          <div className="logo-mark flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground">
-            <Zap className="h-6 w-6 fill-primary-foreground text-primary-foreground" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-[1.15rem] bg-[#141414] text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+            <Zap className="h-7 w-7 fill-white text-white" />
           </div>
-          <span className="tech-title text-2xl">Velocity</span>
+          <span className="text-4xl font-black tracking-tight text-foreground">Velocity</span>
         </div>
         <div className="mb-6 text-center">
           <h1 className="text-xl font-semibold text-foreground">Your gamified task manager</h1>

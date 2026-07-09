@@ -97,7 +97,7 @@ export function useAuth(): AuthState {
   ), [submitLocalAuth]);
 
   const logout = useCallback(() => {
-    fetch("/api/auth/session-logout", { method: "POST", credentials: "include" })
+    fetch("/api/session-logout", { method: "POST", credentials: "include" })
       .finally(() => {
         setUser(null);
         if (isEmbedded) return;

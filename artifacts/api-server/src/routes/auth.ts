@@ -336,11 +336,14 @@ router.get("/logout", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/session-logout", async (req: Request, res: Response) => {
+async function handleSessionLogout(req: Request, res: Response) {
   const sid = getSessionId(req);
   await clearSession(res, sid);
   res.json({ ok: true });
-});
+}
+
+router.post("/session-logout", handleSessionLogout);
+router.post("/auth/session-logout", handleSessionLogout);
 
 router.post(
   "/mobile-auth/token-exchange",

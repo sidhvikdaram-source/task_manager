@@ -24,7 +24,7 @@ const systemPrompt = [
 // more concurrency cushion than openai/gpt-oss-120b and qwen/qwen3.6-27b at 30 RPM.
 const velocityGeminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
 const velocityGroqModels = ["qwen/qwen3-32b", "openai/gpt-oss-120b"];
-const assistantMaxOutputTokens = 720;
+const assistantMaxOutputTokens = 1800;
 const groqMinRequestIntervalMs = 1_100;
 const geminiMinRequestIntervalMs = 700;
 let geminiQueue: Promise<unknown> = Promise.resolve();
@@ -78,6 +78,11 @@ type Priority = "critical" | "high" | "medium" | "low";
 
 interface AssistantLogger {
   warn: (obj: unknown, msg?: string) => void;
+}
+
+interface ChatHistoryMessage {
+  role: "assistant" | "user";
+  content: string;
 }
 
 interface ParsedTaskCommand {
@@ -419,6 +424,7 @@ function inferTaskType(input: string, title: string): TaskType {
 }
 
 function looksLikeTask(input: string, date?: string, time?: string) {
+  if (looksLikeGeneralCreationRequest(input) && !hasExplicitTaskCue(input) && !date && !time) return false;
   if (taskIntentPatterns.some((pattern) => pattern.test(input))) return true;
   if (time && input.trim().length <= 12) return true;
   if (date && /\b(homework|assignment|project|worksheet|study|test|quiz|exam|deadline|due)\b/i.test(input)) return true;
@@ -426,6 +432,14 @@ function looksLikeTask(input: string, date?: string, time?: string) {
     return true;
   }
   return false;
+}
+
+function hasExplicitTaskCue(input: string) {
+  return /\b(remind me|remember to|don't forget|dont forget|add (a )?(task|todo)|create (a )?(task|todo)|set (a )?(task|reminder)|schedule|due|deadline|by|before|at \d|@\d)\b/i.test(input);
+}
+
+function looksLikeGeneralCreationRequest(input: string) {
+  return /\b(write|create|make|draft|generate|compose)\s+(an?\s+|the\s+)?(essay|poem|story|paragraph|report|article|summary|speech|letter|email|blog|script|outline)\b/i.test(input);
 }
 
 function normalizeTitle(title: string) {
@@ -555,7 +569,16 @@ async function scheduleGeminiRequest<T>(operation: () => Promise<T>) {
   return queued;
 }
 
-async function generateGeminiReply(message: string, taskContext: string) {
+function formatConversationForGemini(history: ChatHistoryMessage[], message: string) {
+  const previous = history
+    .slice(-8)
+    .map((item) => `${item.role === "assistant" ? "Velocity Assistant" : "User"}: ${item.content}`)
+    .join("\n");
+
+  return previous ? `${previous}\nUser: ${message}` : message;
+}
+
+async function generateGeminiReply(message: string, taskContext: string, history: ChatHistoryMessage[]) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured");
@@ -568,7 +591,7 @@ async function generateGeminiReply(message: string, taskContext: string) {
     try {
       const response = await scheduleGeminiRequest(() => client.models.generateContent({
         model,
-        contents: message,
+        contents: formatConversationForGemini(history, message),
         config: {
           systemInstruction: `${systemPrompt} ${taskContext}`,
           maxOutputTokens: assistantMaxOutputTokens,
@@ -590,7 +613,7 @@ async function generateGeminiReply(message: string, taskContext: string) {
   throw lastError instanceof Error ? lastError : new Error("Gemini request failed");
 }
 
-async function generateGroqReply(message: string, taskContext: string) {
+async function generateGroqReply(message: string, taskContext: string, history: ChatHistoryMessage[]) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error("GROQ_API_KEY is not configured");
@@ -607,6 +630,10 @@ async function generateGroqReply(message: string, taskContext: string) {
         messages: [
           { role: "system", content: systemPrompt },
           { role: "system", content: taskContext },
+          ...history.slice(-8).map((item) => ({
+            role: item.role,
+            content: item.content,
+          })),
           { role: "user", content: message },
         ],
         max_tokens: assistantMaxOutputTokens,
@@ -627,19 +654,35 @@ async function generateGroqReply(message: string, taskContext: string) {
   throw lastError instanceof Error ? lastError : new Error("Groq request failed");
 }
 
-async function generateAssistantReply(message: string, taskContext: string, log?: AssistantLogger) {
+async function generateAssistantReply(message: string, taskContext: string, history: ChatHistoryMessage[], log?: AssistantLogger) {
   try {
     return {
       provider: "gemini" as const,
-      reply: await generateGeminiReply(message, taskContext),
+      reply: await generateGeminiReply(message, taskContext, history),
     };
   } catch (geminiError) {
     log?.warn?.({ err: geminiError }, "Gemini assistant request failed; falling back to Groq");
     return {
       provider: "groq" as const,
-      reply: await generateGroqReply(message, taskContext),
+      reply: await generateGroqReply(message, taskContext, history),
     };
   }
+}
+
+function parseHistory(value: unknown): ChatHistoryMessage[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is ChatHistoryMessage => {
+      if (typeof item !== "object" || item === null) return false;
+      const maybe = item as { role?: unknown; content?: unknown };
+      return (maybe.role === "assistant" || maybe.role === "user") && typeof maybe.content === "string";
+    })
+    .map((item) => ({
+      role: item.role,
+      content: item.content.trim().slice(0, 2000),
+    }))
+    .filter((item) => item.content.length > 0)
+    .slice(-8);
 }
 
 function getGroqStatus(err: unknown) {
@@ -684,6 +727,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       return;
     }
 
+    const history = parseHistory(req.body?.history);
     const parsedCommand = parseTaskCommand(message);
     let createdTask = null;
 
@@ -717,7 +761,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
         "Respond in clean Markdown with a short confirmation and no extra chatter.",
       ].filter(Boolean).join(" ")
       : "Backend action completed: no task was created for this message.";
-    const { reply, provider } = await generateAssistantReply(message, taskContext, req.log);
+    const { reply, provider } = await generateAssistantReply(message, taskContext, history, req.log);
 
     res.json({
       reply: cleanAssistantReply(reply),

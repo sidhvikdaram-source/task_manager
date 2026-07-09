@@ -49,8 +49,8 @@ export function Sidebar() {
   return (
     <div className="w-64 border-r bg-sidebar flex flex-col h-full shrink-0">
         <div className="p-6 flex items-center gap-3">
-          <div className="logo-mark flex h-8 w-8 items-center justify-center bg-primary text-primary-foreground">
-            <Zap className="w-5 h-5 fill-primary-foreground" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-[0_8px_18px_rgba(0,0,0,0.16)]">
+            <Zap className="h-5 w-5 fill-white text-white" />
           </div>
           <span className="font-bold text-xl tracking-tight text-sidebar-foreground">Velocity</span>
         </div>
