@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Circle, Clock, MoreVertical, Maximize2 } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, Maximize2, Timer } from 'lucide-react';
 import { Task, useCompleteTask, getListTasksQueryKey, getGetDashboardOverviewQueryKey, getGetUserStatsQueryKey } from '@workspace/api-client-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { format, isPast, parseISO } from 'date-fns';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { TaskDetailsModal } from '@/components/TaskDetailsModal';
+import { useLocation } from 'wouter';
 
 interface TaskCardProps {
   task: Task;
@@ -29,10 +30,34 @@ function parseVelocityType(notes?: string | null) {
   return { symbol: match[1], label: match[2] };
 }
 
+function playCompletionSound() {
+  const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  const ctx = new AudioContextClass();
+  [523.25, 659.25, 783.99].forEach((frequency, index) => {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    const start = ctx.currentTime + index * 0.07;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.08, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+    oscillator.start(start);
+    oscillator.stop(start + 0.2);
+  });
+  window.setTimeout(() => void ctx.close(), 700);
+}
+
 export function TaskCard({ task, layoutId }: TaskCardProps) {
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const completeTask = useCompleteTask();
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [completionPop, setCompletionPop] = useState(false);
   const isCompleted = task.status === 'completed';
   const velocityType = parseVelocityType(task.notes);
 
@@ -44,7 +69,12 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
       { id: task.id },
       {
         onSuccess: (result) => {
-          toast.success(`Task completed! +${result.vpAwarded} VP`);
+          playCompletionSound();
+          setCompletionPop(true);
+          window.setTimeout(() => setCompletionPop(false), 1300);
+          toast.success(`Task complete. +${result.vpAwarded} VP`, {
+            description: 'Nice execution. Momentum banked.',
+          });
           if (result.tierUp) {
             toast('Tier Up!', {
               description: `You have reached Tier ${result.newTier}!`,
@@ -60,6 +90,18 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
     );
   };
 
+  const startFocusSpace = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.localStorage.setItem('velocity_focus_task', JSON.stringify({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      dueDate: task.dueDate,
+      estimatedMinutes: task.estimatedMinutes,
+    }));
+    setLocation('/focus');
+  };
+
   const isOverdue = task.dueDate && isPast(parseISO(task.dueDate)) && !isCompleted;
   
   return (
@@ -73,7 +115,20 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
         onClick={() => setDetailsOpen(true)}
         className={`relative group bg-card p-4 rounded-xl border cursor-pointer ${isCompleted ? 'opacity-60 grayscale-[0.5]' : ''} shadow-sm hover:shadow-md transition-shadow`}
       >
+        {completionPop && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="pointer-events-none absolute inset-x-4 top-3 z-10 rounded-xl border border-primary/30 bg-primary px-3 py-2 text-center text-xs font-black text-primary-foreground shadow-lg"
+          >
+            Complete +VP
+          </motion.div>
+        )}
+
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={startFocusSpace} title="Focus Space">
+            <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+          </Button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setDetailsOpen(true); }}>
             <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
@@ -135,7 +190,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
             {(task.checklistCount ?? 0) > 0 && (
               <div className="mt-3 space-y-1.5">
                 <div className="flex justify-between text-[10px] text-muted-foreground font-medium">
-                  <span>Checklist</span>
+                  <span>Action steps</span>
                   <span>{task.checklistCompleted}/{task.checklistCount}</span>
                 </div>
                 <Progress value={((task.checklistCompleted ?? 0) / (task.checklistCount ?? 1)) * 100} className="h-1.5" />

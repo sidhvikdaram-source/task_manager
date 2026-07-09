@@ -16,12 +16,21 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
+interface FocusTask {
+  id: number;
+  title: string;
+  description?: string | null;
+  dueDate?: string | null;
+  estimatedMinutes?: number | null;
+}
+
 export default function FocusArena() {
   const queryClient = useQueryClient();
   const [selectedDuration, setSelectedDuration] = useState(25);
   const [timeLeft, setTimeLeft] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  const [focusTask, setFocusTask] = useState<FocusTask | null>(null);
   
   const createSession = useCreateFocusSession();
   const completeSession = useCompleteFocusSession();
@@ -31,6 +40,18 @@ export default function FocusArena() {
   
   // Clean up interval on unmount
   useEffect(() => {
+    const stored = window.localStorage.getItem('velocity_focus_task');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as FocusTask;
+        setFocusTask(parsed);
+        if (parsed.estimatedMinutes && parsed.estimatedMinutes > 0) {
+          setSelectedDuration(Math.min(90, Math.max(5, parsed.estimatedMinutes)));
+        }
+      } catch {
+        window.localStorage.removeItem('velocity_focus_task');
+      }
+    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
@@ -100,10 +121,44 @@ export default function FocusArena() {
     <div className={`space-y-8 transition-colors duration-700 ${isActive ? 'brightness-90' : ''}`}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Focus Arena</h1>
-          <p className="text-muted-foreground mt-1">Deep work. Earn VP.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">{focusTask ? 'Focus Space' : 'Focus Arena'}</h1>
+          <p className="text-muted-foreground mt-1">
+            {focusTask ? 'One task, no competing backlog.' : 'Deep work. Earn VP.'}
+          </p>
         </div>
+        {focusTask && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              window.localStorage.removeItem('velocity_focus_task');
+              setFocusTask(null);
+            }}
+          >
+            Show all focus
+          </Button>
+        )}
       </div>
+
+      {focusTask && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-primary/30 bg-primary/10 p-4 shadow-[0_0_28px_hsl(var(--primary)/0.12)]"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <Badge variant="outline" className="mb-2 border-primary/30 text-primary">Isolated task</Badge>
+              <h2 className="text-xl font-bold text-foreground">{focusTask.title}</h2>
+              {focusTask.description && <p className="mt-1 text-sm text-muted-foreground">{focusTask.description}</p>}
+            </div>
+            {focusTask.dueDate && (
+              <div className="rounded-xl border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+                Due {format(parseISO(focusTask.dueDate), 'MMM d')}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       <div className="grid md:grid-cols-[1fr_300px] gap-8">
         <div className="bg-card border shadow-sm rounded-2xl p-8 flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden">
@@ -206,7 +261,7 @@ export default function FocusArena() {
           </div>
         </div>
 
-        <div className="space-y-4">
+        {!focusTask && <div className="space-y-4">
           <div className="flex items-center gap-2">
             <TimerIcon className="w-5 h-5 text-muted-foreground" />
             <h2 className="font-semibold text-lg">Recent Sessions</h2>
@@ -246,7 +301,7 @@ export default function FocusArena() {
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </div>
     </div>
   );

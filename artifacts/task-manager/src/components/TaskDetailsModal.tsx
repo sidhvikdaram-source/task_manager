@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { Trash2, Plus, X, Link as LinkIcon, Clock, ExternalLink } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 
 interface TaskLink { url: string; label?: string; }
 
@@ -111,6 +112,31 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
   };
 
   const links: TaskLink[] = (task?.links as TaskLink[] | null) ?? [];
+  const checklistTotal = checklist?.length ?? 0;
+  const checklistDone = checklist?.filter((item) => item.completed).length ?? 0;
+  const checklistProgress = checklistTotal > 0 ? (checklistDone / checklistTotal) * 100 : 0;
+
+  const handleBreakDownTask = () => {
+    if (!task || createChecklistItem.isPending) return;
+    const title = task.title.toLowerCase();
+    const steps = title.includes('test') || title.includes('exam') || title.includes('quiz')
+      ? ['Gather study material', 'Review weakest topics', 'Complete a practice round', 'Pack what you need']
+      : title.includes('call') || title.includes('email') || title.includes('message')
+        ? ['Clarify the goal', 'Prepare key points', 'Send or make contact', 'Log the follow-up']
+        : title.includes('code') || title.includes('bug') || title.includes('build')
+          ? ['Define expected behavior', 'Reproduce the issue', 'Implement the fix', 'Verify and ship']
+          : ['Define the next action', 'Gather what you need', 'Do the focused work', 'Review and close'];
+
+    for (const step of steps) {
+      createChecklistItem.mutate({ id: taskId, data: { title: step } }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListChecklistItemsQueryKey(taskId) });
+          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+        },
+      });
+    }
+    toast.success('Action steps added');
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -310,7 +336,20 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
             </div>
 
             <div className="pt-1 border-t">
-              <h3 className="font-medium text-sm mb-3">Checklist</h3>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <h3 className="font-medium">Action steps</h3>
+                    {checklistTotal > 0 && (
+                      <span className="text-xs text-muted-foreground">{checklistDone}/{checklistTotal}</span>
+                    )}
+                  </div>
+                  {checklistTotal > 0 && <Progress value={checklistProgress} className="mt-2 h-1.5" />}
+                </div>
+                <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={handleBreakDownTask}>
+                  Break down
+                </Button>
+              </div>
               <div className="space-y-2 mb-3">
                 {isLoadingChecklist ? (
                   <Skeleton className="h-8 w-full" />

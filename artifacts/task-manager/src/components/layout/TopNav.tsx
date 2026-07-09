@@ -1,30 +1,171 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette } from 'lucide-react';
-import { useGetUserStats } from '@workspace/api-client-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, Search, AlertTriangle } from 'lucide-react';
+import {
+  getGetDashboardOverviewQueryKey,
+  getGetUserStatsQueryKey,
+  getListTasksQueryKey,
+  useCreateTask,
+  useGetUserStats,
+  useListTasks,
+  type Task,
+} from '@workspace/api-client-react';
 import { useState, useRef, useEffect } from 'react';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { useAuth } from '@workspace/replit-auth-web';
 import { themes, useTheme, type ThemeId } from '@/theme';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
+type Priority = 'critical' | 'high' | 'medium' | 'low';
+
+const projectTagPattern = /#([a-z0-9_-]+)/i;
+const priorityTagPattern = /@(critical|urgent|high|medium|low|important)/i;
+
+function formatDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function nextWeekday(day: number) {
+  const date = new Date();
+  let delta = day - date.getDay();
+  if (delta <= 0) delta += 7;
+  date.setDate(date.getDate() + delta);
+  return formatDate(date);
+}
+
+function parseQuickDate(text: string) {
+  const lower = text.toLowerCase();
+  if (/\btoday\b/.test(lower)) return formatDate(new Date());
+  if (/\btomorrow\b/.test(lower)) {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return formatDate(date);
+  }
+  const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const weekday = weekdays.findIndex((day) => new RegExp(`\\b(next\\s+)?${day}\\b`, 'i').test(text));
+  if (weekday >= 0) return nextWeekday(weekday);
+  const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
+  return iso?.[1];
+}
+
+function parseQuickTime(text: string) {
+  const lower = text.toLowerCase();
+  if (/\bmorning\b/.test(lower)) return '9:00 AM';
+  if (/\bafternoon\b/.test(lower)) return '2:00 PM';
+  if (/\bevening\b/.test(lower)) return '6:00 PM';
+  if (/\btonight\b|\bnight\b/.test(lower)) return '8:00 PM';
+  const match = text.match(/\b(?:at|@)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+  if (!match) return undefined;
+  const hasCue = Boolean(match[2] || match[3] || /(?:^|\s)(at|@)\s*\d/i.test(text));
+  if (!hasCue) return undefined;
+  const hour = Number(match[1]);
+  if (hour < 1 || hour > 23) return undefined;
+  const suffix = match[3]?.toUpperCase() ?? (hour >= 7 && hour <= 11 ? 'AM' : 'PM');
+  const displayHour = hour > 12 ? hour - 12 : hour;
+  return `${displayHour}:${match[2] ?? '00'} ${suffix}`;
+}
+
+function parseQuickPriority(text: string): Priority {
+  const match = text.match(priorityTagPattern);
+  const value = match?.[1]?.toLowerCase();
+  if (value === 'critical' || value === 'urgent') return 'critical';
+  if (value === 'high' || value === 'important') return 'high';
+  if (value === 'low') return 'low';
+  return 'medium';
+}
+
+function cleanQuickTitle(text: string) {
+  const cleaned = text
+    .replace(priorityTagPattern, '')
+    .replace(projectTagPattern, '')
+    .replace(/\b(today|tomorrow|next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi, '')
+    .replace(/\b(morning|afternoon|evening|tonight|night)\b/gi, '')
+    .replace(/\b(20\d{2}-\d{2}-\d{2})\b/g, '')
+    .replace(/\b(?:at|@)\s*\d{1,2}(?::\d{2})?\s*(am|pm)?\b/gi, '')
+    .replace(/\b\d{1,2}:\d{2}\s*(am|pm)?\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || 'Quick Capture';
+}
+
+function parseQuickCapture(text: string) {
+  const dueDate = parseQuickDate(text);
+  const time = parseQuickTime(text);
+  const projectTag = text.match(projectTagPattern)?.[1];
+  const notes = [
+    'Captured from quick bar',
+    time ? `Time: ${time}` : '',
+    projectTag ? `Tag: #${projectTag}` : '',
+  ].filter(Boolean).join('\n');
+
+  return {
+    title: cleanQuickTitle(text),
+    priority: parseQuickPriority(text),
+    dueDate,
+    calendarDate: dueDate,
+    description: time ? `Time: ${time}` : undefined,
+    notes,
+  };
+}
+
+function daysUntil(date?: string | null) {
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${date}T00:00:00`);
+  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+}
+
+function notificationLabel(task: Task) {
+  const text = `${task.title} ${task.description ?? ''} ${task.notes ?? ''}`.toLowerCase();
+  if (/\b(test|exam|quiz|midterm|final)\b/.test(text)) return 'Test coming up';
+  if (/\b(deadline|due|submit|turn in)\b/.test(text)) return 'Deadline coming up';
+  return 'Upcoming task';
+}
 
 export function TopNav() {
   const [location] = useLocation();
+  const queryClient = useQueryClient();
   const { data: stats } = useGetUserStats();
+  const { data: tasks } = useListTasks(
+    { sortBy: 'dueDate' },
+    { query: { queryKey: getListTasksQueryKey({ sortBy: 'dueDate' }) } },
+  );
   const { user, logout, login, isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
+  const createTask = useCreateTask();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [quickText, setQuickText] = useState('');
+  const quickInputRef = useRef<HTMLInputElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
         setAccountOpen(false);
       }
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setNotificationsOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        quickInputRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
   }, []);
 
   const links = [
@@ -33,6 +174,34 @@ export function TopNav() {
     { href: '/focus', label: 'Focus Arena', icon: Timer },
     { href: '/analytics', label: 'Analytics', icon: LineChart },
   ];
+
+  const upcomingNotifications = (tasks ?? [])
+    .filter((task) => task.status !== 'completed')
+    .map((task) => ({ task, days: daysUntil(task.dueDate || task.calendarDate) }))
+    .filter((item): item is { task: Task; days: number } => item.days !== null && item.days >= 0 && item.days <= 2)
+    .slice(0, 8);
+
+  function submitQuickCapture(event: React.FormEvent) {
+    event.preventDefault();
+    const text = quickText.trim();
+    if (!text || createTask.isPending) return;
+
+    const parsed = parseQuickCapture(text);
+    createTask.mutate(
+      { data: parsed as never },
+      {
+        onSuccess: () => {
+          setQuickText('');
+          toast.success('Captured', { description: parsed.title });
+          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(), refetchType: 'all' });
+          queryClient.invalidateQueries({ queryKey: ['/api/tasks'], refetchType: 'all' });
+          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey(), refetchType: 'all' });
+          queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey(), refetchType: 'all' });
+        },
+        onError: () => toast.error('Could not capture task'),
+      },
+    );
+  }
 
   return (
     <>
@@ -51,7 +220,7 @@ export function TopNav() {
           </motion.div>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1 flex-1">
+        <nav className="hidden md:flex items-center gap-1">
           {links.map((link) => {
             const isActive = location === link.href;
             return (
@@ -85,6 +254,25 @@ export function TopNav() {
           })}
         </nav>
 
+        <form onSubmit={submitQuickCapture} className="hidden xl:flex h-9 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-xl border border-border/70 bg-muted/50 px-3">
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <input
+            ref={quickInputRef}
+            value={quickText}
+            onChange={(event) => setQuickText(event.target.value)}
+            placeholder='Quick capture: Call mom Sunday afternoon @High #Personal'
+            className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            aria-label="Quick capture task"
+          />
+          <button
+            type="submit"
+            disabled={!quickText.trim() || createTask.isPending}
+            className="rounded-lg bg-primary px-2 py-1 text-[10px] font-bold text-primary-foreground disabled:opacity-40"
+          >
+            Add
+          </button>
+        </form>
+
         <div className="flex items-center gap-3">
           <label className="hidden lg:flex h-9 items-center gap-2 rounded-xl border border-border/70 bg-muted/60 px-2.5 text-muted-foreground">
             <Palette className="h-4 w-4" />
@@ -102,14 +290,62 @@ export function TopNav() {
             </select>
           </label>
 
-          <motion.button
-            className="w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors border border-border/70"
-            data-testid="button-notifications"
-            whileHover={{ scale: 1.08 }}
-            whileTap={{ scale: 0.92 }}
-          >
-            <Bell className="w-4 h-4" />
-          </motion.button>
+          <div className="relative" ref={notificationsRef}>
+            <motion.button
+              onClick={() => setNotificationsOpen((open) => !open)}
+              className="relative w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors border border-border/70"
+              data-testid="button-notifications"
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+            >
+              <Bell className="w-4 h-4" />
+              {upcomingNotifications.length > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-black text-secondary-foreground">
+                  {upcomingNotifications.length}
+                </span>
+              )}
+            </motion.button>
+
+            <AnimatePresence>
+              {notificationsOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                  transition={{ duration: 0.13 }}
+                  className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-xl border bg-popover shadow-2xl"
+                >
+                  <div className="border-b px-3 py-2">
+                    <p className="text-sm font-bold text-foreground">Notifications</p>
+                    <p className="text-[11px] text-muted-foreground">Due and test reminders within 2 days.</p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto p-2">
+                    {upcomingNotifications.length === 0 ? (
+                      <p className="px-2 py-6 text-center text-xs text-muted-foreground">Nothing urgent in the next 2 days.</p>
+                    ) : (
+                      upcomingNotifications.map(({ task, days }) => (
+                        <Link key={task.id} href="/calendar">
+                          <button
+                            type="button"
+                            onClick={() => setNotificationsOpen(false)}
+                            className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted"
+                          >
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-semibold text-foreground">{task.title}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {notificationLabel(task)} {days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`}
+                              </span>
+                            </span>
+                          </button>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Account menu */}
           <div className="relative" ref={accountRef}>
