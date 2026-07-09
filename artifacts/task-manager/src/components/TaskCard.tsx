@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { TaskDetailsModal } from '@/components/TaskDetailsModal';
 import { useLocation } from 'wouter';
+import { playCompletionSound, primeCompletionSound } from '@/lib/completionSound';
 
 interface TaskCardProps {
   task: Task;
@@ -28,46 +29,6 @@ function parseVelocityType(notes?: string | null) {
   const match = notes.match(/^Velocity Type:\s*(\[[^\]]+\])\s*(.+)$/m);
   if (!match?.[1] || !match?.[2]) return null;
   return { symbol: match[1], label: match[2] };
-}
-
-let completionAudioContext: AudioContext | null = null;
-
-function getCompletionAudioContext() {
-  const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextClass) return null;
-
-  completionAudioContext ??= new AudioContextClass();
-  return completionAudioContext;
-}
-
-function primeCompletionSound() {
-  const ctx = getCompletionAudioContext();
-  if (ctx?.state === 'suspended') {
-    void ctx.resume();
-  }
-}
-
-function playCompletionSound() {
-  const ctx = getCompletionAudioContext();
-  if (!ctx) return;
-
-  if (ctx.state === 'suspended') {
-    void ctx.resume();
-  }
-  [523.25, 659.25, 783.99].forEach((frequency, index) => {
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.value = frequency;
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    const start = ctx.currentTime + index * 0.07;
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.08, start + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
-    oscillator.start(start);
-    oscillator.stop(start + 0.2);
-  });
 }
 
 export function TaskCard({ task, layoutId }: TaskCardProps) {

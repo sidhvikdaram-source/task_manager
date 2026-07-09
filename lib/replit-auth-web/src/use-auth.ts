@@ -97,12 +97,12 @@ export function useAuth(): AuthState {
   ), [submitLocalAuth]);
 
   const logout = useCallback(() => {
-    if (isEmbedded) {
-      fetch("/api/auth/session-logout", { method: "POST", credentials: "include" })
-        .finally(() => setUser(null));
-    } else {
-      window.location.href = "/api/logout";
-    }
+    fetch("/api/auth/session-logout", { method: "POST", credentials: "include" })
+      .finally(() => {
+        setUser(null);
+        if (isEmbedded) return;
+        window.location.href = "/";
+      });
   }, [isEmbedded]);
 
   return {

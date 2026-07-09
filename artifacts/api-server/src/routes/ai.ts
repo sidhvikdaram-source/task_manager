@@ -16,6 +16,7 @@ const systemPrompt = [
   "When no task was created, answer the user normally and do not mention backend internals.",
   "Keep responses brief, professional, and free of filler.",
   "Use structured Markdown only: short paragraphs, bullets, bold labels, and code fences when useful.",
+  "For math, do not use raw LaTeX delimiters or commands. Write readable plain-text math, for example x = (-4 +/- sqrt(-104)) / 10, then explain each step.",
   "Do not include malformed tables, decorative characters, fake JSON, or hidden chain-of-thought.",
 ].join(" ");
 
@@ -40,6 +41,38 @@ const weekdays = [
   "friday",
   "saturday",
 ] as const;
+
+const monthNames: Record<string, number> = {
+  january: 1,
+  jan: 1,
+  february: 2,
+  feb: 2,
+  march: 3,
+  mar: 3,
+  april: 4,
+  apr: 4,
+  may: 5,
+  june: 6,
+  jun: 6,
+  july: 7,
+  jul: 7,
+  august: 8,
+  aug: 8,
+  september: 9,
+  sept: 9,
+  sep: 9,
+  october: 10,
+  oct: 10,
+  november: 11,
+  nov: 11,
+  december: 12,
+  dec: 12,
+};
+
+const monthDatePattern = new RegExp(
+  `\\b(${Object.keys(monthNames).join("|")})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(20\\d{2}))?\\b`,
+  "i",
+);
 
 type Priority = "critical" | "high" | "medium" | "low";
 
@@ -105,7 +138,7 @@ const taskIntentPatterns = [
   /\b(remind me|remember to|don't let me forget|dont let me forget|make sure i|i need to|need to|have to|gotta|should)\b/i,
   /\b(add|create|set|schedule|plan|put|make|start|finish|complete|do|work on|handle|take care of|prep|prepare)\b/i,
   /\b(call|email|text|message|reply|follow up|ping|meet|book|reserve|submit|turn in|send)\b/i,
-  /\b(study|review|practice|read|write|draft|design|code|debug|deploy|test|pay|buy|pick up|clean|wash|workout|exercise)\b/i,
+  /\b(study|homework|assignment|project|worksheet|review|practice|read|write|draft|design|code|debug|deploy|test|pay|buy|pick up|clean|wash|workout|exercise)\b/i,
   /\b(due|deadline|by|before|appointment|meeting|event|todo|task)\b/i,
 ];
 
@@ -210,6 +243,20 @@ function parseDate(input: string) {
   const isoMatch = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
   if (isoMatch?.[1]) return isoMatch[1];
 
+  const monthDateMatch = text.match(monthDatePattern);
+  if (monthDateMatch?.[1] && monthDateMatch[2]) {
+    const month = monthNames[monthDateMatch[1].replace(".", "")];
+    const day = Number(monthDateMatch[2]);
+    let year = monthDateMatch[3] ? Number(monthDateMatch[3]) : now.getFullYear();
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const candidate = new Date(year, month - 1, day, 12);
+      if (!monthDateMatch[3] && candidate < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+        year += 1;
+      }
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
   const slashMatch = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
   if (slashMatch) {
     const month = Number(slashMatch[1]);
@@ -272,6 +319,7 @@ function cleanTitle(input: string) {
     .replace(/\b(next\s+)?(today|tomorrow|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/gi, "")
     .replace(/\b(morning|afternoon|evening|tonight|night)\b/gi, "")
     .replace(/\b20\d{2}-\d{2}-\d{2}\b/g, "")
+    .replace(monthDatePattern, "")
     .replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, "")
     .replace(/\b(?:at|by|before|around|@)\s*\d{1,2}(?::\d{2})?\s*(am|pm)?\b/gi, "")
     .replace(/\b\d{1,2}:\d{2}\s*(am|pm)?\b/gi, "")
@@ -280,6 +328,58 @@ function cleanTitle(input: string) {
     .replace(/\b(at|by|on|for)\b/gi, "")
     .replace(/\s+/g, " ")
     .replace(/\s+[,.;:!?]+$/g, "")
+    .trim();
+}
+
+function replaceLatexFractions(text: string) {
+  let output = text;
+  let index = output.indexOf("\\frac{");
+
+  while (index !== -1) {
+    const numeratorStart = index + "\\frac{".length;
+    const numeratorEnd = findMatchingBrace(output, numeratorStart - 1);
+    if (numeratorEnd === -1 || output[numeratorEnd + 1] !== "{") break;
+
+    const denominatorStart = numeratorEnd + 2;
+    const denominatorEnd = findMatchingBrace(output, numeratorEnd + 1);
+    if (denominatorEnd === -1) break;
+
+    const numerator = output.slice(numeratorStart, numeratorEnd);
+    const denominator = output.slice(denominatorStart, denominatorEnd);
+    output = `${output.slice(0, index)}(${numerator})/(${denominator})${output.slice(denominatorEnd + 1)}`;
+    index = output.indexOf("\\frac{");
+  }
+
+  return output;
+}
+
+function findMatchingBrace(text: string, openBraceIndex: number) {
+  let depth = 0;
+  for (let index = openBraceIndex; index < text.length; index += 1) {
+    if (text[index] === "{") depth += 1;
+    if (text[index] === "}") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+function cleanAssistantReply(reply: string) {
+  return replaceLatexFractions(reply)
+    .replace(/\$\$/g, "")
+    .replace(/\$/g, "")
+    .replace(/\\\(/g, "")
+    .replace(/\\\)/g, "")
+    .replace(/\\\[/g, "")
+    .replace(/\\\]/g, "")
+    .replace(/\\pm/g, "+/-")
+    .replace(/\\times/g, "x")
+    .replace(/\\cdot/g, "*")
+    .replace(/\\sqrt\{([^{}]+)\}/g, "sqrt($1)")
+    .replace(/\\left|\\right/g, "")
+    .replace(/\{([^{}]+)\}/g, "$1")
+    .replace(/[ \t]+\n/g, "\n")
     .trim();
 }
 
@@ -321,6 +421,7 @@ function inferTaskType(input: string, title: string): TaskType {
 function looksLikeTask(input: string, date?: string, time?: string) {
   if (taskIntentPatterns.some((pattern) => pattern.test(input))) return true;
   if (time && input.trim().length <= 12) return true;
+  if (date && /\b(homework|assignment|project|worksheet|study|test|quiz|exam|deadline|due)\b/i.test(input)) return true;
   if ((date || time) && /\b(i|me|my|tomorrow|today|next|at|by|before|morning|afternoon|evening|tonight)\b/i.test(input)) {
     return true;
   }
@@ -619,7 +720,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     const { reply, provider } = await generateAssistantReply(message, taskContext, req.log);
 
     res.json({
-      reply,
+      reply: cleanAssistantReply(reply),
       provider,
       taskCreated: Boolean(createdTask),
       task: createdTask,

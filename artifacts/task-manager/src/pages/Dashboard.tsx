@@ -16,6 +16,7 @@ import { OverdueTriageModal } from '@/components/OverdueTriageModal';
 import { IntroAnimation } from '@/components/IntroAnimation';
 import { DailyChecklist } from '@/components/DailyChecklist';
 import { VelocityAssistantCard } from '@/components/VelocityAssistantCard';
+import { playCompletionSound, primeCompletionSound } from '@/lib/completionSound';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
@@ -91,7 +92,7 @@ function TaskRow({ task, onComplete, completing, onClick, delay = 0 }: TaskRowPr
       data-testid={`task-row-${task.id}`}
     >
       <motion.button
-        onClick={(e) => { e.stopPropagation(); onComplete(task.id); }}
+        onClick={(e) => { e.stopPropagation(); primeCompletionSound(); onComplete(task.id); }}
         disabled={completing}
         data-testid={`button-complete-task-${task.id}`}
         className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
@@ -203,6 +204,7 @@ export default function Dashboard() {
     setCompletingId(id);
     completeTask.mutate({ id }, {
       onSuccess: (result) => {
+        playCompletionSound();
         invalidate();
         if (result.tierUp) {
           toast.success(`Tier ${result.newTier} unlocked!`, {

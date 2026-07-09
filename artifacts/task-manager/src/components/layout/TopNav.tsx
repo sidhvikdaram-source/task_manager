@@ -79,7 +79,7 @@ export function TopNav() {
             whileTap={{ scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-[1.15rem] bg-[#141414] text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[0.85rem] bg-[#141414] text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
               <Zap className="h-5 w-5 fill-white text-white" />
             </div>
             <span className="text-xl font-black tracking-tight text-foreground">Velocity</span>

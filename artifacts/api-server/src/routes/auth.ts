@@ -321,14 +321,19 @@ router.get("/logout", async (req: Request, res: Response) => {
     return;
   }
 
-  const config = await getOidcConfig();
+  try {
+    const config = await getOidcConfig();
 
-  const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: clientId,
-    post_logout_redirect_uri: origin,
-  });
+    const endSessionUrl = oidc.buildEndSessionUrl(config, {
+      client_id: clientId,
+      post_logout_redirect_uri: origin,
+    });
 
-  res.redirect(endSessionUrl.href);
+    res.redirect(endSessionUrl.href);
+  } catch (err) {
+    req.log?.warn({ err }, "OIDC logout failed; local session was cleared");
+    res.redirect("/");
+  }
 });
 
 router.post("/session-logout", async (req: Request, res: Response) => {
