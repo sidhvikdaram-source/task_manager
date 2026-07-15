@@ -13,6 +13,7 @@ const systemPrompt = [
   "Handle relative dates like tomorrow, next Monday, Friday afternoon, in two hours, and in three days accurately.",
   "Infer intent from short user phrases, but do not pretend to complete actions that the backend did not report as completed.",
   "When the backend created a task, confirm the title and schedule reference first.",
+  "When the backend created multiple tasks from a previous agenda or plan, briefly list the tasks that were added.",
   "When no task was created, answer the user normally and do not mention backend internals.",
   "Keep responses brief, professional, and free of filler.",
   "Use structured Markdown only: short paragraphs, bullets, bold labels, and code fences when useful.",
@@ -96,6 +97,11 @@ interface ParsedTaskCommand {
   priority: Priority;
 }
 
+type CreatedTaskResponse = typeof tasksTable.$inferSelect & {
+  checklistCount: number;
+  checklistCompleted: number;
+};
+
 type TaskType =
   | "focus"
   | "appointment"
@@ -145,7 +151,7 @@ const taskIntentPatterns = [
   /\b(add|create|set|schedule|plan|put|make|start|finish|complete|do|work on|handle|take care of|prep|prepare)\b/i,
   /\b(call|email|text|message|reply|follow up|ping|meet|book|reserve|submit|turn in|send)\b/i,
   /\b(study|homework|assignment|project|worksheet|review|practice|read|write|draft|design|code|debug|deploy|test|pay|buy|pick up|clean|wash|workout|exercise)\b/i,
-  /\b(due|deadline|before|appointment|meeting|event|todo|task)\b/i,
+  /\b(due|deadline|before|appointment|meeting|event|todo|todos|task|tasks)\b/i,
 ];
 
 const taskTypePatterns: Array<[TaskType, RegExp]> = [
@@ -318,6 +324,13 @@ function parsePriority(input: string): Priority {
   return "medium";
 }
 
+function getVpValue(priority: Priority) {
+  if (priority === "critical") return 25;
+  if (priority === "high") return 15;
+  if (priority === "medium") return 10;
+  return 5;
+}
+
 function cleanTitle(input: string) {
   return input
     .replace(/^\s*(please\s+)?(can you\s+)?(remind me to|remind me|remember to|don't let me forget to|dont let me forget to|don't forget to|dont forget to|i need to|need to|i have to|have to|gotta|set(?: a)? task(?: to)?|add(?: a)? task to|add(?: a)? task|create(?: a)? task to|create(?: a)? task|schedule|todo|plan to|plan|make sure i|make sure to)\s*/i, "")
@@ -431,6 +444,7 @@ function inferTaskType(input: string, title: string): TaskType {
 function looksLikeTask(input: string, date?: string, time?: string) {
   if (looksLikeMathRequest(input) && !hasExplicitTaskCue(input)) return false;
   if (looksLikeGeneralCreationRequest(input) && !hasExplicitTaskCue(input) && !date && !time) return false;
+  if (looksLikePlanningRequest(input) && !mentionsTaskCreation(input)) return false;
   if (taskIntentPatterns.some((pattern) => pattern.test(input))) return true;
   if (time && input.trim().length <= 12) return true;
   if (date && /\b(homework|assignment|project|worksheet|study|test|quiz|exam|deadline|due)\b/i.test(input)) return true;
@@ -441,11 +455,19 @@ function looksLikeTask(input: string, date?: string, time?: string) {
 }
 
 function hasExplicitTaskCue(input: string) {
-  return /\b(remind me|remember to|don't forget|dont forget|add (a )?(task|todo)|create (a )?(task|todo)|set (a )?(task|reminder)|schedule|due|deadline|before|at \d|@\d)\b/i.test(input);
+  return /\b(remind me|remember to|don't forget|dont forget|add (a )?(task|tasks|todo|todos)|create (a )?(task|tasks|todo|todos)|make (a )?(task|tasks|todo|todos)|generate (a )?(task|tasks|todo|todos)|turn (this|that|it|the plan|the agenda).{0,30}\b(task|tasks|todo|todos)\b|set (a )?(task|reminder)|schedule|due|deadline|before|at \d|@\d)\b/i.test(input);
+}
+
+function mentionsTaskCreation(input: string) {
+  return /\b(task|tasks|todo|todos|to-do|to-dos|checklist|action items)\b/i.test(input);
 }
 
 function looksLikeGeneralCreationRequest(input: string) {
   return /\b(write|create|make|draft|generate|compose)\s+(an?\s+|the\s+)?(essay|poem|story|paragraph|report|article|summary|speech|letter|email|blog|script|outline)\b/i.test(input);
+}
+
+function looksLikePlanningRequest(input: string) {
+  return /\b(create|make|generate|build|draft|write)\s+(an?\s+|the\s+)?(agenda|plan|study plan|practice plan|schedule|routine|roadmap)\b/i.test(input);
 }
 
 function looksLikeMathRequest(input: string) {
@@ -546,6 +568,63 @@ function parseTaskCommand(message: string): ParsedTaskCommand | null {
     keywords: matchedKeywords(message),
     priority: parsePriority(message),
   };
+}
+
+function looksLikeBulkTaskRequest(message: string) {
+  return mentionsTaskCreation(message) && /\b(generate|create|make|add|turn|convert|put)\b/i.test(message);
+}
+
+function getLatestAssistantPlan(history: ChatHistoryMessage[]) {
+  return [...history].reverse().find((item) => item.role === "assistant" && item.content.length > 20)?.content ?? "";
+}
+
+function cleanAgendaItem(line: string) {
+  return line
+    .replace(/^\s{0,3}(?:[-*•]|\d+[.)])\s*/u, "")
+    .replace(/^#{1,6}\s*/, "")
+    .replace(/\*\*/g, "")
+    .replace(/^\s*(?:day|week|session|step|task)\s+\d+\s*[:.-]\s*/i, "")
+    .replace(/^\s*(?:morning|afternoon|evening|night|\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*[:.-]\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isUsefulAgendaTask(line: string) {
+  if (line.length < 8 || line.length > 120) return false;
+  if (/^(agenda|plan|overview|summary|tips|notes?|goal|goals|here'?s|sure|absolutely)\b/i.test(line)) return false;
+  if (/^(warm-up|cooldown|break|review)$/i.test(line)) return false;
+  return /\b(practice|review|solve|study|complete|take|do|work on|learn|memorize|drill|read|watch|analyze|check|reflect|write|outline|quiz|test|problems?)\b/i.test(line);
+}
+
+function parseBulkTaskCommands(message: string, history: ChatHistoryMessage[]): ParsedTaskCommand[] {
+  if (!looksLikeBulkTaskRequest(message)) return [];
+
+  const source = getLatestAssistantPlan(history);
+  if (!source) return [];
+
+  const seen = new Set<string>();
+  return source
+    .split(/\r?\n/)
+    .map(cleanAgendaItem)
+    .filter(isUsefulAgendaTask)
+    .map((line) => {
+      const title = normalizeTitle(line.replace(/[:：]\s*.+$/, "").trim() || line);
+      const taskType = inferTaskType(`${message} ${source}`, title);
+      const priority = parsePriority(line);
+      return {
+        title,
+        taskType,
+        priority,
+        keywords: matchedKeywords(`${message} ${line}`),
+      } satisfies ParsedTaskCommand;
+    })
+    .filter((command) => {
+      const key = command.title.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return command.title.length > 0;
+    })
+    .slice(0, 10);
 }
 
 function wait(ms: number) {
@@ -743,10 +822,27 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     }
 
     const history = parseHistory(req.body?.history);
-    const parsedCommand = parseTaskCommand(message);
-    let createdTask = null;
+    const bulkCommands = parseBulkTaskCommands(message, history);
+    const parsedCommand = bulkCommands.length > 0 ? null : parseTaskCommand(message);
+    let createdTasks: CreatedTaskResponse[] = [];
 
-    if (parsedCommand) {
+    if (bulkCommands.length > 0) {
+      const insertedTasks = await db
+        .insert(tasksTable)
+        .values(bulkCommands.map((command) => ({
+          title: command.title,
+          description: buildTaskDescription(command),
+          priority: command.priority,
+          dueDate: command.date,
+          calendarDate: command.date,
+          notes: buildTaskNotes(command),
+          userId: req.user.id,
+          vpValue: getVpValue(command.priority),
+        })))
+        .returning();
+
+      createdTasks = insertedTasks.map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 }));
+    } else if (parsedCommand) {
       const [task] = await db
         .insert(tasksTable)
         .values({
@@ -757,32 +853,37 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
           calendarDate: parsedCommand.date,
           notes: buildTaskNotes(parsedCommand),
           userId: req.user.id,
-          vpValue:
-            parsedCommand.priority === "critical" ? 25 :
-            parsedCommand.priority === "high" ? 15 :
-            parsedCommand.priority === "medium" ? 10 : 5,
+          vpValue: getVpValue(parsedCommand.priority),
         })
         .returning();
 
-      createdTask = { ...task, checklistCount: 0, checklistCompleted: 0 };
+      createdTasks = [{ ...task, checklistCount: 0, checklistCompleted: 0 }];
     }
 
-    const taskContext = createdTask
+    const primaryTask = createdTasks[0] ?? null;
+    const taskContext = createdTasks.length > 1
       ? [
-        `Backend action completed: created task "${createdTask.title}".`,
-        parsedCommand ? `Task type: ${taskTypeSymbols[parsedCommand.taskType]} ${taskTypeLabels[parsedCommand.taskType]}.` : "",
-        parsedCommand?.scheduleLabel ? `Schedule reference: ${parsedCommand.scheduleLabel}.` : "",
-        parsedCommand?.time ? `Time captured: ${parsedCommand.time}.` : "",
-        "Respond in clean Markdown with a short confirmation and no extra chatter.",
+        `Backend action completed: created ${createdTasks.length} tasks from the previous agenda/plan.`,
+        `Task titles: ${createdTasks.map((task) => task.title).join("; ")}.`,
+        "Respond in clean Markdown with a short confirmation and the added task titles.",
       ].filter(Boolean).join(" ")
-      : "Backend action completed: no task was created for this message.";
+      : primaryTask
+        ? [
+          `Backend action completed: created task "${primaryTask.title}".`,
+          parsedCommand ? `Task type: ${taskTypeSymbols[parsedCommand.taskType]} ${taskTypeLabels[parsedCommand.taskType]}.` : "",
+          parsedCommand?.scheduleLabel ? `Schedule reference: ${parsedCommand.scheduleLabel}.` : "",
+          parsedCommand?.time ? `Time captured: ${parsedCommand.time}.` : "",
+          "Respond in clean Markdown with a short confirmation and no extra chatter.",
+        ].filter(Boolean).join(" ")
+        : "Backend action completed: no task was created for this message.";
     const { reply, provider } = await generateAssistantReply(message, taskContext, history, req.log);
 
     res.json({
       reply: cleanAssistantReply(reply),
       provider,
-      taskCreated: Boolean(createdTask),
-      task: createdTask,
+      taskCreated: createdTasks.length > 0,
+      task: primaryTask,
+      tasks: createdTasks,
     });
   } catch (err) {
     req.log?.error({ err }, "AI chat request failed");

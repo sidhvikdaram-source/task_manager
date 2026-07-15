@@ -23,6 +23,7 @@ interface AssistantResponse {
   reply: string;
   taskCreated: boolean;
   task?: Task | null;
+  tasks?: Task[];
   error?: string;
 }
 
@@ -194,8 +195,9 @@ export function VelocityAssistantCard() {
       const data = await response.json() as AssistantResponse;
       if (!response.ok) throw new Error(data.error || 'Assistant request failed');
 
-      if (data.taskCreated && data.task) {
-        seedCreatedTask(queryClient, data.task);
+      const createdTasks = data.tasks?.length ? data.tasks : data.task ? [data.task] : [];
+      if (data.taskCreated && createdTasks.length > 0) {
+        createdTasks.forEach((task) => seedCreatedTask(queryClient, task));
         queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
         queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
       }
