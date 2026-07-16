@@ -7,6 +7,7 @@ import { pinoHttp } from "pino-http";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { getDatabaseState } from "./lib/databaseState";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,7 +33,20 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(authMiddleware);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const database = getDatabaseState();
+  if (req.path === "/api/healthz") return next();
+  if (!database.ready && req.path.startsWith("/api/")) {
+    res.status(503).json({
+      error: "Velocity's database is temporarily unavailable. The server is reconnecting automatically.",
+      code: "DATABASE_UNAVAILABLE",
+      retryAfterSeconds: 30,
+    });
+    return;
+  }
+  if (!database.ready) return next();
+  void authMiddleware(req, res, next).catch(next);
+});
 
 app.use("/api", router);
 
