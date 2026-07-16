@@ -8,6 +8,7 @@ services:
     repo: https://github.com/sidhvikdaram-source/task_manager.git
     branch: main
     plan: free
+    region: oregon
     buildCommand: pnpm install --prod=false && pnpm run render-build
     startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
     envVars:
