@@ -73,6 +73,33 @@ router.get("/analytics/milestones", async (req, res): Promise<void> => {
   res.json(milestones);
 });
 
+router.get("/analytics/insights", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const stats = await getOrCreateUserStats(req.user.id);
+  const completed = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.status, "completed")));
+  const insights: Array<{ type: string; text: string; sampleSize: number }> = [];
+
+  const hourCounts = new Array<number>(24).fill(0);
+  completed.forEach((task) => { if (task.completedAt) hourCounts[new Date(task.completedAt).getHours()] += 1; });
+  const peakHour = hourCounts.indexOf(Math.max(...hourCounts));
+  if (completed.filter((task) => task.completedAt).length >= 5 && hourCounts[peakHour] > 0) {
+    const formatHour = (hour: number) => `${hour % 12 || 12} ${hour >= 12 ? "PM" : "AM"}`;
+    insights.push({ type: "peak-time", text: `You complete the most tasks between ${formatHour(peakHour)} and ${formatHour((peakHour + 2) % 24)}.`, sampleSize: completed.filter((task) => task.completedAt).length });
+  }
+
+  const mathTasks = completed.filter((task) => /\b(math|algebra|geometry|calculus|amc)\b/i.test(`${task.title} ${task.description ?? ""}`) && task.estimatedMinutes && task.actualMinutes);
+  if (mathTasks.length >= 3) {
+    const estimate = mathTasks.reduce((sum, task) => sum + (task.estimatedMinutes ?? 0), 0);
+    const actual = mathTasks.reduce((sum, task) => sum + (task.actualMinutes ?? 0), 0);
+    const difference = Math.round((actual / estimate - 1) * 100);
+    insights.push({ type: "estimate", text: difference > 0 ? `Math tasks take approximately ${difference}% longer than your estimate.` : `Your math task estimates are within ${Math.abs(difference)}% of actual time.`, sampleSize: mathTasks.length });
+  }
+
+  const vpRemaining = stats.tierProgress === 0 && stats.totalVp > 0 ? 100 : 100 - stats.tierProgress;
+  insights.push({ type: "tier", text: `You are ${vpRemaining} VP away from your next tier.`, sampleSize: 1 });
+  res.json(insights);
+});
+
 router.get("/dashboard/overview", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;

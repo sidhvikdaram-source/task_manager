@@ -467,7 +467,7 @@ function looksLikeGeneralCreationRequest(input: string) {
 }
 
 function looksLikePlanningRequest(input: string) {
-  return /\b(create|make|generate|build|draft|write)\s+(an?\s+|the\s+)?(agenda|plan|study plan|practice plan|schedule|routine|roadmap)\b/i.test(input);
+  return /\b(create|make|generate|build|draft|write)\s+(?:(?:an?|the|my)\s+)?(?:(?:one|two|three|four|five|six|seven|\d+)[ -]?(?:day|week|month)\s+)?(agenda|plan|study plan|practice plan|schedule|routine|roadmap)\b/i.test(input);
 }
 
 function looksLikeMathRequest(input: string) {
@@ -832,6 +832,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     const bulkCommands = agendaWithTasks ? [] : parseBulkTaskCommands(message, history);
     const parsedCommand = bulkCommands.length > 0 || agendaWithTasks ? null : parseTaskCommand(message);
     let createdTasks: CreatedTaskResponse[] = [];
+    let taskPreview: ParsedTaskCommand[] = [];
     let agendaReply: string | null = null;
 
     if (agendaWithTasks) {
@@ -849,40 +850,11 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
         [...history, { role: "assistant", content: agendaReply }],
       );
 
-      if (agendaCommands.length > 0) {
-        const insertedTasks = await db
-          .insert(tasksTable)
-          .values(agendaCommands.map((command) => ({
-            title: command.title,
-            description: buildTaskDescription(command),
-            priority: command.priority,
-            dueDate: command.date,
-            calendarDate: command.date,
-            notes: buildTaskNotes(command),
-            userId: req.user.id,
-            vpValue: getVpValue(command.priority),
-          })))
-          .returning();
-        createdTasks = insertedTasks.map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 }));
-      }
+      taskPreview = agendaCommands;
     }
 
     if (!agendaWithTasks && bulkCommands.length > 0) {
-      const insertedTasks = await db
-        .insert(tasksTable)
-        .values(bulkCommands.map((command) => ({
-          title: command.title,
-          description: buildTaskDescription(command),
-          priority: command.priority,
-          dueDate: command.date,
-          calendarDate: command.date,
-          notes: buildTaskNotes(command),
-          userId: req.user.id,
-          vpValue: getVpValue(command.priority),
-        })))
-        .returning();
-
-      createdTasks = insertedTasks.map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 }));
+      taskPreview = bulkCommands;
     } else if (parsedCommand) {
       const [task] = await db
         .insert(tasksTable)
@@ -920,8 +892,8 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     const generated = agendaReply
       ? { reply: agendaReply, provider: "agenda" as const }
       : await generateAssistantReply(message, taskContext, history, req.log);
-    const reply = createdTasks.length > 0 && agendaReply
-      ? `${agendaReply}\n\n**Tasks added to your board**\n${createdTasks.map((task) => `- ${task.title}`).join("\n")}`
+    const reply = taskPreview.length > 0 && agendaReply
+      ? `${agendaReply}\n\n**Review before adding**\n${taskPreview.map((task) => `- ${task.title}`).join("\n")}`
       : generated.reply;
 
     res.json({
@@ -930,6 +902,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       taskCreated: createdTasks.length > 0,
       task: primaryTask,
       tasks: createdTasks,
+      taskPreview,
     });
   } catch (err) {
     req.log?.error({ err }, "AI chat request failed");
@@ -940,6 +913,23 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       error: message,
     });
   }
+});
+
+router.post("/ai/tasks/confirm", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const raw = Array.isArray(req.body?.tasks) ? req.body.tasks.slice(0, 12) : [];
+  const commands: ParsedTaskCommand[] = raw.flatMap((item: unknown) => {
+    if (!item || typeof item !== "object") return [];
+    const value = item as Partial<ParsedTaskCommand>;
+    const title = typeof value.title === "string" ? normalizeTitle(value.title).slice(0, 140) : "";
+    if (!title) return [];
+    const priority: Priority = ["critical", "high", "medium", "low"].includes(value.priority ?? "") ? value.priority as Priority : "medium";
+    const taskType: TaskType = value.taskType && value.taskType in taskTypeLabels ? value.taskType : inferTaskType(title, title);
+    return [{ title, priority, taskType, date: typeof value.date === "string" ? value.date : undefined, time: typeof value.time === "string" ? value.time : undefined, scheduleLabel: typeof value.scheduleLabel === "string" ? value.scheduleLabel : undefined, keywords: [] }];
+  });
+  if (commands.length === 0) { res.status(400).json({ error: "No valid tasks to create." }); return; }
+  const inserted = await db.insert(tasksTable).values(commands.map((command) => ({ title: command.title, description: buildTaskDescription(command), priority: command.priority, dueDate: command.date, calendarDate: command.date, notes: buildTaskNotes(command), userId: req.user.id, vpValue: getVpValue(command.priority) }))).returning();
+  res.status(201).json({ tasks: inserted.map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 })) });
 });
 
 export default router;

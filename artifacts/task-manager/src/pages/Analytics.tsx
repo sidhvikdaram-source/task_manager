@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   useGetVelocityChart, 
@@ -14,16 +14,18 @@ import {
   Tooltip as RechartsTooltip, 
   ResponsiveContainer 
 } from 'recharts';
-import { Flame, Trophy, Zap, Clock, CheckCircle2 } from 'lucide-react';
+import { Flame, Trophy, Zap, Clock, CheckCircle2, Lightbulb } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO } from 'date-fns';
 
 export default function Analytics() {
+  const [insights, setInsights] = useState<Array<{ type: string; text: string; sampleSize: number }>>([]);
   const { data: chartData, isLoading: isLoadingChart } = useGetVelocityChart();
   const { data: summary, isLoading: isLoadingSummary } = useGetAnalyticsSummary();
   const { data: milestones, isLoading: isLoadingMilestones } = useGetMilestones();
 
   const isLoading = isLoadingChart || isLoadingSummary || isLoadingMilestones;
+  useEffect(() => { fetch('/api/analytics/insights', { credentials: 'include' }).then((response) => response.ok ? response.json() : []).then(setInsights).catch(() => setInsights([])); }, []);
 
   if (isLoading) {
     return (
@@ -81,6 +83,8 @@ export default function Analytics() {
           <div className="text-2xl font-bold">{summary.focusMinutes}</div>
         </div>
       </div>
+
+      <section className="bento-card p-5"><div className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-primary" /><h2 className="text-lg font-bold">Stored-data insights</h2></div><div className="mt-4 grid gap-3 md:grid-cols-3">{insights.map((insight) => <div key={insight.type} className="rounded-xl border bg-muted/25 p-4"><p className="text-sm font-semibold leading-relaxed">{insight.text}</p>{insight.sampleSize > 1 && <p className="mt-2 text-[10px] font-bold uppercase text-muted-foreground">Based on {insight.sampleSize} completed tasks</p>}</div>)}</div></section>
 
       <div className="grid md:grid-cols-[1fr_350px] gap-8 items-start">
         <div className="bg-card border rounded-2xl shadow-sm p-6">

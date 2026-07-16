@@ -1,12 +1,15 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-export type ThemeId = 'tech-brutalist' | 'clean-matte' | 'midnight-violet' | 'evergreen';
+export type ThemeId = 'tech-brutalist' | 'clean-matte' | 'midnight-violet' | 'evergreen' | 'paper-blue' | 'soft-sage' | 'rose-quartz';
 
 export const themes: Array<{ id: ThemeId; label: string }> = [
   { id: 'tech-brutalist', label: 'Tech Brutalist' },
   { id: 'clean-matte', label: 'Clean Matte' },
   { id: 'midnight-violet', label: 'Midnight Violet' },
   { id: 'evergreen', label: 'Evergreen' },
+  { id: 'paper-blue', label: 'Paper Blue' },
+  { id: 'soft-sage', label: 'Soft Sage' },
+  { id: 'rose-quartz', label: 'Rose Quartz' },
 ];
 
 interface ThemeContextValue {
@@ -20,7 +23,7 @@ const storageKey = 'velocity-theme';
 function readInitialTheme(): ThemeId {
   try {
     const stored = localStorage.getItem(storageKey);
-    if (stored === 'tech-brutalist' || stored === 'clean-matte' || stored === 'midnight-violet' || stored === 'evergreen') return stored;
+    if (themes.some((theme) => theme.id === stored)) return stored as ThemeId;
   } catch {
     // localStorage can be unavailable in embedded/private contexts.
   }
@@ -32,7 +35,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.toggle('dark', theme !== 'clean-matte');
+    document.documentElement.classList.toggle('dark', ['tech-brutalist', 'midnight-violet', 'evergreen'].includes(theme));
     try {
       localStorage.setItem(storageKey, theme);
     } catch {

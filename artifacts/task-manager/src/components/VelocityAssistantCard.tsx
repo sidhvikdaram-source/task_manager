@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Sparkles, Zap } from 'lucide-react';
+import { Check, Loader2, Send, Sparkles, Zap } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetDashboardOverviewQueryKey,
@@ -17,13 +17,18 @@ interface ChatMessage {
   role: ChatRole;
   content: string;
   typing?: boolean;
+  taskPreview?: TaskPreview[];
+  previewConfirmed?: boolean;
 }
+
+type TaskPreview = { title: string; date?: string; time?: string; scheduleLabel?: string; taskType: string; priority: Task['priority']; keywords: string[] };
 
 interface AssistantResponse {
   reply: string;
   taskCreated: boolean;
   task?: Task | null;
   tasks?: Task[];
+  taskPreview?: TaskPreview[];
   error?: string;
 }
 
@@ -131,6 +136,7 @@ export function VelocityAssistantCard() {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const canSend = input.trim().length > 0 && !isSending;
@@ -158,6 +164,21 @@ export function VelocityAssistantCard() {
     setMessages((current) => current.map((message) => (
       message.id === id ? { ...message, content, typing: false } : message
     )));
+  }
+
+  async function confirmTaskPreview(messageId: string, preview: TaskPreview[]) {
+    setConfirmingId(messageId);
+    try {
+      const response = await fetch('/api/ai/tasks/confirm', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tasks: preview }) });
+      const data = await response.json() as { tasks?: Task[]; error?: string };
+      if (!response.ok || !data.tasks) throw new Error(data.error || 'Could not create tasks');
+      data.tasks.forEach((task) => seedCreatedTask(queryClient, task));
+      queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+      queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+      setMessages((current) => current.map((message) => message.id === messageId ? { ...message, previewConfirmed: true } : message));
+    } catch (error) {
+      setMessages((current) => [...current, { id: `assistant-error-${Date.now()}`, role: 'assistant', content: error instanceof Error ? error.message : 'Could not create those tasks.' }]);
+    } finally { setConfirmingId(null); }
   }
 
   async function sendMessage(event?: React.FormEvent) {
@@ -203,6 +224,9 @@ export function VelocityAssistantCard() {
       }
 
       await animateAssistantMessage(assistantId, data.reply);
+      if (data.taskPreview?.length) {
+        setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, taskPreview: data.taskPreview } : message));
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Velocity Assistant hit a snag. Please try again.';
       await animateAssistantMessage(assistantId, message);
@@ -259,8 +283,9 @@ export function VelocityAssistantCard() {
                   : 'border-secondary/30 bg-secondary/15 text-foreground',
               )}
             >
-              {message.content ? <MarkdownMessage content={message.content} /> : (message.typing ? '...' : '')}
-              {message.typing && <span className="ml-0.5 animate-pulse text-primary">|</span>}
+              {message.content ? <MarkdownMessage content={message.content} /> : (message.typing ? <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-.2s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-.1s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" /></span> : '')}
+              {message.typing && message.content && <span className="ml-0.5 animate-pulse text-primary">|</span>}
+              {message.taskPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmTaskPreview(message.id, message.taskPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Adding tasks</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Tasks added</> : `Add ${message.taskPreview.length} tasks`}</button>}
             </div>
           </div>
         ))}

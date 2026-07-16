@@ -1,98 +1,69 @@
 import { Router, type IRouter } from "express";
-import { eq, and, inArray } from "drizzle-orm";
-import { db, dailyHabitsTable, dailyHabitCompletionsTable } from "@workspace/db";
-import { CreateDailyHabitBody, DeleteDailyHabitParams, ToggleDailyHabitParams } from "@workspace/api-zod";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { db, dailyHabitsTable, dailyHabitCompletionsTable, userStatsTable } from "@workspace/db";
 
 const router: IRouter = Router();
+const todayDate = () => new Date().toISOString().slice(0, 10);
+const allowedIcons = new Set(["target", "book", "brain", "heart", "run", "water", "code", "music"]);
 
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
+function habitInput(body: unknown) {
+  const value = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const title = typeof value.title === "string" ? value.title.trim().slice(0, 100) : "";
+  const days = Array.isArray(value.daysOfWeek) ? value.daysOfWeek.filter((day): day is number => Number.isInteger(day) && Number(day) >= 0 && Number(day) <= 6) : [0,1,2,3,4,5,6];
+  const reminderTime = typeof value.reminderTime === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.reminderTime) ? value.reminderTime : null;
+  const icon = typeof value.icon === "string" && allowedIcons.has(value.icon) ? value.icon : "target";
+  const vpReward = Math.min(25, Math.max(1, Number(value.vpReward) || 5));
+  return { title, daysOfWeek: [...new Set(days)].sort().join(","), reminderTime, icon, vpReward };
 }
 
 router.get("/daily-habits", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const userId = req.user.id;
-
-  const habits = await db
-    .select()
-    .from(dailyHabitsTable)
-    .where(eq(dailyHabitsTable.userId, userId))
-    .orderBy(dailyHabitsTable.sortOrder, dailyHabitsTable.createdAt);
-
-  if (habits.length === 0) { res.json([]); return; }
-
-  const today = todayDate();
-  const completions = await db
-    .select()
-    .from(dailyHabitCompletionsTable)
-    .where(and(
-      inArray(dailyHabitCompletionsTable.habitId, habits.map((h) => h.id)),
-      eq(dailyHabitCompletionsTable.completedDate, today),
-    ));
-
-  const completedIds = new Set(completions.map((c) => c.habitId));
-  res.json(habits.map((h) => ({ ...h, completedToday: completedIds.has(h.id) })));
+  const habits = await db.select().from(dailyHabitsTable).where(eq(dailyHabitsTable.userId, req.user.id)).orderBy(dailyHabitsTable.sortOrder, dailyHabitsTable.createdAt);
+  if (!habits.length) { res.json([]); return; }
+  const completions = await db.select().from(dailyHabitCompletionsTable).where(inArray(dailyHabitCompletionsTable.habitId, habits.map((habit) => habit.id))).orderBy(desc(dailyHabitCompletionsTable.completedDate));
+  res.json(habits.map((habit) => ({ ...habit, daysOfWeek: habit.daysOfWeek.split(",").map(Number), completedToday: completions.some((entry) => entry.habitId === habit.id && entry.completedDate === todayDate() && entry.completed), recentCompletions: completions.filter((entry) => entry.habitId === habit.id && entry.completed).slice(0, 30).map((entry) => entry.completedDate) })));
 });
 
 router.post("/daily-habits", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const userId = req.user.id;
+  const input = habitInput(req.body); if (!input.title || !input.daysOfWeek) { res.status(400).json({ error: "Add a title and at least one day." }); return; }
+  const existing = await db.select({ id: dailyHabitsTable.id }).from(dailyHabitsTable).where(eq(dailyHabitsTable.userId, req.user.id));
+  const [habit] = await db.insert(dailyHabitsTable).values({ ...input, userId: req.user.id, sortOrder: existing.length }).returning();
+  res.status(201).json({ ...habit, daysOfWeek: habit.daysOfWeek.split(",").map(Number), completedToday: false, recentCompletions: [] });
+});
 
-  const parsed = CreateDailyHabitBody.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-
-  const existing = await db.select().from(dailyHabitsTable).where(eq(dailyHabitsTable.userId, userId));
-  const [habit] = await db
-    .insert(dailyHabitsTable)
-    .values({ title: parsed.data.title, userId, sortOrder: existing.length })
-    .returning();
-
-  res.status(201).json({ ...habit, completedToday: false });
+router.patch("/daily-habits/:habitId", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const id = Number(req.params.habitId); const status = req.body?.status;
+  if (!["active", "paused", "archived"].includes(status)) { res.status(400).json({ error: "Invalid habit status." }); return; }
+  const [habit] = await db.update(dailyHabitsTable).set({ status }).where(and(eq(dailyHabitsTable.id, id), eq(dailyHabitsTable.userId, req.user.id))).returning();
+  if (!habit) { res.status(404).json({ error: "Habit not found." }); return; } res.json(habit);
 });
 
 router.post("/daily-habits/:habitId/toggle", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const userId = req.user.id;
-
-  const params = ToggleDailyHabitParams.safeParse(req.params);
-  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-
-  const today = todayDate();
-  const habitId = params.data.habitId;
-
-  const [habit] = await db.select().from(dailyHabitsTable).where(
-    and(eq(dailyHabitsTable.id, habitId), eq(dailyHabitsTable.userId, userId))
-  );
-  if (!habit) { res.status(404).json({ error: "Habit not found" }); return; }
-
-  const [existing] = await db
-    .select()
-    .from(dailyHabitCompletionsTable)
-    .where(and(eq(dailyHabitCompletionsTable.habitId, habitId), eq(dailyHabitCompletionsTable.completedDate, today)));
-
+  const id = Number(req.params.habitId); const [habit] = await db.select().from(dailyHabitsTable).where(and(eq(dailyHabitsTable.id, id), eq(dailyHabitsTable.userId, req.user.id)));
+  if (!habit || habit.status !== "active") { res.status(404).json({ error: "Active habit not found." }); return; }
+  const today = todayDate(); const [existing] = await db.select().from(dailyHabitCompletionsTable).where(and(eq(dailyHabitCompletionsTable.habitId, id), eq(dailyHabitCompletionsTable.completedDate, today)));
   if (existing) {
-    await db.delete(dailyHabitCompletionsTable).where(eq(dailyHabitCompletionsTable.id, existing.id));
-    res.json({ completedToday: false });
-  } else {
-    await db.insert(dailyHabitCompletionsTable).values({ habitId, completedDate: today });
-    res.json({ completedToday: true });
+    const completed = !existing.completed; await db.update(dailyHabitCompletionsTable).set({ completed }).where(eq(dailyHabitCompletionsTable.id, existing.id));
+    if (completed && !existing.vpAwarded) { await awardVp(req.user.id, habit.vpReward); await db.update(dailyHabitCompletionsTable).set({ vpAwarded: true }).where(eq(dailyHabitCompletionsTable.id, existing.id)); }
+    res.json({ completedToday: completed, vpAwarded: completed && !existing.vpAwarded ? habit.vpReward : 0 }); return;
   }
+  await db.insert(dailyHabitCompletionsTable).values({ habitId: id, completedDate: today, completed: true, vpAwarded: true }); await awardVp(req.user.id, habit.vpReward);
+  res.json({ completedToday: true, vpAwarded: habit.vpReward });
 });
+
+async function awardVp(userId: string, amount: number) {
+  const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
+  if (stats) await db.update(userStatsTable).set({ totalVp: stats.totalVp + amount, tierProgress: (stats.tierProgress + amount) % 100, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
+  else await db.insert(userStatsTable).values({ userId, totalVp: amount, tierProgress: amount % 100 });
+}
 
 router.delete("/daily-habits/:habitId", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const userId = req.user.id;
-
-  const params = DeleteDailyHabitParams.safeParse(req.params);
-  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
-
-  const [habit] = await db
-    .delete(dailyHabitsTable)
-    .where(and(eq(dailyHabitsTable.id, params.data.habitId), eq(dailyHabitsTable.userId, userId)))
-    .returning();
-
-  if (!habit) { res.status(404).json({ error: "Habit not found" }); return; }
-  res.sendStatus(204);
+  const [habit] = await db.delete(dailyHabitsTable).where(and(eq(dailyHabitsTable.id, Number(req.params.habitId)), eq(dailyHabitsTable.userId, req.user.id))).returning();
+  if (!habit) { res.status(404).json({ error: "Habit not found." }); return; } res.sendStatus(204);
 });
 
 export default router;

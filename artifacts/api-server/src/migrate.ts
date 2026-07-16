@@ -25,7 +25,9 @@ export async function runMigrations(): Promise<void> {
     ALTER TABLE "users"
       ADD COLUMN IF NOT EXISTS "username" varchar,
       ADD COLUMN IF NOT EXISTS "avatar_style" varchar DEFAULT 'bolt' NOT NULL,
-      ADD COLUMN IF NOT EXISTS "equipped_cosmetic" varchar DEFAULT 'starter-bolt' NOT NULL;
+      ADD COLUMN IF NOT EXISTS "equipped_cosmetic" varchar DEFAULT 'starter-bolt' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_frame" varchar DEFAULT 'none' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_pet" varchar DEFAULT 'none' NOT NULL;
   `);
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_username_unique" ON "users" ("username") WHERE "username" IS NOT NULL;`);
 
@@ -35,6 +37,40 @@ export async function runMigrations(): Promise<void> {
       "item_id" varchar NOT NULL,
       "purchased_at" timestamp with time zone DEFAULT now() NOT NULL,
       PRIMARY KEY ("user_id", "item_id")
+    );
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "friendships" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "requester_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "recipient_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "status" varchar DEFAULT 'pending' NOT NULL,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("requester_id", "recipient_id")
+    );
+    CREATE TABLE IF NOT EXISTS "direct_messages" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "sender_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "recipient_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "body" text NOT NULL,
+      "read_at" timestamp with time zone,
+      "deleted_at" timestamp with time zone,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS "user_blocks" (
+      "blocker_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "blocked_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("blocker_id", "blocked_id")
+    );
+    CREATE TABLE IF NOT EXISTS "user_reports" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "reporter_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "reported_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "reason" varchar NOT NULL,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL
     );
   `);
 
@@ -226,6 +262,18 @@ export async function runMigrations(): Promise<void> {
       "completed_date" date NOT NULL,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL
     );
+  `);
+  await db.execute(sql`
+    ALTER TABLE "daily_habits"
+      ADD COLUMN IF NOT EXISTS "days_of_week" text DEFAULT '0,1,2,3,4,5,6' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "reminder_time" varchar,
+      ADD COLUMN IF NOT EXISTS "icon" varchar DEFAULT 'target' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "vp_reward" integer DEFAULT 5 NOT NULL,
+      ADD COLUMN IF NOT EXISTS "status" varchar DEFAULT 'active' NOT NULL;
+    ALTER TABLE "daily_habit_completions"
+      ADD COLUMN IF NOT EXISTS "completed" boolean DEFAULT true NOT NULL,
+      ADD COLUMN IF NOT EXISTS "vp_awarded" boolean DEFAULT false NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS "habit_completion_day_unique" ON "daily_habit_completions" ("habit_id", "completed_date");
   `);
 
   console.log("[migrate] Schema migration complete!");

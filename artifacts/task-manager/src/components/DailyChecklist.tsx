@@ -1,273 +1,37 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  useListDailyHabits,
-  useCreateDailyHabit,
-  useToggleDailyHabit,
-  useDeleteDailyHabit,
-  getListDailyHabitsQueryKey,
-} from '@workspace/api-client-react';
-import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Circle, Plus, Trash2, Repeat } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Archive, BookOpen, Brain, CheckCircle2, Circle, Clock, Code2, Droplets, Dumbbell, Heart, Music, Pause, Play, Plus, Repeat, Target, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+type Habit = { id: number; title: string; daysOfWeek: number[]; reminderTime: string | null; icon: string; vpReward: number; status: 'active' | 'paused' | 'archived'; completedToday: boolean; recentCompletions: string[] };
+const weekdays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const iconMap = { target: Target, book: BookOpen, brain: Brain, heart: Heart, run: Dumbbell, water: Droplets, code: Code2, music: Music };
+
+async function request<T>(path: string, options?: RequestInit) { const response = await fetch(path, { credentials: 'include', ...options, headers: options?.body ? { 'Content-Type': 'application/json' } : undefined }); if (!response.ok) { const data = await response.json().catch(() => ({})) as { error?: string }; throw new Error(data.error || 'Request failed'); } return response.status === 204 ? null as T : await response.json() as T; }
+
 export function DailyChecklist() {
-  const qc = useQueryClient();
-  const { data: habits = [], isLoading } = useListDailyHabits();
-  const createHabit = useCreateDailyHabit();
-  const toggleHabit = useToggleDailyHabit();
-  const deleteHabit = useDeleteDailyHabit();
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [title, setTitle] = useState('');
+  const [days, setDays] = useState([1,2,3,4,5]);
+  const [reminderTime, setReminderTime] = useState('');
+  const [icon, setIcon] = useState('target');
+  const [vpReward, setVpReward] = useState(5);
+  const load = async () => setHabits(await request<Habit[]>('/api/daily-habits'));
+  useEffect(() => { void load().catch(() => undefined); }, []);
+  const visible = habits.filter((habit) => showArchived ? habit.status === 'archived' : habit.status !== 'archived');
+  const active = habits.filter((habit) => habit.status === 'active');
+  const completed = active.filter((habit) => habit.completedToday).length;
+  const create = async () => { if (!title.trim() || days.length === 0) return; try { await request('/api/daily-habits', { method: 'POST', body: JSON.stringify({ title, daysOfWeek: days, reminderTime: reminderTime || null, icon, vpReward }) }); setTitle(''); setAdding(false); await load(); toast.success('Habit added'); } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not add habit'); } };
+  const toggle = async (habit: Habit) => { try { const result = await request<{ completedToday: boolean; vpAwarded: number }>(`/api/daily-habits/${habit.id}/toggle`, { method: 'POST' }); await load(); if (result.completedToday) toast.success(result.vpAwarded ? `Habit complete · +${result.vpAwarded} VP` : 'Habit complete'); } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not update habit'); } };
+  const status = async (habit: Habit, next: Habit['status']) => { await request(`/api/daily-habits/${habit.id}`, { method: 'PATCH', body: JSON.stringify({ status: next }) }); await load(); };
+  const remove = async (habit: Habit) => { if (!window.confirm(`Delete “${habit.title}” and its history?`)) return; await request(`/api/daily-habits/${habit.id}`, { method: 'DELETE' }); await load(); };
 
-  const [newTitle, setNewTitle] = useState('');
-  const [isAdding, setIsAdding] = useState(false);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
-
-  const invalidate = () => qc.invalidateQueries({ queryKey: getListDailyHabitsQueryKey() });
-
-  const completedCount = habits.filter(h => h.completedToday).length;
-  const total = habits.length;
-
-  const handleAdd = () => {
-    const title = newTitle.trim();
-    if (!title) return;
-    createHabit.mutate({ data: { title } }, {
-      onSuccess: () => {
-        invalidate();
-        setNewTitle('');
-        setIsAdding(false);
-        toast.success('Habit added');
-      },
-    });
-  };
-
-  const handleToggle = (id: number) => {
-    setTogglingId(id);
-    toggleHabit.mutate({ habitId: id }, {
-      onSuccess: (result) => {
-        invalidate();
-        if (result.completedToday) toast.success('Habit completed ✓');
-      },
-      onSettled: () => setTogglingId(null),
-    });
-  };
-
-  const handleDelete = (id: number) => {
-    deleteHabit.mutate({ habitId: id }, {
-      onSuccess: () => { invalidate(); toast.success('Habit removed'); },
-    });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleAdd();
-    if (e.key === 'Escape') { setIsAdding(false); setNewTitle(''); }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 14, filter: 'blur(3px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={{ delay: 0.42, duration: 0.38, ease: 'easeOut' }}
-      className="bg-card border rounded-xl shadow-sm overflow-hidden"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
-        <div className="flex items-center gap-2">
-          <Repeat className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="font-semibold text-sm">Daily Habits</span>
-          {total > 0 && (
-            <motion.span
-              key={`${completedCount}/${total}`}
-              initial={{ scale: 1.15 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${
-                completedCount === total && total > 0
-                  ? 'bg-foreground text-background'
-                  : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {completedCount}/{total}
-            </motion.span>
-          )}
-        </div>
-        <motion.button
-          onClick={() => setIsAdding(true)}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.92 }}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors font-medium"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add habit
-        </motion.button>
-      </div>
-
-      {/* Progress bar */}
-      {total > 0 && (
-        <div className="h-0.5 bg-muted">
-          <motion.div
-            className="h-full bg-foreground rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${total > 0 ? (completedCount / total) * 100 : 0}%` }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-          />
-        </div>
-      )}
-
-      {/* Habit list */}
-      <div className="divide-y divide-border/50">
-        <AnimatePresence initial={false}>
-          {isLoading ? (
-            <div className="py-6 text-center text-muted-foreground text-sm">Loading…</div>
-          ) : habits.length === 0 && !isAdding ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="py-8 text-center"
-            >
-              <Repeat className="w-7 h-7 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No daily habits yet.</p>
-              <button
-                onClick={() => setIsAdding(true)}
-                className="mt-2 text-xs font-medium text-foreground underline underline-offset-2"
-              >
-                Add your first habit
-              </button>
-            </motion.div>
-          ) : (
-            habits.map((habit, i) => (
-              <motion.div
-                key={habit.id}
-                layout
-                initial={{ opacity: 0, x: -12 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 12, height: 0 }}
-                transition={{ delay: i * 0.04, duration: 0.24, ease: 'easeOut' }}
-                className="flex items-center gap-3 px-4 py-3 group"
-              >
-                {/* Toggle button */}
-                <motion.button
-                  onClick={() => handleToggle(habit.id)}
-                  disabled={togglingId === habit.id}
-                  whileHover={{ scale: 1.12 }}
-                  whileTap={{ scale: 0.88 }}
-                  className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <AnimatePresence mode="wait">
-                    {togglingId === habit.id ? (
-                      <motion.div
-                        key="spinner"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 0.6, repeat: Infinity, ease: 'linear' }}
-                        className="w-4.5 h-4.5 border-2 border-foreground border-t-transparent rounded-full"
-                        style={{ width: 18, height: 18 }}
-                      />
-                    ) : habit.completedToday ? (
-                      <motion.div
-                        key="checked"
-                        initial={{ scale: 0.6, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.6, opacity: 0 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 20 }}
-                      >
-                        <CheckCircle2 className="w-[18px] h-[18px] text-foreground fill-foreground" />
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        key="unchecked"
-                        initial={{ scale: 0.6, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.6, opacity: 0 }}
-                      >
-                        <Circle className="w-[18px] h-[18px]" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.button>
-
-                {/* Title */}
-                <motion.span
-                  animate={{
-                    opacity: habit.completedToday ? 0.4 : 1,
-                    textDecoration: habit.completedToday ? 'line-through' : 'none',
-                  }}
-                  transition={{ duration: 0.2 }}
-                  className="flex-1 text-sm font-medium text-foreground select-none"
-                >
-                  {habit.title}
-                </motion.span>
-
-                {/* Delete */}
-                <motion.button
-                  onClick={() => handleDelete(habit.id)}
-                  className="shrink-0 text-muted-foreground/0 group-hover:text-muted-foreground hover:text-foreground transition-colors"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  title="Remove habit"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </motion.button>
-              </motion.div>
-            ))
-          )}
-        </AnimatePresence>
-
-        {/* Add input row */}
-        <AnimatePresence>
-          {isAdding && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="overflow-hidden"
-            >
-              <div className="flex items-center gap-2 px-4 py-3">
-                <Plus className="w-[18px] h-[18px] text-muted-foreground shrink-0" />
-                <input
-                  autoFocus
-                  value={newTitle}
-                  onChange={e => setNewTitle(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="e.g. Practice Python, Do math…"
-                  className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground/50 text-foreground"
-                />
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <motion.button
-                    onClick={handleAdd}
-                    disabled={!newTitle.trim() || createHabit.isPending}
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.96 }}
-                    className="text-xs font-semibold text-primary-foreground bg-primary px-2.5 py-1 rounded-md disabled:opacity-40 transition-opacity"
-                  >
-                    Add
-                  </motion.button>
-                  <button
-                    onClick={() => { setIsAdding(false); setNewTitle(''); }}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* All-done banner */}
-      <AnimatePresence>
-        {completedCount === total && total > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            className="px-4 py-2.5 border-t bg-foreground/4 flex items-center gap-2"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-foreground" />
-            <span className="text-xs font-semibold text-foreground">All habits done for today 🎉</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
+  return <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-xl border bg-card shadow-sm">
+    <header className="flex items-center justify-between border-b bg-muted/30 px-4 py-3"><div className="flex items-center gap-2"><Repeat className="h-4 w-4 text-primary" /><span className="text-sm font-bold">Daily Habits</span>{active.length > 0 && <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-black text-muted-foreground">{completed}/{active.length}</span>}</div><div className="flex gap-2"><button onClick={() => setShowArchived((value) => !value)} className="text-xs font-bold text-muted-foreground">{showArchived ? 'Current' : 'Archived'}</button><button onClick={() => setAdding(true)} className="flex items-center gap-1 text-xs font-bold text-primary"><Plus className="h-3.5 w-3.5" />Add</button></div></header>
+    {active.length > 0 && <div className="h-1 bg-muted"><motion.div className="h-full bg-primary" animate={{ width: `${completed / active.length * 100}%` }} /></div>}
+    <div className="divide-y divide-border/60">{visible.map((habit) => { const Icon = iconMap[habit.icon as keyof typeof iconMap] ?? Target; return <div key={habit.id} className={`group p-3 ${habit.status === 'paused' ? 'opacity-55' : ''}`}><div className="flex items-center gap-3"><button disabled={habit.status !== 'active'} onClick={() => toggle(habit)} className="text-muted-foreground hover:text-primary disabled:cursor-not-allowed">{habit.completedToday ? <CheckCircle2 className="h-5 w-5 fill-primary text-primary" /> : <Circle className="h-5 w-5" />}</button><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{habit.title}</p><div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] font-bold text-muted-foreground"><span>{habit.daysOfWeek.map((day) => weekdays[day]).join(' ')}</span>{habit.reminderTime && <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{habit.reminderTime}</span>}<span className="text-primary">+{habit.vpReward} VP</span></div></div><div className="flex opacity-0 transition-opacity group-hover:opacity-100">{habit.status === 'active' ? <button onClick={() => status(habit, 'paused')} title="Pause" className="p-1.5 text-muted-foreground"><Pause className="h-3.5 w-3.5" /></button> : habit.status === 'paused' ? <button onClick={() => status(habit, 'active')} title="Resume" className="p-1.5 text-muted-foreground"><Play className="h-3.5 w-3.5" /></button> : null}{habit.status !== 'archived' && <button onClick={() => status(habit, 'archived')} title="Archive" className="p-1.5 text-muted-foreground"><Archive className="h-3.5 w-3.5" /></button>}<button onClick={() => remove(habit)} title="Delete" className="p-1.5 text-muted-foreground"><Trash2 className="h-3.5 w-3.5" /></button></div></div>{habit.recentCompletions.length > 0 && <div className="ml-16 mt-2 flex gap-1" title="Recent completion history">{Array.from({ length: 14 }, (_, index) => { const date = new Date(); date.setDate(date.getDate() - (13-index)); const key = date.toISOString().slice(0,10); return <span key={key} className={`h-2 flex-1 rounded-sm ${habit.recentCompletions.includes(key) ? 'bg-primary' : 'bg-muted'}`} />; })}</div>}</div>; })}{visible.length === 0 && !adding && <p className="p-8 text-center text-sm text-muted-foreground">{showArchived ? 'No archived habits.' : 'Add a habit with the days and reminder that fit your week.'}</p>}</div>
+    <AnimatePresence>{adding && <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t"><div className="space-y-4 p-4"><input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Habit name" className="w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-primary" /><div><p className="mb-2 text-xs font-black uppercase text-muted-foreground">Days</p><div className="flex gap-1.5">{weekdays.map((label, day) => <button key={day} onClick={() => setDays((current) => current.includes(day) ? current.filter((item) => item !== day) : [...current, day].sort())} className={`h-8 w-8 rounded-lg text-xs font-black ${days.includes(day) ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>{label}</button>)}</div></div><div className="grid grid-cols-2 gap-3"><label className="text-xs font-bold text-muted-foreground">Reminder<input type="time" value={reminderTime} onChange={(event) => setReminderTime(event.target.value)} className="mt-1 block w-full rounded-lg border bg-background px-2 py-2 text-foreground" /></label><label className="text-xs font-bold text-muted-foreground">VP reward<input type="number" min={1} max={25} value={vpReward} onChange={(event) => setVpReward(Number(event.target.value))} className="mt-1 block w-full rounded-lg border bg-background px-2 py-2 text-foreground" /></label></div><div><p className="mb-2 text-xs font-black uppercase text-muted-foreground">Icon</p><div className="flex flex-wrap gap-2">{Object.entries(iconMap).map(([name, Icon]) => <button key={name} onClick={() => setIcon(name)} className={`rounded-lg border p-2 ${icon === name ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground'}`} title={name}><Icon className="h-4 w-4" /></button>)}</div></div><div className="flex justify-end gap-2"><button onClick={() => setAdding(false)} className="rounded-lg px-3 py-2 text-xs font-bold text-muted-foreground">Cancel</button><button onClick={create} disabled={!title.trim() || days.length === 0} className="rounded-lg bg-primary px-4 py-2 text-xs font-black text-primary-foreground disabled:opacity-40">Create habit</button></div></div></motion.div>}</AnimatePresence>
+  </motion.section>;
 }

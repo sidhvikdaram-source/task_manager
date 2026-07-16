@@ -23,6 +23,8 @@ export const usersTable = pgTable("users", {
   username: varchar("username").unique(),
   avatarStyle: varchar("avatar_style").notNull().default("bolt"),
   equippedCosmetic: varchar("equipped_cosmetic").notNull().default("starter-bolt"),
+  equippedFrame: varchar("equipped_frame").notNull().default("none"),
+  equippedPet: varchar("equipped_pet").notNull().default("none"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });
