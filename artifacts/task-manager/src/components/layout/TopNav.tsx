@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, ListTodo, Users, UserRound } from 'lucide-react';
 import {
   getListTasksQueryKey,
   useGetUserStats,
@@ -58,8 +58,10 @@ export function TopNav() {
 
   const links = [
     { href: '/', label: 'Home', icon: LayoutDashboard },
+    { href: '/tasks', label: 'Tasks', icon: ListTodo },
     { href: '/calendar', label: 'Calendar', icon: CalendarDays },
     { href: '/focus', label: 'Focus Arena', icon: Timer },
+    { href: '/social', label: 'Social', icon: Users },
     { href: '/analytics', label: 'Analytics', icon: LineChart },
   ];
 
@@ -229,6 +231,12 @@ export function TopNav() {
                       )}
                     </div>
                   )}
+                  <Link href="/profile">
+                    <button onClick={() => setAccountOpen(false)} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                      <UserRound className="w-3.5 h-3.5" />
+                      Profile
+                    </button>
+                  </Link>
                   {isAuthenticated ? (
                     <button
                       onClick={() => { setAccountOpen(false); logout(); }}

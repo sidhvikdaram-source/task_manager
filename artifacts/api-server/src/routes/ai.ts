@@ -574,6 +574,12 @@ function looksLikeBulkTaskRequest(message: string) {
   return mentionsTaskCreation(message) && /\b(generate|create|make|add|turn|convert|put)\b/i.test(message);
 }
 
+function looksLikeAgendaWithTasksRequest(message: string) {
+  return looksLikePlanningRequest(message)
+    && mentionsTaskCreation(message)
+    && /\b(create|make|generate|add|build|turn|convert)\b/i.test(message);
+}
+
 function getLatestAssistantPlan(history: ChatHistoryMessage[]) {
   return [...history].reverse().find((item) => item.role === "assistant" && item.content.length > 20)?.content ?? "";
 }
@@ -822,11 +828,46 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     }
 
     const history = parseHistory(req.body?.history);
-    const bulkCommands = parseBulkTaskCommands(message, history);
-    const parsedCommand = bulkCommands.length > 0 ? null : parseTaskCommand(message);
+    const agendaWithTasks = looksLikeAgendaWithTasksRequest(message);
+    const bulkCommands = agendaWithTasks ? [] : parseBulkTaskCommands(message, history);
+    const parsedCommand = bulkCommands.length > 0 || agendaWithTasks ? null : parseTaskCommand(message);
     let createdTasks: CreatedTaskResponse[] = [];
+    let agendaReply: string | null = null;
 
-    if (bulkCommands.length > 0) {
+    if (agendaWithTasks) {
+      const agendaContext = [
+        "The user asked for an agenda and for its actions to become real tasks.",
+        "First write a concise, specific agenda. Use 4-8 Markdown bullets.",
+        "Every bullet must start with a clear action and contain one concrete concept, topic, or deliverable.",
+        "Do not say that a task was created yet. The backend will save each agenda item after you respond.",
+      ].join(" ");
+      const generated = await generateAssistantReply(message, agendaContext, history, req.log);
+      agendaReply = cleanAssistantReply(generated.reply);
+
+      const agendaCommands = parseBulkTaskCommands(
+        "create tasks from this agenda",
+        [...history, { role: "assistant", content: agendaReply }],
+      );
+
+      if (agendaCommands.length > 0) {
+        const insertedTasks = await db
+          .insert(tasksTable)
+          .values(agendaCommands.map((command) => ({
+            title: command.title,
+            description: buildTaskDescription(command),
+            priority: command.priority,
+            dueDate: command.date,
+            calendarDate: command.date,
+            notes: buildTaskNotes(command),
+            userId: req.user.id,
+            vpValue: getVpValue(command.priority),
+          })))
+          .returning();
+        createdTasks = insertedTasks.map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 }));
+      }
+    }
+
+    if (!agendaWithTasks && bulkCommands.length > 0) {
       const insertedTasks = await db
         .insert(tasksTable)
         .values(bulkCommands.map((command) => ({
@@ -876,11 +917,16 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
           "Respond in clean Markdown with a short confirmation and no extra chatter.",
         ].filter(Boolean).join(" ")
         : "Backend action completed: no task was created for this message.";
-    const { reply, provider } = await generateAssistantReply(message, taskContext, history, req.log);
+    const generated = agendaReply
+      ? { reply: agendaReply, provider: "agenda" as const }
+      : await generateAssistantReply(message, taskContext, history, req.log);
+    const reply = createdTasks.length > 0 && agendaReply
+      ? `${agendaReply}\n\n**Tasks added to your board**\n${createdTasks.map((task) => `- ${task.title}`).join("\n")}`
+      : generated.reply;
 
     res.json({
       reply: cleanAssistantReply(reply),
-      provider,
+      provider: generated.provider,
       taskCreated: createdTasks.length > 0,
       task: primaryTask,
       tasks: createdTasks,

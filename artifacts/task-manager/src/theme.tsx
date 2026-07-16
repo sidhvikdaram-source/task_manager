@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-export type ThemeId = 'tech-brutalist' | 'clean-matte';
+export type ThemeId = 'tech-brutalist' | 'clean-matte' | 'midnight-violet' | 'evergreen';
 
 export const themes: Array<{ id: ThemeId; label: string }> = [
   { id: 'tech-brutalist', label: 'Tech Brutalist' },
   { id: 'clean-matte', label: 'Clean Matte' },
+  { id: 'midnight-violet', label: 'Midnight Violet' },
+  { id: 'evergreen', label: 'Evergreen' },
 ];
 
 interface ThemeContextValue {
@@ -18,7 +20,7 @@ const storageKey = 'velocity-theme';
 function readInitialTheme(): ThemeId {
   try {
     const stored = localStorage.getItem(storageKey);
-    if (stored === 'tech-brutalist' || stored === 'clean-matte') return stored;
+    if (stored === 'tech-brutalist' || stored === 'clean-matte' || stored === 'midnight-violet' || stored === 'evergreen') return stored;
   } catch {
     // localStorage can be unavailable in embedded/private contexts.
   }
@@ -30,7 +32,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    document.documentElement.classList.toggle('dark', theme === 'tech-brutalist');
+    document.documentElement.classList.toggle('dark', theme !== 'clean-matte');
     try {
       localStorage.setItem(storageKey, theme);
     } catch {

@@ -10,7 +10,7 @@ import {
   getGetDashboardOverviewQueryKey
 } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
-import { Play, Square, Timer as TimerIcon } from 'lucide-react';
+import { Play, Square, Timer as TimerIcon, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +31,9 @@ export default function FocusArena() {
   const [isActive, setIsActive] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [focusTask, setFocusTask] = useState<FocusTask | null>(null);
+  const [sound, setSound] = useState<'none' | 'rain' | 'library' | 'cafe' | 'white-noise' | 'forest'>('none');
+  const soundContextRef = useRef<AudioContext | null>(null);
+  const soundNodesRef = useRef<AudioNode[]>([]);
   
   const createSession = useCreateFocusSession();
   const completeSession = useCompleteFocusSession();
@@ -54,8 +57,41 @@ export default function FocusArena() {
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      stopFocusSound();
     };
   }, []);
+
+  const stopFocusSound = () => {
+    soundNodesRef.current.forEach((node) => { try { node.disconnect(); } catch { /* already disconnected */ } });
+    soundNodesRef.current = [];
+    if (soundContextRef.current) void soundContextRef.current.close();
+    soundContextRef.current = null;
+  };
+
+  const startFocusSound = () => {
+    stopFocusSound();
+    if (sound === 'none') return;
+    const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtor) return;
+    const context = new AudioCtor();
+    const gain = context.createGain();
+    gain.gain.value = sound === 'white-noise' ? 0.025 : 0.018;
+    gain.connect(context.destination);
+    soundContextRef.current = context;
+    const buffer = context.createBuffer(1, context.sampleRate * 2, context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let index = 0; index < data.length; index += 1) data[index] = Math.random() * 2 - 1;
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    const filter = context.createBiquadFilter();
+    filter.type = sound === 'cafe' || sound === 'library' ? 'bandpass' : 'lowpass';
+    filter.frequency.value = sound === 'forest' ? 950 : sound === 'rain' ? 1800 : sound === 'cafe' ? 550 : 1200;
+    source.connect(filter);
+    filter.connect(gain);
+    source.start();
+    soundNodesRef.current = [source, filter, gain];
+  };
 
   const startSession = () => {
     createSession.mutate(
@@ -65,6 +101,7 @@ export default function FocusArena() {
           setActiveSessionId(session.id);
           setTimeLeft(selectedDuration * 60);
           setIsActive(true);
+          startFocusSound();
           
           timerRef.current = window.setInterval(() => {
             setTimeLeft((prev) => {
@@ -86,6 +123,7 @@ export default function FocusArena() {
       { id },
       {
         onSuccess: (session) => {
+          stopFocusSound();
           setIsActive(false);
           setActiveSessionId(null);
           toast.success(`Focus session complete! +${session.vpAwarded} VP`);
@@ -102,6 +140,7 @@ export default function FocusArena() {
     setIsActive(false);
     setActiveSessionId(null);
     setTimeLeft(0);
+    stopFocusSound();
     // Ideally we would have an abandon API, but completing it prematurely acts as abandon or we can just drop it if API doesn't support abandon. 
     // We will just let it be or mark it if possible. The spec says Complete API, but status can be abandoned. 
     // Given the hooks, we only have completeFocusSession. Let's just reset UI.
@@ -228,6 +267,12 @@ export default function FocusArena() {
                         {dur} min
                       </Button>
                     ))}
+                  </div>
+                  <div>
+                    <div className="mb-2 flex items-center justify-between text-xs font-bold text-muted-foreground"><span>Focus sound</span>{sound === 'none' ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5 text-primary" />}</div>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {(['none', 'rain', 'library', 'cafe', 'white-noise', 'forest'] as const).map((option) => <button key={option} type="button" onClick={() => setSound(option)} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-colors ${sound === option ? 'border-primary bg-primary/15 text-primary' : 'border-border text-muted-foreground hover:border-primary/40'}`}>{option === 'white-noise' ? 'White noise' : option === 'none' ? 'Off' : option[0].toUpperCase() + option.slice(1)}</button>)}
+                    </div>
                   </div>
                   <Button 
                     size="lg" 
