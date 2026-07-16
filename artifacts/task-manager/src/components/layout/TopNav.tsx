@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, ListTodo, Users, UserRound } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound } from 'lucide-react';
 import {
   getListTasksQueryKey,
   useGetUserStats,
@@ -58,7 +58,6 @@ export function TopNav() {
 
   const links = [
     { href: '/', label: 'Home', icon: LayoutDashboard },
-    { href: '/tasks', label: 'Tasks', icon: ListTodo },
     { href: '/calendar', label: 'Calendar', icon: CalendarDays },
     { href: '/focus', label: 'Focus Arena', icon: Timer },
     { href: '/social', label: 'Social', icon: Users },

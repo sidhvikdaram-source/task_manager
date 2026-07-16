@@ -9,6 +9,8 @@ import analyticsRouter from "./analytics";
 import habitsRouter from "./habits";
 import projectsRouter from "./projects";
 import aiRouter from "./ai";
+import socialRouter from "./social";
+import rewardsRouter from "./rewards";
 
 const router: IRouter = Router();
 
@@ -22,5 +24,7 @@ router.use(analyticsRouter);
 router.use(habitsRouter);
 router.use(projectsRouter);
 router.use(aiRouter);
+router.use(socialRouter);
+router.use(rewardsRouter);
 
 export default router;

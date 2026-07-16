@@ -21,6 +21,22 @@ export async function runMigrations(): Promise<void> {
   await db.execute(sql`
     ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "password_hash" varchar;
   `);
+  await db.execute(sql`
+    ALTER TABLE "users"
+      ADD COLUMN IF NOT EXISTS "username" varchar,
+      ADD COLUMN IF NOT EXISTS "avatar_style" varchar DEFAULT 'bolt' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_cosmetic" varchar DEFAULT 'starter-bolt' NOT NULL;
+  `);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_username_unique" ON "users" ("username") WHERE "username" IS NOT NULL;`);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "user_cosmetics" (
+      "user_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "item_id" varchar NOT NULL,
+      "purchased_at" timestamp with time zone DEFAULT now() NOT NULL,
+      PRIMARY KEY ("user_id", "item_id")
+    );
+  `);
 
   // Create sessions table
   await db.execute(sql`

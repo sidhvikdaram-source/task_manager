@@ -8,7 +8,6 @@ import Dashboard from "@/pages/Dashboard";
 import Calendar from "@/pages/Calendar";
 import FocusArena from "@/pages/FocusArena";
 import Analytics from "@/pages/Analytics";
-import Tasks from "@/pages/Tasks";
 import Social from "@/pages/Social";
 import Profile from "@/pages/Profile";
 import NotFound from "@/pages/not-found";
@@ -193,7 +192,6 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/calendar" component={Calendar} />
-        <Route path="/tasks" component={Tasks} />
         <Route path="/focus" component={FocusArena} />
         <Route path="/social" component={Social} />
         <Route path="/analytics" component={Analytics} />
