@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer, jsonb, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, jsonb, varchar, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { projectsTable } from "./projects";
@@ -19,6 +19,11 @@ export const tasksTable = pgTable("tasks", {
   actualMinutes: integer("actual_minutes"),
   links: jsonb("links").$type<Array<{ url: string; label?: string }>>(),
   notes: text("notes"),
+  subject: text("subject"),
+  taskKind: text("task_kind").notNull().default("assignment"),
+  difficulty: integer("difficulty").notNull().default(2),
+  blocked: boolean("blocked").notNull().default(false),
+  organized: boolean("organized").notNull().default(true),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

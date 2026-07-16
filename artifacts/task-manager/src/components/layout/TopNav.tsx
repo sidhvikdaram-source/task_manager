@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound, Library, FolderKanban, ClipboardCheck, ListChecks } from 'lucide-react';
 import {
   getListTasksQueryKey,
   useGetUserStats,
@@ -58,8 +58,12 @@ export function TopNav() {
 
   const links = [
     { href: '/', label: 'Home', icon: LayoutDashboard },
+    { href: '/workspace', label: 'My Work', icon: ListChecks },
+    { href: '/school', label: 'School', icon: Library },
+    { href: '/projects', label: 'Projects', icon: FolderKanban },
     { href: '/calendar', label: 'Calendar', icon: CalendarDays },
     { href: '/focus', label: 'Focus Arena', icon: Timer },
+    { href: '/review', label: 'Review', icon: ClipboardCheck },
     { href: '/social', label: 'Social', icon: Users },
     { href: '/analytics', label: 'Analytics', icon: LineChart },
   ];
@@ -87,14 +91,14 @@ export function TopNav() {
           </motion.div>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden xl:flex items-center gap-0.5">
           {links.map((link) => {
             const isActive = location === link.href;
             return (
               <Link key={link.href} href={link.href}>
                 <motion.div
                   data-testid={`nav-link-${link.label.toLowerCase().replace(' ', '-')}`}
-                  className={`relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-colors ${
+                  className={`relative flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
                     isActive ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                   whileTap={{ scale: 0.96 }}
@@ -303,6 +307,13 @@ export function TopNav() {
           </motion.button>
         </div>
       </header>
+
+      <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-border/70 bg-background/90 px-3 py-2 xl:hidden">
+        {links.map((link) => {
+          const active = location === link.href;
+          return <Link key={link.href} href={link.href}><div className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold ${active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}><link.icon className="h-3.5 w-3.5" />{link.label}</div></Link>;
+        })}
+      </nav>
 
       <CreateTaskModal open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} />
     </>

@@ -10,6 +10,10 @@ import FocusArena from "@/pages/FocusArena";
 import Analytics from "@/pages/Analytics";
 import Social from "@/pages/Social";
 import Profile from "@/pages/Profile";
+import Workspace from "@/pages/Workspace";
+import SchoolPlanner from "@/pages/SchoolPlanner";
+import Projects from "@/pages/Projects";
+import WeeklyReview from "@/pages/WeeklyReview";
 import NotFound from "@/pages/not-found";
 import { useAuth } from "@workspace/replit-auth-web";
 import { Loader2, Lock, Mail, User, Zap } from "lucide-react";
@@ -192,6 +196,10 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/calendar" component={Calendar} />
+        <Route path="/workspace" component={Workspace} />
+        <Route path="/school" component={SchoolPlanner} />
+        <Route path="/projects" component={Projects} />
+        <Route path="/review" component={WeeklyReview} />
         <Route path="/focus" component={FocusArena} />
         <Route path="/social" component={Social} />
         <Route path="/analytics" component={Analytics} />

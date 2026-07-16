@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useAuth } from '@workspace/replit-auth-web';
 import {
   Zap, Flame, Target, ChevronRight, CheckCircle2, Circle,
   Clock, Trophy, ArrowRight, BarChart3,
@@ -152,6 +153,7 @@ function fadeIn(delay: number) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const { data: overview, isLoading: overviewLoading } = useGetDashboardOverview();
   const { data: allTasks, isLoading: tasksLoading } = useListTasks(
@@ -296,33 +298,31 @@ export default function Dashboard() {
             transition={{ duration: 0.3 }}
             className="space-y-6"
           >
-            {/* Greeting */}
             <motion.div
               {...fadeIn(0.05)}
               
               initial="hidden"
               animate="visible"
-              className="bento-card relative overflow-hidden p-5 sm:p-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4"
+              className="flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="absolute right-10 top-0 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
               <div>
-                <h1 className="tech-title text-3xl sm:text-5xl text-foreground">
-                  {getHourGreeting()}.
+                <h1 className="text-2xl font-black text-foreground sm:text-3xl">
+                  {getHourGreeting()}, {user?.firstName || user?.email?.split('@')[0] || 'there'}.
                 </h1>
-                <p className="text-muted-foreground text-sm mt-0.5">
+                <p className="mt-1 text-sm text-muted-foreground">
                   {stats.totalVp === 0
                     ? "Start completing tasks to build your velocity."
-                    : `You're ${vpToNextTier} VP away from reaching Tier ${stats.tier + 1}. Let's crush it.`}
+                    : `${vpToNextTier} VP to Tier ${stats.tier + 1}. ${activeTasks.length} active task${activeTasks.length === 1 ? '' : 's'}.`}
                 </p>
               </div>
               <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
                 <Button
-                  onClick={() => setIsCreateModalOpen(true)}
+                  onClick={() => { window.location.href = `${(import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')}/focus`; }}
                   size="sm"
                   className="h-10 rounded-xl bg-secondary text-secondary-foreground shadow-[0_0_26px_rgba(255,111,26,0.24)]"
                   data-testid="button-start-focus"
                 >
-                  <Target className="w-4 h-4 mr-1.5" />
+                  <Target className="mr-1.5 h-4 w-4" />
                   Start Focus Session
                 </Button>
               </motion.div>

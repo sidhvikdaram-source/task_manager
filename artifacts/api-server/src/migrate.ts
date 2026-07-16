@@ -138,6 +138,11 @@ export async function runMigrations(): Promise<void> {
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "actual_minutes" integer;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "links" jsonb;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "notes" varchar;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "subject" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "task_kind" text DEFAULT 'assignment' NOT NULL;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "difficulty" integer DEFAULT 2 NOT NULL;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "blocked" boolean DEFAULT false NOT NULL;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "organized" boolean DEFAULT true NOT NULL;
 
       IF EXISTS (
         SELECT 1 FROM information_schema.columns
@@ -183,6 +188,52 @@ export async function runMigrations(): Promise<void> {
       "title" text NOT NULL,
       "completed" boolean DEFAULT false NOT NULL,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL
+    );
+  `);
+  await db.execute(sql`
+    ALTER TABLE "projects"
+      ADD COLUMN IF NOT EXISTS "description" text,
+      ADD COLUMN IF NOT EXISTS "subject" text,
+      ADD COLUMN IF NOT EXISTS "due_date" text,
+      ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'active' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "priority" text DEFAULT 'medium' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "notes" text,
+      ADD COLUMN IF NOT EXISTS "rubric" text,
+      ADD COLUMN IF NOT EXISTS "submission_link" text,
+      ADD COLUMN IF NOT EXISTS "grade_weight" integer,
+      ADD COLUMN IF NOT EXISTS "archived" boolean DEFAULT false NOT NULL;
+    CREATE TABLE IF NOT EXISTS "project_requirements" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "project_id" integer NOT NULL REFERENCES "projects"("id") ON DELETE CASCADE,
+      "title" text NOT NULL,
+      "completed" boolean DEFAULT false NOT NULL,
+      "kind" text DEFAULT 'requirement' NOT NULL,
+      "due_date" text,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL
+    );
+    ALTER TABLE "project_requirements" ADD COLUMN IF NOT EXISTS "kind" text DEFAULT 'requirement' NOT NULL;
+    ALTER TABLE "project_requirements" ADD COLUMN IF NOT EXISTS "due_date" text;
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "subjects" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" varchar NOT NULL,
+      "name" text NOT NULL,
+      "color" text DEFAULT '#2563eb' NOT NULL,
+      "archived" boolean DEFAULT false NOT NULL,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("user_id", "name")
+    );
+    CREATE TABLE IF NOT EXISTS "weekly_reviews" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" varchar NOT NULL,
+      "week_start" text NOT NULL,
+      "top_priorities" jsonb DEFAULT '[]'::jsonb NOT NULL,
+      "focus_goal_minutes" integer DEFAULT 0 NOT NULL,
+      "vp_awarded" integer DEFAULT 0 NOT NULL,
+      "completed_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("user_id", "week_start")
     );
   `);
 

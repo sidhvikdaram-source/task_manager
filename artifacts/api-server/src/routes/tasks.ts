@@ -14,6 +14,17 @@ import {
 
 const router: IRouter = Router();
 
+function taskMetadata(body: unknown) {
+  const value = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const update: Partial<typeof tasksTable.$inferInsert> = {};
+  if (typeof value.subject === "string") update.subject = value.subject.trim().slice(0, 50) || null;
+  if (typeof value.taskKind === "string" && ["assignment","test","quiz","project","note","reading","practice"].includes(value.taskKind)) update.taskKind = value.taskKind;
+  if (Number.isInteger(value.difficulty)) update.difficulty = Math.min(3, Math.max(1, Number(value.difficulty)));
+  if (typeof value.blocked === "boolean") update.blocked = value.blocked;
+  if (typeof value.organized === "boolean") update.organized = value.organized;
+  return update;
+}
+
 async function getOrCreateUserStats(userId: string) {
   const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
   if (stats) return stats;
@@ -103,7 +114,7 @@ router.post("/tasks", async (req, res): Promise<void> => {
     parsed.data.priority === "medium" ? 10 : 5
   );
 
-  const [task] = await db.insert(tasksTable).values({ ...parsed.data, vpValue, userId }).returning();
+  const [task] = await db.insert(tasksTable).values({ ...parsed.data, ...taskMetadata(req.body), vpValue, userId }).returning();
   res.status(201).json({ ...task, checklistCount: 0, checklistCompleted: 0 });
 });
 
@@ -146,7 +157,7 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
 
   const [task] = await db
     .update(tasksTable)
-    .set(parsed.data)
+    .set({ ...parsed.data, ...taskMetadata(req.body) })
     .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)))
     .returning();
 

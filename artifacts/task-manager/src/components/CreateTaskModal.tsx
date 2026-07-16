@@ -31,6 +31,10 @@ const formSchema = z.object({
   projectId: z.string().optional(),
   estimatedMinutes: z.string().optional(),
   notes: z.string().optional(),
+  subject: z.string().optional(),
+  taskKind: z.enum(['assignment', 'test', 'quiz', 'project', 'note', 'reading', 'practice']),
+  difficulty: z.enum(['1', '2', '3']),
+  blocked: z.boolean(),
 });
 
 const priorityRank: Record<Task['priority'], number> = {
@@ -96,6 +100,8 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
   const queryClient = useQueryClient();
   const createTask = useCreateTask();
   const { data: projects } = useListProjects();
+  const [subjects, setSubjects] = React.useState<Array<{ id: number; name: string }>>([]);
+  React.useEffect(() => { if (open) fetch('/api/subjects', { credentials: 'include' }).then((response) => response.ok ? response.json() : []).then(setSubjects).catch(() => setSubjects([])); }, [open]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,6 +115,10 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
       projectId: '',
       estimatedMinutes: '',
       notes: '',
+      subject: '',
+      taskKind: 'assignment',
+      difficulty: '2',
+      blocked: false,
     },
   });
 
@@ -130,6 +140,10 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
     if (values.projectId) payload.projectId = parseInt(values.projectId, 10);
     if (values.estimatedMinutes) payload.estimatedMinutes = parseInt(values.estimatedMinutes, 10);
     if (values.notes) payload.notes = values.notes;
+    if (values.subject) payload.subject = values.subject;
+    payload.taskKind = values.taskKind;
+    payload.difficulty = Number(values.difficulty);
+    payload.blocked = values.blocked;
 
     createTask.mutate(
       { data: payload as never },
@@ -248,6 +262,16 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
                   )}
                 />
               )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="subject" render={({ field }) => <FormItem><FormLabel>Subject</FormLabel><Select onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None / Inbox</SelectItem>{subjects.map((subject) => <SelectItem key={subject.id} value={subject.name}>{subject.name}</SelectItem>)}</SelectContent></Select></FormItem>} />
+              <FormField control={form.control} name="taskKind" render={({ field }) => <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="assignment">Assignment</SelectItem><SelectItem value="test">Test</SelectItem><SelectItem value="quiz">Quiz</SelectItem><SelectItem value="project">Project</SelectItem><SelectItem value="reading">Reading</SelectItem><SelectItem value="practice">Practice</SelectItem><SelectItem value="note">Note</SelectItem></SelectContent></Select></FormItem>} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="difficulty" render={({ field }) => <FormItem><FormLabel>Difficulty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">Light</SelectItem><SelectItem value="2">Standard</SelectItem><SelectItem value="3">Deep work</SelectItem></SelectContent></Select></FormItem>} />
+              <FormField control={form.control} name="blocked" render={({ field }) => <FormItem><FormLabel>Availability</FormLabel><button type="button" onClick={() => field.onChange(!field.value)} className={`flex h-10 w-full items-center rounded-md border px-3 text-sm ${field.value ? 'border-secondary bg-secondary/10 text-secondary' : 'text-muted-foreground'}`}>{field.value ? 'Waiting / blocked' : 'Ready to work'}</button></FormItem>} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
