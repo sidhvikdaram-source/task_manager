@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound, Library, FolderKanban, ClipboardCheck, ListChecks } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound, Library, ListChecks } from 'lucide-react';
 import {
   getListTasksQueryKey,
   useGetUserStats,
@@ -59,13 +59,11 @@ export function TopNav() {
   const links = [
     { href: '/', label: 'Home', icon: LayoutDashboard },
     { href: '/workspace', label: 'My Work', icon: ListChecks },
-    { href: '/school', label: 'School', icon: Library },
-    { href: '/projects', label: 'Projects', icon: FolderKanban },
+    { href: '/school', label: 'School & Projects', icon: Library },
     { href: '/calendar', label: 'Calendar', icon: CalendarDays },
     { href: '/focus', label: 'Focus Arena', icon: Timer },
-    { href: '/review', label: 'Review', icon: ClipboardCheck },
     { href: '/social', label: 'Social', icon: Users },
-    { href: '/analytics', label: 'Analytics', icon: LineChart },
+    { href: '/analytics', label: 'Analytics & Review', icon: LineChart },
   ];
 
   const upcomingNotifications = (tasks ?? [])

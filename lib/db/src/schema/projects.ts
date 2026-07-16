@@ -29,6 +29,7 @@ export const projectRequirementsTable = pgTable("project_requirements", {
   completed: boolean("completed").notNull().default(false),
   kind: text("kind").notNull().default("requirement"),
   dueDate: text("due_date"),
+  taskId: integer("task_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -26,9 +26,9 @@ function projectInput(body: unknown, partial = false) {
 async function enriched(project: typeof projectsTable.$inferSelect, userId: string) {
   const [taskRows, requirements] = await Promise.all([db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), eq(tasksTable.userId, userId))), db.select().from(projectRequirementsTable).where(eq(projectRequirementsTable.projectId, project.id))]);
   const completed = taskRows.filter((task) => task.status === "completed").length;
-  const requirementsDone = requirements.filter((item) => item.completed).length;
-  const denominator = taskRows.length + requirements.length;
-  return { ...project, taskCount: taskRows.length, completedTaskCount: completed, progress: denominator ? Math.round((completed + requirementsDone) / denominator * 100) : 0, requirements };
+  const taskById = new Map(taskRows.map((task) => [task.id, task]));
+  const syncedRequirements = requirements.map((item) => ({ ...item, completed: item.taskId ? taskById.get(item.taskId)?.status === "completed" : item.completed }));
+  return { ...project, taskCount: taskRows.length, completedTaskCount: completed, progress: taskRows.length ? Math.round(completed / taskRows.length * 100) : 0, requirements: syncedRequirements };
 }
 
 router.get("/projects", async (req, res): Promise<void> => {
@@ -53,18 +53,41 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
 router.post("/projects/:id/requirements", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const id = Number(req.params.id); const title = typeof req.body?.title === "string" ? req.body.title.trim().slice(0, 200) : "";
-  const [project] = await db.select({ id: projectsTable.id }).from(projectsTable).where(and(eq(projectsTable.id, id), eq(projectsTable.userId, req.user.id)));
+  const [project] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, id), eq(projectsTable.userId, req.user.id)));
   if (!project || !title) { res.status(400).json({ error: "Valid project and requirement are required." }); return; }
   const kind = req.body?.kind === "milestone" ? "milestone" : "requirement";
   const dueDate = typeof req.body?.dueDate === "string" ? req.body.dueDate || null : null;
-  const [item] = await db.insert(projectRequirementsTable).values({ projectId: id, title, kind, dueDate }).returning(); res.status(201).json(item);
+  const item = await db.transaction(async (tx) => {
+    const [task] = await tx.insert(tasksTable).values({
+      userId: req.user.id,
+      title,
+      projectId: project.id,
+      subject: project.subject,
+      taskKind: kind === "milestone" ? "project" : "assignment",
+      priority: project.priority,
+      dueDate: dueDate ?? project.dueDate,
+      calendarDate: dueDate ?? project.dueDate,
+      organized: true,
+      notes: `Project requirement for ${project.name}`,
+    }).returning();
+    const [requirement] = await tx.insert(projectRequirementsTable).values({ projectId: id, title, kind, dueDate, taskId: task.id }).returning();
+    return requirement;
+  });
+  res.status(201).json(item);
 });
 
 router.patch("/projects/:projectId/requirements/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [project] = await db.select({ id: projectsTable.id }).from(projectsTable).where(and(eq(projectsTable.id, Number(req.params.projectId)), eq(projectsTable.userId, req.user.id)));
   if (!project) { res.status(404).json({ error: "Project not found." }); return; }
-  const [item] = await db.update(projectRequirementsTable).set({ completed: Boolean(req.body?.completed) }).where(and(eq(projectRequirementsTable.id, Number(req.params.id)), eq(projectRequirementsTable.projectId, project.id))).returning(); res.json(item);
+  const completed = Boolean(req.body?.completed);
+  const item = await db.transaction(async (tx) => {
+    const [updated] = await tx.update(projectRequirementsTable).set({ completed }).where(and(eq(projectRequirementsTable.id, Number(req.params.id)), eq(projectRequirementsTable.projectId, project.id))).returning();
+    if (updated?.taskId) await tx.update(tasksTable).set({ status: completed ? "completed" : "backlog", completedAt: completed ? new Date() : null }).where(and(eq(tasksTable.id, updated.taskId), eq(tasksTable.userId, req.user.id)));
+    return updated;
+  });
+  if (!item) { res.status(404).json({ error: "Requirement not found." }); return; }
+  res.json(item);
 });
 
 router.delete("/projects/:id", async (req, res): Promise<void> => {

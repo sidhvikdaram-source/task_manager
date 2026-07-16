@@ -778,6 +778,40 @@ async function generateAssistantReply(message: string, taskContext: string, hist
   }
 }
 
+function extractJsonObject(text: string) {
+  const match = text.replace(/```(?:json)?/gi, "").match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try { return JSON.parse(match[0]) as Record<string, unknown>; } catch { return null; }
+}
+
+async function inferTaskIntent(message: string, history: ChatHistoryMessage[], log?: AssistantLogger): Promise<ParsedTaskCommand | null> {
+  if (looksLikeMathRequest(message) || looksLikeGeneralCreationRequest(message) || looksLikePlanningRequest(message) || looksLikeTaskDataQuestion(message)) return null;
+  try {
+    const classifierPrompt = [
+      "Classify the user's intent. Return only one JSON object and no Markdown.",
+      'Schema: {"intent":"create_task"|"general","title":string|null,"date":string|null,"time":string|null,"priority":"critical"|"high"|"medium"|"low"}.',
+      "Choose create_task only when the user wants an action remembered, scheduled, tracked, or added to their workload.",
+      "Choose general for questions, math, writing, explanations, brainstorming, plans, agendas, and requests to produce content unless the user explicitly asks to save resulting actions as tasks.",
+      "For create_task, remove scheduling words from title, correct obvious spelling errors, and keep the actual action. Use YYYY-MM-DD dates and h:mm AM/PM times. Use null when absent.",
+      `Today is ${new Date().toISOString().slice(0, 10)}. User message: ${JSON.stringify(message)}`,
+    ].join(" ");
+    const generated = await generateAssistantReply(classifierPrompt, "This is an intent-classification call. Output strict JSON only.", history.slice(-2), log);
+    const value = extractJsonObject(generated.reply);
+    if (value?.intent !== "create_task" || typeof value.title !== "string") return null;
+    const title = normalizeTitle(value.title).slice(0, 140);
+    if (!title) return null;
+    const modelDate = typeof value.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.date) ? value.date : undefined;
+    const modelTime = typeof value.time === "string" && value.time.trim() ? value.time.trim().slice(0, 20) : undefined;
+    const date = modelDate ?? parseDate(message);
+    const time = modelTime ?? parseTime(message);
+    const priority = typeof value.priority === "string" && ["critical", "high", "medium", "low"].includes(value.priority) ? value.priority as Priority : parsePriority(message);
+    return { title, date, time, scheduleLabel: formatScheduleLabel(date, time), taskType: inferTaskType(message, title), keywords: matchedKeywords(message), priority };
+  } catch (err) {
+    log?.warn?.({ err }, "Task intent classifier failed; continuing as general chat");
+    return null;
+  }
+}
+
 function parseHistory(value: unknown): ChatHistoryMessage[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -841,7 +875,10 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     const bulkReschedule = looksLikeBulkReschedule(message);
     const agendaWithTasks = looksLikeAgendaWithTasksRequest(message);
     const bulkCommands = agendaWithTasks ? [] : parseBulkTaskCommands(message, history);
-    const parsedCommand = bulkCommands.length > 0 || agendaWithTasks || dataQuestion || bulkReschedule ? null : parseTaskCommand(message);
+    let parsedCommand = bulkCommands.length > 0 || agendaWithTasks || dataQuestion || bulkReschedule ? null : parseTaskCommand(message);
+    if (!parsedCommand && bulkCommands.length === 0 && !agendaWithTasks && !dataQuestion && !bulkReschedule) {
+      parsedCommand = await inferTaskIntent(message, history, req.log);
+    }
     let createdTasks: CreatedTaskResponse[] = [];
     let taskPreview: ParsedTaskCommand[] = [];
     let agendaReply: string | null = null;

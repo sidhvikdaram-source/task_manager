@@ -39,8 +39,33 @@ router.patch("/subjects/:id", async (req, res): Promise<void> => {
   if (typeof req.body?.name === "string" && req.body.name.trim()) update.name = req.body.name.trim().slice(0, 40);
   if (typeof req.body?.color === "string" && /^#[0-9a-f]{6}$/i.test(req.body.color)) update.color = req.body.color;
   if (typeof req.body?.archived === "boolean") update.archived = req.body.archived;
-  const [subject] = await db.update(subjectsTable).set(update).where(and(eq(subjectsTable.id, Number(req.params.id)), eq(subjectsTable.userId, req.user.id))).returning();
+  const [existing] = await db.select().from(subjectsTable).where(and(eq(subjectsTable.id, Number(req.params.id)), eq(subjectsTable.userId, req.user.id)));
+  if (!existing) { res.status(404).json({ error: "Subject not found." }); return; }
+  const [subject] = await db.transaction(async (tx) => {
+    const changed = await tx.update(subjectsTable).set(update).where(eq(subjectsTable.id, existing.id)).returning();
+    if (update.name && update.name !== existing.name) {
+      await Promise.all([
+        tx.update(tasksTable).set({ subject: update.name }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.subject, existing.name))),
+        tx.update(projectsTable).set({ subject: update.name }).where(and(eq(projectsTable.userId, req.user.id), eq(projectsTable.subject, existing.name))),
+      ]);
+    }
+    return changed;
+  });
   if (!subject) { res.status(404).json({ error: "Subject not found." }); return; } res.json(subject);
+});
+
+router.delete("/subjects/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [subject] = await db.select().from(subjectsTable).where(and(eq(subjectsTable.id, Number(req.params.id)), eq(subjectsTable.userId, req.user.id)));
+  if (!subject) { res.status(404).json({ error: "Subject not found." }); return; }
+  await db.transaction(async (tx) => {
+    await Promise.all([
+      tx.update(tasksTable).set({ subject: "Other" }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.subject, subject.name))),
+      tx.update(projectsTable).set({ subject: "Other" }).where(and(eq(projectsTable.userId, req.user.id), eq(projectsTable.subject, subject.name))),
+    ]);
+    await tx.delete(subjectsTable).where(eq(subjectsTable.id, subject.id));
+  });
+  res.sendStatus(204);
 });
 
 router.post("/inbox/capture", async (req, res): Promise<void> => {

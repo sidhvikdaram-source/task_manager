@@ -213,6 +213,7 @@ export async function runMigrations(): Promise<void> {
     );
     ALTER TABLE "project_requirements" ADD COLUMN IF NOT EXISTS "kind" text DEFAULT 'requirement' NOT NULL;
     ALTER TABLE "project_requirements" ADD COLUMN IF NOT EXISTS "due_date" text;
+    ALTER TABLE "project_requirements" ADD COLUMN IF NOT EXISTS "task_id" integer;
   `);
 
   await db.execute(sql`

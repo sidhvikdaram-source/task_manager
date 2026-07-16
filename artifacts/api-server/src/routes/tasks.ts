@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc, and, inArray } from "drizzle-orm";
-import { db, tasksTable, checklistItemsTable, userStatsTable, milestonesTable } from "@workspace/db";
+import { db, tasksTable, checklistItemsTable, userStatsTable, milestonesTable, projectsTable } from "@workspace/db";
 import {
   ListTasksQueryParams,
   CreateTaskBody,
@@ -114,7 +114,13 @@ router.post("/tasks", async (req, res): Promise<void> => {
     parsed.data.priority === "medium" ? 10 : 5
   );
 
-  const [task] = await db.insert(tasksTable).values({ ...parsed.data, ...taskMetadata(req.body), vpValue, userId }).returning();
+  const metadata = taskMetadata(req.body);
+  if (parsed.data.projectId && !metadata.subject) {
+    const [project] = await db.select({ subject: projectsTable.subject }).from(projectsTable).where(and(eq(projectsTable.id, parsed.data.projectId), eq(projectsTable.userId, userId)));
+    if (!project) { res.status(400).json({ error: "Project not found." }); return; }
+    metadata.subject = project.subject;
+  }
+  const [task] = await db.insert(tasksTable).values({ ...parsed.data, ...metadata, vpValue, userId }).returning();
   res.status(201).json({ ...task, checklistCount: 0, checklistCompleted: 0 });
 });
 

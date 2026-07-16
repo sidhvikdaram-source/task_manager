@@ -17,8 +17,10 @@ import {
 import { Flame, Trophy, Zap, Clock, CheckCircle2, Lightbulb } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, parseISO } from 'date-fns';
+import WeeklyReview from '@/pages/WeeklyReview';
 
 export default function Analytics() {
+  const [view, setView] = useState<'analytics' | 'review'>('analytics');
   const [insights, setInsights] = useState<Array<{ type: string; text: string; sampleSize: number }>>([]);
   const { data: chartData, isLoading: isLoadingChart } = useGetVelocityChart();
   const { data: summary, isLoading: isLoadingSummary } = useGetAnalyticsSummary();
@@ -27,9 +29,14 @@ export default function Analytics() {
   const isLoading = isLoadingChart || isLoadingSummary || isLoadingMilestones;
   useEffect(() => { fetch('/api/analytics/insights', { credentials: 'include' }).then((response) => response.ok ? response.json() : []).then(setInsights).catch(() => setInsights([])); }, []);
 
+  const viewTabs = <div className="inline-flex rounded-xl border bg-muted/35 p-1"><button onClick={() => setView('analytics')} className={`rounded-lg px-4 py-2 text-sm font-bold ${view === 'analytics' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>Analytics</button><button onClick={() => setView('review')} className={`rounded-lg px-4 py-2 text-sm font-bold ${view === 'review' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'}`}>Weekly review</button></div>;
+
+  if (view === 'review') return <div className="space-y-5">{viewTabs}<WeeklyReview /></div>;
+
   if (isLoading) {
     return (
       <div className="space-y-6">
+        {viewTabs}
         <Skeleton className="h-10 w-48" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
@@ -43,6 +50,7 @@ export default function Analytics() {
 
   return (
     <div className="space-y-8">
+      {viewTabs}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">Analytics</h1>
         <p className="text-muted-foreground mt-1">Review your performance and momentum.</p>
