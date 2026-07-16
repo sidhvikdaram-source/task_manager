@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import Groq from "groq-sdk";
 import { Router, type IRouter } from "express";
 import { db, tasksTable } from "@workspace/db";
+import { and, eq, ne } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -479,6 +480,14 @@ function looksLikeMathRequest(input: string) {
   );
 }
 
+function looksLikeTaskDataQuestion(input: string) {
+  return /\b(what should i work on|what('?s| is) next|show|list|which).{0,35}\b(tasks?|due|priority|work on)\b|\b(tasks?|anything)\s+due\s+(this|next)\s+week\b/i.test(input);
+}
+
+function looksLikeBulkReschedule(input: string) {
+  return /\b(move|reschedule|shift|push)\b.{0,45}\b(unfinished|incomplete|remaining|all|tasks?)\b.{0,30}\b(tomorrow|next\s+\w+|today)\b/i.test(input);
+}
+
 function normalizeTitle(title: string) {
   const corrections: Array<[RegExp, string]> = [
     [/\bspanisn\b/gi, "Spanish"],
@@ -828,9 +837,11 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     }
 
     const history = parseHistory(req.body?.history);
+    const dataQuestion = looksLikeTaskDataQuestion(message);
+    const bulkReschedule = looksLikeBulkReschedule(message);
     const agendaWithTasks = looksLikeAgendaWithTasksRequest(message);
     const bulkCommands = agendaWithTasks ? [] : parseBulkTaskCommands(message, history);
-    const parsedCommand = bulkCommands.length > 0 || agendaWithTasks ? null : parseTaskCommand(message);
+    const parsedCommand = bulkCommands.length > 0 || agendaWithTasks || dataQuestion || bulkReschedule ? null : parseTaskCommand(message);
     let createdTasks: CreatedTaskResponse[] = [];
     let taskPreview: ParsedTaskCommand[] = [];
     let agendaReply: string | null = null;
@@ -874,7 +885,15 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     }
 
     const primaryTask = createdTasks[0] ?? null;
-    const taskContext = createdTasks.length > 1
+    const activeTasks = dataQuestion ? await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"))) : [];
+    const relevantTasks = activeTasks.sort((a, b) => (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31")).slice(0, 12);
+    const taskContext = bulkReschedule
+      ? "The user requested a bulk reschedule. Do not claim it happened. Tell them a confirmation preview is ready."
+      : dataQuestion
+        ? relevantTasks.length > 0
+          ? `Use only these actual active tasks to answer: ${relevantTasks.map((task) => `${task.title} [due ${task.dueDate ?? "unscheduled"}, priority ${task.priority}]`).join("; ")}. Do not invent tasks or dates.`
+          : "The user's stored active task list is empty. State that clearly."
+      : createdTasks.length > 1
       ? [
         `Backend action completed: created ${createdTasks.length} tasks from the previous agenda/plan.`,
         `Task titles: ${createdTasks.map((task) => task.title).join("; ")}.`,
@@ -903,6 +922,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       task: primaryTask,
       tasks: createdTasks,
       taskPreview,
+      actionPreview: bulkReschedule ? { type: "reschedule-unfinished-tomorrow", count: (await db.select({ id: tasksTable.id }).from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed")))).length, label: "Move unfinished tasks to tomorrow" } : null,
     });
   } catch (err) {
     req.log?.error({ err }, "AI chat request failed");
@@ -930,6 +950,14 @@ router.post("/ai/tasks/confirm", async (req, res): Promise<void> => {
   if (commands.length === 0) { res.status(400).json({ error: "No valid tasks to create." }); return; }
   const inserted = await db.insert(tasksTable).values(commands.map((command) => ({ title: command.title, description: buildTaskDescription(command), priority: command.priority, dueDate: command.date, calendarDate: command.date, notes: buildTaskNotes(command), userId: req.user.id, vpValue: getVpValue(command.priority) }))).returning();
   res.status(201).json({ tasks: inserted.map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 })) });
+});
+
+router.post("/ai/actions/confirm", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (req.body?.type !== "reschedule-unfinished-tomorrow") { res.status(400).json({ error: "Unknown action." }); return; }
+  const tomorrow = formatDate(addDays(1));
+  const updated = await db.update(tasksTable).set({ dueDate: tomorrow, calendarDate: tomorrow }).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"))).returning({ id: tasksTable.id });
+  res.json({ updated: updated.length, date: tomorrow });
 });
 
 export default router;
