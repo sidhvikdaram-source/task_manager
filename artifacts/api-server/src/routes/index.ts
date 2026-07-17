@@ -12,6 +12,7 @@ import aiRouter from "./ai";
 import socialRouter from "./social";
 import rewardsRouter from "./rewards";
 import planningRouter from "./planning";
+import quickCaptureRouter from "./quickCapture";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(aiRouter);
 router.use(socialRouter);
 router.use(rewardsRouter);
 router.use(planningRouter);
+router.use(quickCaptureRouter);
 
 export default router;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound, Library, ListChecks } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound, Library, ListChecks, Check } from 'lucide-react';
 import {
   getListTasksQueryKey,
   useGetUserStats,
@@ -40,8 +40,10 @@ export function TopNav() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [themesOpen, setThemesOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const themesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -51,6 +53,9 @@ export function TopNav() {
       if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
         setNotificationsOpen(false);
       }
+      if (themesRef.current && !themesRef.current.contains(e.target as Node)) {
+        setThemesOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -58,12 +63,12 @@ export function TopNav() {
 
   const links = [
     { href: '/', label: 'Home', icon: LayoutDashboard },
-    { href: '/workspace', label: 'My Work', icon: ListChecks },
-    { href: '/school', label: 'School & Projects', icon: Library },
+    { href: '/workspace', label: 'Tasks', icon: ListChecks },
+    { href: '/school', label: 'Academics', icon: Library },
     { href: '/calendar', label: 'Calendar', icon: CalendarDays },
-    { href: '/focus', label: 'Focus Arena', icon: Timer },
-    { href: '/social', label: 'Social', icon: Users },
-    { href: '/analytics', label: 'Analytics & Review', icon: LineChart },
+    { href: '/focus', label: 'Focus', icon: Timer },
+    { href: '/social', label: 'Community', icon: Users },
+    { href: '/analytics', label: 'Progress', icon: LineChart },
   ];
 
   const upcomingNotifications = (tasks ?? [])
@@ -124,21 +129,41 @@ export function TopNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
-          <label className="hidden lg:flex h-9 items-center gap-2 rounded-xl border border-border/70 bg-muted/60 px-2.5 text-muted-foreground">
-            <Palette className="h-4 w-4" />
-            <select
-              aria-label="Theme"
-              value={theme}
-              onChange={(event) => setTheme(event.target.value as ThemeId)}
-              className="h-full bg-transparent text-xs font-bold text-foreground outline-none"
+          <div className="relative hidden lg:block" ref={themesRef}>
+            <motion.button
+              type="button"
+              aria-label="Choose theme"
+              title="Theme"
+              onClick={() => setThemesOpen((open) => !open)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              whileTap={{ scale: 0.92 }}
             >
-              {themes.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              <Palette className="h-4 w-4" />
+            </motion.button>
+            <AnimatePresence>
+              {themesOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                  transition={{ duration: 0.13 }}
+                  className="absolute right-0 top-10 z-50 w-48 overflow-hidden rounded-xl border bg-popover p-1 shadow-2xl"
+                >
+                  {themes.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => { setTheme(item.id as ThemeId); setThemesOpen(false); }}
+                      className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-foreground hover:bg-muted"
+                    >
+                      {item.label}
+                      {item.id === theme && <Check className="h-3.5 w-3.5 text-primary" />}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           <div className="relative" ref={notificationsRef}>
             <motion.button

@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import Groq from "groq-sdk";
 import { Router, type IRouter } from "express";
-import { db, tasksTable } from "@workspace/db";
+import { db, projectsTable, tasksTable } from "@workspace/db";
 import { and, eq, ne } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -102,6 +102,38 @@ type CreatedTaskResponse = typeof tasksTable.$inferSelect & {
   checklistCount: number;
   checklistCompleted: number;
 };
+
+interface AssistantProjectPlan {
+  name: string;
+  subject: string | null;
+  description: string | null;
+  dueDate: string | null;
+}
+
+interface AssistantPlannedTask {
+  title: string;
+  description: string | null;
+  subject: string | null;
+  dueDate: string | null;
+  priority: Priority;
+  estimatedMinutes: number | null;
+  taskKind: string;
+}
+
+interface AssistantActionPlan {
+  summary: string;
+  project: AssistantProjectPlan | null;
+  tasks: AssistantPlannedTask[];
+}
+
+interface PlanExpectations {
+  projectRequested: boolean;
+  tasksRequested: boolean;
+  projectName: string | null;
+  subject: string | null;
+  oneWeek: boolean;
+  originalRequest: string;
+}
 
 type TaskType =
   | "focus"
@@ -589,6 +621,32 @@ function looksLikeAgendaWithTasksRequest(message: string) {
     && /\b(create|make|generate|add|build|turn|convert)\b/i.test(message);
 }
 
+function looksLikeMultiActionRequest(message: string) {
+  if (looksLikeMathRequest(message) || looksLikeGeneralCreationRequest(message)) return false;
+  const explicitlyRequestsSeveral = /\b(tasks|todos|subtasks|checklist|steps)\b/i.test(message)
+    && /\b(create|add|generate|make|schedule|turn|break down|organize)\b/i.test(message);
+  const requestsProject = /\b(create|make|set up|start|add)\b.{0,40}\bproject\b/i.test(message);
+  const projectStudyWorkflow = /\bproject\b/i.test(message)
+    && /\b(study|practice|work on|each day|daily|for a week|beginner)\b/i.test(message);
+  const asksForSeveralTasks = explicitlyRequestsSeveral;
+  const chainedActions = (message.match(/\b(create|add|make|schedule|move|plan|break down|organize)\b/gi) ?? []).length >= 2;
+  return requestsProject || projectStudyWorkflow || asksForSeveralTasks || (chainedActions && explicitlyRequestsSeveral);
+}
+
+function getPlanExpectations(message: string): PlanExpectations {
+  const projectName = message.match(/\bproject\s+(?:called|named)\s+["']?(.+?)["']?(?=\s+(?:and|with|for|under|keep|subject)\b|[,.]|$)/i)?.[1]?.trim() ?? null;
+  const subject = message.match(/\bsubject(?:\s+(?:is|as|to|should be))?\s+["']?([a-z][a-z &-]{1,30}?)["']?(?=\s+(?:and|with|for|then|add|create|make|schedule)\b|[,.]|$)/i)?.[1]?.trim() ?? null;
+  return {
+    projectRequested: /\bproject\b/i.test(message),
+    tasksRequested: /\b(tasks|todos|subtasks|checklist|steps)\b/i.test(message)
+      || (/\bproject\b/i.test(message) && /\b(study|practice|work on|each day|daily|for a week|beginner)\b/i.test(message)),
+    projectName: projectName ? normalizeTitle(projectName).slice(0, 100) : null,
+    subject: subject ? normalizeTitle(subject).slice(0, 50) : null,
+    oneWeek: /\b(?:one|1)[ -]?week\b|\bfor\s+(?:a|one)\s+week\b|\bweek-long\b/i.test(message),
+    originalRequest: message,
+  };
+}
+
 function getLatestAssistantPlan(history: ChatHistoryMessage[]) {
   return [...history].reverse().find((item) => item.role === "assistant" && item.content.length > 20)?.content ?? "";
 }
@@ -784,6 +842,76 @@ function extractJsonObject(text: string) {
   try { return JSON.parse(match[0]) as Record<string, unknown>; } catch { return null; }
 }
 
+function validateActionPlan(value: Record<string, unknown> | null, expectations?: PlanExpectations): AssistantActionPlan | null {
+  if (!value || !Array.isArray(value.tasks)) return null;
+  const rawProject = value.project && typeof value.project === "object" ? value.project as Record<string, unknown> : null;
+  const projectName = typeof rawProject?.name === "string" ? normalizeTitle(rawProject.name).slice(0, 100) : "";
+  const resolvedProjectName = expectations?.projectName ?? projectName;
+  const project: AssistantProjectPlan | null = resolvedProjectName ? {
+    name: resolvedProjectName,
+    subject: expectations?.subject ?? (typeof rawProject?.subject === "string" ? normalizeTitle(rawProject.subject).slice(0, 50) : null),
+    description: typeof rawProject?.description === "string" ? rawProject.description.trim().slice(0, 1000) || null : null,
+    dueDate: typeof rawProject?.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawProject.dueDate) ? rawProject.dueDate : null,
+  } : null;
+  let tasks = value.tasks.flatMap((item): AssistantPlannedTask[] => {
+    if (!item || typeof item !== "object") return [];
+    const raw = item as Record<string, unknown>;
+    const title = typeof raw.title === "string" ? normalizeTitle(raw.title).slice(0, 140) : "";
+    if (!title) return [];
+    const priority: Priority = typeof raw.priority === "string" && ["critical", "high", "medium", "low"].includes(raw.priority) ? raw.priority as Priority : "medium";
+    const taskKind = typeof raw.taskKind === "string" && ["assignment", "test", "quiz", "project", "note", "reading", "practice"].includes(raw.taskKind) ? raw.taskKind : "practice";
+    return [{
+      title,
+      description: typeof raw.description === "string" ? raw.description.trim().slice(0, 500) || null : null,
+      subject: typeof raw.subject === "string" ? normalizeTitle(raw.subject).slice(0, 50) : project?.subject ?? null,
+      dueDate: typeof raw.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw.dueDate) ? raw.dueDate : null,
+      priority,
+      estimatedMinutes: Number.isFinite(Number(raw.estimatedMinutes)) ? Math.min(480, Math.max(5, Number(raw.estimatedMinutes))) : null,
+      taskKind,
+    }];
+  }).filter((task, index, all) => all.findIndex((item) => item.title.toLowerCase() === task.title.toLowerCase()) === index).slice(0, 15);
+  const normalizedRequest = normalizeTitle(expectations?.originalRequest ?? "").toLowerCase();
+  if (tasks.some((task) => {
+    const title = task.title.toLowerCase();
+    return title === normalizedRequest || /\bcreate (?:a )?project\b|\bproject (?:called|named)\b/.test(title);
+  })) return null;
+  if (expectations?.projectRequested && !project) return null;
+  if (expectations && !expectations.tasksRequested) tasks = [];
+  if (expectations?.tasksRequested && tasks.length < 2) return null;
+  if (expectations?.oneWeek && tasks.length < 7) return null;
+  if (expectations?.oneWeek) {
+    tasks = tasks.slice(0, 7).map((task, index) => ({
+      ...task,
+      subject: task.subject ?? expectations.subject ?? project?.subject ?? null,
+      dueDate: formatDate(addDays(index)),
+    }));
+  }
+  if (!project && tasks.length < 2) return null;
+  return { summary: typeof value.summary === "string" ? value.summary.trim().slice(0, 300) : "Review the proposed work before adding it.", project, tasks };
+}
+
+async function generateActionPlan(message: string, history: ChatHistoryMessage[], log?: AssistantLogger) {
+  const today = new Date().toISOString().slice(0, 10);
+  const expectations = getPlanExpectations(message);
+  const instruction = [
+    "Translate the user's complete multi-step request into one strict JSON object. Return JSON only, with no Markdown fences.",
+    'Schema: {"summary":string,"project":null|{"name":string,"subject":string|null,"description":string|null,"dueDate":"YYYY-MM-DD"|null},"tasks":[{"title":string,"description":string|null,"subject":string|null,"dueDate":"YYYY-MM-DD"|null,"priority":"critical"|"high"|"medium"|"low","estimatedMinutes":number|null,"taskKind":"assignment"|"test"|"quiz"|"project"|"note"|"reading"|"practice"}]}.',
+    "Capture every requested action and relationship. A request to create a project and study tasks must include the project plus specific linked tasks, never one task containing the whole prompt.",
+    "Task titles must be concrete actions and must not repeat the user's request. Use descriptions for scope or study instructions.",
+    "If the user requests a one-week beginner plan, create seven progressively ordered daily tasks and schedule them from today through the next six days unless another start date is supplied.",
+    "Do not create a project unless the user asks for one. Do not invent deadlines unless a duration or schedule implies them. Limit the plan to 15 tasks.",
+    `Today is ${today}. User request: ${JSON.stringify(message)}`,
+  ].join(" ");
+  const first = await generateAssistantReply(instruction, "This request is only for strict structured action planning. Output JSON only.", history.slice(-4), log);
+  let plan = validateActionPlan(extractJsonObject(first.reply), expectations);
+  if (!plan) {
+    const repair = await generateAssistantReply(`Repair this into the required JSON schema. Preserve every explicit project name, subject, requested action, and duration. A one-week request needs exactly seven concrete tasks. Never use the full user prompt as a task title. Original request: ${JSON.stringify(message)}. Invalid result: ${first.reply}`, "Output one valid JSON object only.", [], log);
+    plan = validateActionPlan(extractJsonObject(repair.reply), expectations);
+  }
+  if (!plan) throw new Error("The assistant could not produce a valid multi-step plan. Please retry the request.");
+  return { plan, provider: first.provider };
+}
+
 async function inferTaskIntent(message: string, history: ChatHistoryMessage[], log?: AssistantLogger): Promise<ParsedTaskCommand | null> {
   if (looksLikeMathRequest(message) || looksLikeGeneralCreationRequest(message) || looksLikePlanningRequest(message) || looksLikeTaskDataQuestion(message)) return null;
   try {
@@ -871,6 +999,24 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     }
 
     const history = parseHistory(req.body?.history);
+    if (looksLikeMultiActionRequest(message)) {
+      const generated = await generateActionPlan(message, history, req.log);
+      const projectLine = generated.plan.project ? `**Project:** ${generated.plan.project.name}${generated.plan.project.subject ? ` · ${generated.plan.project.subject}` : ""}` : "";
+      const taskLines = generated.plan.tasks.length > 0
+        ? ["**Proposed tasks**", ...generated.plan.tasks.map((task, index) => `${index + 1}. ${task.title}${task.dueDate ? ` · ${task.dueDate}` : ""}`)]
+        : [];
+      res.json({
+        reply: [generated.plan.summary, projectLine, ...taskLines].filter(Boolean).join("\n\n"),
+        provider: generated.provider,
+        taskCreated: false,
+        task: null,
+        tasks: [],
+        taskPreview: [],
+        planPreview: generated.plan,
+        actionPreview: null,
+      });
+      return;
+    }
     const dataQuestion = looksLikeTaskDataQuestion(message);
     const bulkReschedule = looksLikeBulkReschedule(message);
     const agendaWithTasks = looksLikeAgendaWithTasksRequest(message);
@@ -987,6 +1133,61 @@ router.post("/ai/tasks/confirm", async (req, res): Promise<void> => {
   if (commands.length === 0) { res.status(400).json({ error: "No valid tasks to create." }); return; }
   const inserted = await db.insert(tasksTable).values(commands.map((command) => ({ title: command.title, description: buildTaskDescription(command), priority: command.priority, dueDate: command.date, calendarDate: command.date, notes: buildTaskNotes(command), userId: req.user.id, vpValue: getVpValue(command.priority) }))).returning();
   res.status(201).json({ tasks: inserted.map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 })) });
+});
+
+router.post("/ai/plans/confirm", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const plan = validateActionPlan(req.body?.plan && typeof req.body.plan === "object" ? req.body.plan as Record<string, unknown> : null);
+  if (!plan) { res.status(400).json({ error: "The action plan is invalid or incomplete." }); return; }
+  const result = await db.transaction(async (tx) => {
+    let project: typeof projectsTable.$inferSelect | null = null;
+    if (plan.project) {
+      const existing = await tx.select().from(projectsTable).where(eq(projectsTable.userId, req.user.id));
+      project = existing.find((item) => item.name.toLowerCase() === plan.project!.name.toLowerCase()) ?? null;
+      if (!project) {
+        [project] = await tx.insert(projectsTable).values({
+          userId: req.user.id,
+          name: plan.project.name,
+          subject: plan.project.subject,
+          description: plan.project.description,
+          dueDate: plan.project.dueDate,
+          color: "#2563eb",
+          priority: "medium",
+        }).returning();
+      } else if (plan.project.subject && project.subject !== plan.project.subject) {
+        [project] = await tx.update(projectsTable).set({ subject: plan.project.subject }).where(eq(projectsTable.id, project.id)).returning();
+      }
+    }
+    const existingProjectTasks = project
+      ? await tx.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, project.id)))
+      : [];
+    const tasksToCreate = plan.tasks.filter((task) => !existingProjectTasks.some((existing) =>
+      existing.title.toLowerCase() === task.title.toLowerCase() && existing.dueDate === task.dueDate
+    ));
+    const inserted = tasksToCreate.length > 0 ? await tx.insert(tasksTable).values(tasksToCreate.map((task) => ({
+      userId: req.user.id,
+      title: task.title,
+      description: task.description,
+      subject: task.subject ?? project?.subject ?? null,
+      projectId: project?.id ?? null,
+      dueDate: task.dueDate,
+      calendarDate: task.dueDate,
+      priority: task.priority,
+      vpValue: getVpValue(task.priority),
+      estimatedMinutes: task.estimatedMinutes,
+      taskKind: task.taskKind,
+      organized: true,
+    }))).returning() : [];
+    const retained = existingProjectTasks.filter((existing) => plan.tasks.some((task) =>
+      existing.title.toLowerCase() === task.title.toLowerCase() && existing.dueDate === task.dueDate
+    ));
+    return {
+      project,
+      createdCount: inserted.length,
+      tasks: [...retained, ...inserted].map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 })),
+    };
+  });
+  res.status(201).json(result);
 });
 
 router.post("/ai/actions/confirm", async (req, res): Promise<void> => {

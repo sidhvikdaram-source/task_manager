@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Loader2, Send, Sparkles, Zap } from 'lucide-react';
+import { Check, FolderKanban, Loader2, Send, Sparkles, Zap } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetDashboardOverviewQueryKey,
@@ -20,9 +20,17 @@ interface ChatMessage {
   taskPreview?: TaskPreview[];
   previewConfirmed?: boolean;
   actionPreview?: { type: string; count: number; label: string };
+  planPreview?: ActionPlan;
 }
 
 type TaskPreview = { title: string; date?: string; time?: string; scheduleLabel?: string; taskType: string; priority: Task['priority']; keywords: string[] };
+type ActionPlan = { summary: string; project: { name: string; subject: string | null; description: string | null; dueDate: string | null } | null; tasks: Array<{ title: string; description: string | null; subject: string | null; dueDate: string | null; priority: Task['priority']; estimatedMinutes: number | null; taskKind: string }> };
+
+function planCommandLabel(plan: ActionPlan) {
+  if (plan.project && plan.tasks.length > 0) return `Create project + ${plan.tasks.length} tasks`;
+  if (plan.project) return 'Create project';
+  return `Create ${plan.tasks.length} tasks`;
+}
 
 interface AssistantResponse {
   reply: string;
@@ -31,6 +39,7 @@ interface AssistantResponse {
   tasks?: Task[];
   taskPreview?: TaskPreview[];
   actionPreview?: { type: string; count: number; label: string } | null;
+  planPreview?: ActionPlan | null;
   error?: string;
 }
 
@@ -196,6 +205,23 @@ export function VelocityAssistantCard() {
     finally { setConfirmingId(null); }
   }
 
+  async function confirmPlan(messageId: string, plan: ActionPlan) {
+    setConfirmingId(messageId);
+    try {
+      const response = await fetch('/api/ai/plans/confirm', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ plan }) });
+      const data = await response.json() as { project?: { name: string } | null; tasks?: Task[]; error?: string };
+      if (!response.ok || !data.tasks) throw new Error(data.error || 'Could not create the plan');
+      data.tasks.forEach((task) => seedCreatedTask(queryClient, task));
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['/api/tasks'] }), queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() })]);
+      const confirmation = data.project && data.tasks.length > 0
+        ? `${data.project.name} and ${data.tasks.length} tasks`
+        : data.project?.name ?? `${data.tasks.length} tasks`;
+      setMessages((current) => current.map((message) => message.id === messageId ? { ...message, previewConfirmed: true, content: `${message.content}\n\n**Created ${confirmation}.**` } : message));
+    } catch (error) {
+      setMessages((current) => [...current, { id: `assistant-error-${Date.now()}`, role: 'assistant', content: error instanceof Error ? error.message : 'Could not create that plan.' }]);
+    } finally { setConfirmingId(null); }
+  }
+
   async function sendMessage(event?: React.FormEvent) {
     event?.preventDefault();
     const text = input.trim();
@@ -244,6 +270,9 @@ export function VelocityAssistantCard() {
       }
       if (data.actionPreview) {
         setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, actionPreview: data.actionPreview ?? undefined } : message));
+      }
+      if (data.planPreview) {
+        setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, planPreview: data.planPreview ?? undefined } : message));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Velocity Assistant hit a snag. Please try again.';
@@ -305,6 +334,7 @@ export function VelocityAssistantCard() {
               {message.typing && message.content && <span className="ml-0.5 animate-pulse text-primary">|</span>}
               {message.taskPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmTaskPreview(message.id, message.taskPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Adding tasks</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Tasks added</> : `Add ${message.taskPreview.length} tasks`}</button>}
               {message.actionPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmAction(message.id, message.actionPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-secondary px-3 py-2 text-xs font-black text-secondary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Updating</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Confirmed</> : `${message.actionPreview.label} (${message.actionPreview.count})`}</button>}
+              {message.planPreview && !message.typing && <div className="mt-3 rounded-xl border border-primary/25 bg-background/70 p-3"><div className="flex items-center gap-2 text-xs font-black"><FolderKanban className="h-3.5 w-3.5 text-primary"/>{message.planPreview.project?.name ?? 'Multi-step plan'}<span className="ml-auto text-muted-foreground">{message.planPreview.tasks.length > 0 ? `${message.planPreview.tasks.length} tasks` : 'Project'}</span></div><button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmPlan(message.id, message.planPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating plan</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Plan created</> : planCommandLabel(message.planPreview)}</button></div>}
             </div>
           </div>
         ))}

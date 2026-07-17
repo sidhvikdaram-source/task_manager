@@ -16,6 +16,7 @@ import { OverdueTriageModal } from '@/components/OverdueTriageModal';
 import { IntroAnimation } from '@/components/IntroAnimation';
 import { DailyChecklist } from '@/components/DailyChecklist';
 import { VelocityAssistantCard } from '@/components/VelocityAssistantCard';
+import { QuickCapture } from '@/components/QuickCapture';
 import { playCompletionSound, primeCompletionSound } from '@/lib/completionSound';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -24,7 +25,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@workspace/replit-auth-web';
 import {
   Zap, Flame, Target, ChevronRight, CheckCircle2, Circle,
-  Clock, Trophy, ArrowRight, BarChart3,
+  Clock, Trophy, Plus,
 } from 'lucide-react';
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -228,8 +229,8 @@ export default function Dashboard() {
         {!introDone && <IntroAnimation onComplete={handleIntroDone} />}
         <div className="space-y-6">
           <Skeleton className="h-10 w-72" />
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+          <div className="grid grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
           </div>
           <div className="grid grid-cols-3 gap-6">
             <div className="col-span-2 space-y-3">
@@ -256,32 +257,25 @@ export default function Dashboard() {
 
   const statCards = [
     {
-      label: 'Daily VP',
-      rawValue: stats.totalVp,
-      icon: <Zap className="w-4 h-4 text-primary" />,
+      label: 'Active tasks',
+      rawValue: totalActive,
+      icon: <Target className="w-4 h-4 text-primary" />,
       color: 'text-primary',
       countUp: true,
     },
     {
-      label: 'Streak',
+      label: 'Completed',
+      rawValue: overview.completedCount,
+      icon: <CheckCircle2 className="w-4 h-4 text-foreground" />,
+      color: 'text-foreground',
+      countUp: true,
+    },
+    {
+      label: 'Current streak',
       rawValue: stats.streakDays,
-      displayValue: `${stats.streakDays} Day${stats.streakDays !== 1 ? 's' : ''}`,
+      displayValue: `${stats.streakDays} day${stats.streakDays !== 1 ? 's' : ''}`,
       icon: <Flame className="w-4 h-4 text-amber-500" />,
       color: 'text-amber-600',
-    },
-    {
-      label: 'Active Quests',
-      rawValue: totalActive,
-      displayValue: `${totalActive > 0 ? 1 : 0}/${totalActive}`,
-      icon: <Target className="w-4 h-4 text-foreground" />,
-      color: 'text-foreground',
-    },
-    {
-      label: 'Focus Multiplier',
-      rawValue: stats.multiplier,
-      displayValue: `${stats.multiplier}×`,
-      icon: <BarChart3 className="w-4 h-4 text-foreground" />,
-      color: 'text-foreground',
     },
   ];
 
@@ -329,7 +323,7 @@ export default function Dashboard() {
             </motion.div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {statCards.map((stat, i) => (
                 <StatCard key={stat.label} stat={stat} index={i} ready={introDone} />
               ))}
@@ -342,8 +336,8 @@ export default function Dashboard() {
               {/* Task columns */}
               <div className="lg:col-span-2 space-y-6">
 
-                {/* Critical Quests */}
-                <motion.div
+                {/* Urgent tasks stay out of the way until they need attention. */}
+                {criticalTasks.length > 0 && <motion.div
                   {...fadeIn(0.22)}
                   
                   initial="hidden"
@@ -357,7 +351,7 @@ export default function Dashboard() {
                         animate={{ scale: criticalTasks.length > 0 ? [1, 1.3, 1] : 1 }}
                         transition={{ duration: 1.5, repeat: criticalTasks.length > 0 ? Infinity : 0, repeatDelay: 2 }}
                       />
-                      <span className="font-semibold text-sm">Critical Quests</span>
+                      <span className="font-semibold text-sm">Priority</span>
                       {criticalTasks.length > 0 && (
                         <motion.span
                           initial={{ scale: 0 }}
@@ -374,7 +368,7 @@ export default function Dashboard() {
                       className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
                       data-testid="button-view-all-critical"
                     >
-                      View All <ArrowRight className="w-3 h-3" />
+                      Add <Plus className="w-3 h-3" />
                     </button>
                   </div>
                   <div className="divide-y divide-border/50">
@@ -401,9 +395,9 @@ export default function Dashboard() {
                       )}
                     </AnimatePresence>
                   </div>
-                </motion.div>
+                </motion.div>}
 
-                {/* Active In-Flight */}
+                {/* In progress */}
                 <motion.div
                   {...fadeIn(0.30)}
                   
@@ -414,7 +408,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between px-4 py-3 border-b neon-rule bg-white/[0.035]">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-amber-500" />
-                      <span className="font-semibold text-sm">Active In-Flight</span>
+                      <span className="font-semibold text-sm">In progress</span>
                       {inFlightTasks.length > 0 && (
                         <span className="text-xs bg-muted text-muted-foreground font-medium px-1.5 py-0.5 rounded-md">
                           {inFlightTasks.length} Task{inFlightTasks.length !== 1 ? 's' : ''}
@@ -502,10 +496,8 @@ export default function Dashboard() {
                       <CheckCircle2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
                     </motion.div>
                     <p className="font-semibold text-foreground">All clear</p>
-                    <p className="text-sm text-muted-foreground mt-1 mb-4">No active tasks — create one to start earning VP</p>
-                    <Button size="sm" onClick={() => setIsCreateModalOpen(true)} data-testid="button-create-first-task">
-                      Create your first task
-                    </Button>
+                    <p className="text-sm text-muted-foreground mt-1">Capture one task and optional steps.</p>
+                    <QuickCapture onCreated={invalidate} />
                   </motion.div>
                 )}
 
@@ -634,43 +626,6 @@ export default function Dashboard() {
                   )}
                 </motion.div>
 
-                {/* Quick Stats */}
-                <motion.div
-                  {...fadeIn(0.34)}
-                  
-                  initial="hidden"
-                  animate="visible"
-                  className="bento-card p-5"
-                >
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Overview</span>
-                  <div className="mt-3 space-y-2.5">
-                    {[
-                      { label: 'Tasks Completed', value: overview.completedCount },
-                      { label: 'In Progress', value: overview.inProgressCount },
-                      { label: 'Backlog', value: overview.todoCount },
-                      { label: 'Total VP Earned', value: `${stats.totalVp} VP` },
-                    ].map((item, i) => (
-                      <motion.div
-                        key={item.label}
-                        initial={{ opacity: 0, x: 8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.35 + i * 0.06 }}
-                        className="flex justify-between items-center text-sm"
-                      >
-                        <span className="text-muted-foreground">{item.label}</span>
-                        <motion.span
-                          key={String(item.value)}
-                          initial={{ scale: 1.2, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-                          className="font-semibold"
-                        >
-                          {item.value}
-                        </motion.span>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
               </div>
             </div>
 
