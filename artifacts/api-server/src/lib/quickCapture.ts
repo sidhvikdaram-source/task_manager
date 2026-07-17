@@ -84,6 +84,20 @@ function findNamed<T extends NamedRecord>(token: string | undefined, records: T[
   return records.find((record) => record.name.toLowerCase() === normalized) ?? null;
 }
 
+function parsePriorityPhrase(text: string): { value: QuickCapturePriority; matched: string } | null {
+  const rules: Array<[QuickCapturePriority, RegExp]> = [
+    ["low", /\b(?:not\s+(?:very\s+)?important|not\s+(?:urgent|critical)|not\s+a\s+priority|unimportant|no\s+rush|low\s+priority|minor|optional|whenever|can\s+wait|someday)\b/i],
+    ["critical", /\b(?:critical|urgent|asap|emergency|must[ -]?do|must\s+finish|top\s+priority|highest\s+priority|extremely\s+important|very\s+important|time[ -]?sensitive)\b/i],
+    ["high", /\b(?:important|high\s+priority|prioritize|needs?\s+attention|do\s+soon|soon)\b/i],
+    ["medium", /\b(?:medium\s+priority|normal\s+priority|standard\s+priority)\b/i],
+  ];
+  for (const [value, pattern] of rules) {
+    const match = text.match(pattern);
+    if (match) return { value, matched: match[0] };
+  }
+  return null;
+}
+
 export function parseQuickCapture(text: string, projects: NamedRecord[], subjects: NamedRecord[], now = new Date()): QuickCaptureResult {
   const lines = text.split(/\r?\n/).map(cleanLine).filter(Boolean);
   const sourceTitle = lines[0] ?? "";
@@ -94,6 +108,7 @@ export function parseQuickCapture(text: string, projects: NamedRecord[], subject
   const subject = findNamed(subjectToken, subjects);
   const priorityToken = sourceTitle.match(/(?:^|\s)p([1-4])\b/i)?.[1];
   const priorityMap: Record<string, QuickCapturePriority> = { "1": "critical", "2": "high", "3": "medium", "4": "low" };
+  const priorityPhrase = parsePriorityPhrase(sourceTitle);
   const duration = sourceTitle.match(/(?:^|\s)~(\d{1,3})\s*(m|min|minutes?|h|hours?)\b/i);
   const estimatedMinutes = duration ? Math.min(480, Number(duration[1]) * (/^h/i.test(duration[2]) ? 60 : 1)) : null;
   const date = parseDate(sourceTitle, now);
@@ -108,6 +123,7 @@ export function parseQuickCapture(text: string, projects: NamedRecord[], subject
     .replace(/(?:^|\s)~\d{1,3}\s*(?:m|min|minutes?|h|hours?)\b/gi, " ");
   if (date) title = title.replace(date.matched, " ");
   if (time) title = title.replace(time.matched, " ");
+  if (priorityPhrase) title = title.replace(priorityPhrase.matched, " ");
   title = title.replace(/\s+/g, " ").replace(/[,:;-]+$/, "").trim();
-  return { title, checklist, dueDate: date?.value ?? null, time: time?.value ?? null, priority: priorityMap[priorityToken ?? ""] ?? "medium", projectId: project?.id ?? null, projectName: project?.name ?? null, subject: subject?.name ?? null, estimatedMinutes, warnings };
+  return { title, checklist, dueDate: date?.value ?? null, time: time?.value ?? null, priority: priorityMap[priorityToken ?? ""] ?? priorityPhrase?.value ?? "medium", projectId: project?.id ?? null, projectName: project?.name ?? null, subject: subject?.name ?? null, estimatedMinutes, warnings };
 }

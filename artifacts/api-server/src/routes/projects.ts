@@ -46,7 +46,14 @@ router.post("/projects", async (req, res): Promise<void> => {
 
 router.patch("/projects/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const [project] = await db.update(projectsTable).set(projectInput(req.body, true)).where(and(eq(projectsTable.id, Number(req.params.id)), eq(projectsTable.userId, req.user.id))).returning();
+  const input = projectInput(req.body, true);
+  const [project] = await db.transaction(async (tx) => {
+    const updated = await tx.update(projectsTable).set(input).where(and(eq(projectsTable.id, Number(req.params.id)), eq(projectsTable.userId, req.user.id))).returning();
+    if (updated[0] && input.subject !== undefined) {
+      await tx.update(tasksTable).set({ subject: input.subject }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, updated[0].id)));
+    }
+    return updated;
+  });
   if (!project) { res.status(404).json({ error: "Project not found." }); return; } res.json(await enriched(project, req.user.id));
 });
 

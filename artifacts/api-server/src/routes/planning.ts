@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { db, focusSessionsTable, projectsTable, subjectsTable, tasksTable, userStatsTable, weeklyReviewsTable } from "@workspace/db";
+import { scoreTaskRecommendation, type RecommendationEnergy } from "../lib/taskRecommendation";
 
 const router: IRouter = Router();
 const defaultSubjects = [
@@ -86,24 +87,18 @@ router.patch("/inbox/:id/organize", async (req, res): Promise<void> => {
 router.get("/recommendations/next", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const minutes = Math.min(60, Math.max(10, Number(req.query.minutes) || 30));
-  const energy = ["low","medium","high"].includes(String(req.query.energy)) ? String(req.query.energy) : "medium";
+  const energy: RecommendationEnergy = ["low","medium","high"].includes(String(req.query.energy)) ? String(req.query.energy) as RecommendationEnergy : "medium";
   const today = dateOnly(new Date());
   const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"), eq(tasksTable.blocked, false)));
-  const candidates = tasks.filter((task) => (task.estimatedMinutes ?? 30) <= minutes);
-  const scored = candidates.map((task) => {
-    const duration = task.estimatedMinutes ?? 30;
-    const days = task.dueDate ? Math.ceil((new Date(`${task.dueDate}T12:00:00Z`).getTime() - new Date(`${today}T12:00:00Z`).getTime()) / 86400000) : 30;
-    const urgency = days < 0 ? 50 : days === 0 ? 42 : days === 1 ? 35 : Math.max(0, 20 - days * 2);
-    const priority = task.priority === "critical" ? 32 : task.priority === "high" ? 22 : task.priority === "medium" ? 12 : 4;
-    const targetDifficulty = energy === "low" ? 1 : energy === "high" ? 3 : 2;
-    const energyFit = 16 - Math.abs(task.difficulty - targetDifficulty) * 7;
-    const timeFit = 12 - Math.abs(minutes - duration) / 5;
-    return { task, score: urgency + priority + energyFit + timeFit, duration, days };
-  }).sort((a,b) => b.score - a.score);
+  const scored = tasks.map((task) => ({ task, ranking: scoreTaskRecommendation(task, { minutes, energy, today }) }))
+    .filter((item) => item.ranking.eligible)
+    .sort((a,b) => b.ranking.score - a.ranking.score || a.task.title.localeCompare(b.task.title));
   const best = scored[0];
   if (!best) { res.json({ recommendation: null, reason: tasks.length ? `No unblocked task fits within ${minutes} minutes.` : "Your active task list is clear." }); return; }
-  const dueReason = best.days < 0 ? "is overdue" : best.days === 0 ? "is due today" : best.days === 1 ? "is due tomorrow" : best.task.dueDate ? `is due in ${best.days} days` : "has no fixed deadline";
-  res.json({ recommendation: best.task, reason: `${best.task.title} ${dueReason}, should take about ${best.duration} minutes, and fits ${energy} energy.` });
+  const dueReason = best.ranking.days < 0 ? "is overdue" : best.ranking.days === 0 ? "is due today" : best.ranking.days === 1 ? "is due tomorrow" : best.task.dueDate ? `is due in ${best.ranking.days} days` : "has no fixed deadline";
+  const priorityReason = best.task.priority === "critical" || best.task.priority === "high" ? ` It is ${best.task.priority} priority.` : "";
+  const timeReason = best.ranking.canFinish ? `It should fit in about ${best.ranking.duration} minutes.` : `Use the next ${minutes} minutes to make focused progress.`;
+  res.json({ recommendation: best.task, reason: `${best.task.title} ${dueReason}.${priorityReason} ${timeReason} It matches ${energy} energy as ${best.ranking.workload}.` });
 });
 
 router.get("/weekly-review", async (req, res): Promise<void> => {

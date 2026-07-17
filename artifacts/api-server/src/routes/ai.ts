@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import Groq from "groq-sdk";
 import { Router, type IRouter } from "express";
-import { db, projectsTable, tasksTable } from "@workspace/db";
+import { checklistItemsTable, db, projectsTable, subjectsTable, tasksTable } from "@workspace/db";
 import { and, eq, ne } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -119,6 +119,23 @@ interface AssistantActionPlan {
   summary: string;
   project: AssistantProjectPlan | null;
   tasks: AssistantPlannedTask[];
+}
+
+type WorkspaceOperation =
+  | { type: "create_subject"; label: string; name: string; color: string }
+  | { type: "update_subject"; label: string; targetId: number; name?: string; color?: string; archived?: boolean }
+  | { type: "delete_subject"; label: string; targetId: number }
+  | { type: "create_project"; label: string; name: string; subject: string | null; priority: Priority; dueDate: string | null; description: string | null; status: string }
+  | { type: "update_project"; label: string; targetId: number; name?: string; subject?: string | null; priority?: Priority; dueDate?: string | null; description?: string | null; status?: string; archived?: boolean }
+  | { type: "delete_project"; label: string; targetId: number }
+  | { type: "create_task"; label: string; title: string; subject: string | null; projectName: string | null; priority: Priority; dueDate: string | null; estimatedMinutes: number | null; difficulty: number; status: string; blocked: boolean }
+  | { type: "update_task"; label: string; targetId: number; title?: string; subject?: string | null; projectName?: string | null; priority?: Priority; dueDate?: string | null; estimatedMinutes?: number | null; difficulty?: number; status?: string; blocked?: boolean }
+  | { type: "delete_task"; label: string; targetId: number }
+  | { type: "add_checklist_item"; label: string; targetId: number; title: string };
+
+interface WorkspaceActionPlan {
+  summary: string;
+  operations: WorkspaceOperation[];
 }
 
 interface PlanExpectations {
@@ -628,6 +645,18 @@ function looksLikeMultiActionRequest(message: string) {
   return requestsProject || projectStudyWorkflow || asksForSeveralTasks || (chainedActions && explicitlyRequestsSeveral);
 }
 
+function looksLikeWorkspaceOperation(message: string) {
+  if (looksLikeMathRequest(message) || looksLikeGeneralCreationRequest(message)) return false;
+  const management = /\b(update|change|rename|move|assign|sort|organize|reorganize|archive|delete|remove|edit|mark)\b/i.test(message)
+    && /\b(tasks?|todos?|projects?|subjects?|classes?|priorit(?:y|ies)|checklists?|subtasks?|due dates?|deadlines?|blocked)\b/i.test(message);
+  const setMetadata = /\bset\b/i.test(message) && /\b(priorit(?:y|ies)|subject|project|class|due date|deadline|blocked)\b/i.test(message);
+  const multiCreate = /\b(create|add|make|set up)\b/i.test(message)
+    && /\b(tasks|todos|projects?|subjects?|classes?|checklists?|subtasks?)\b/i.test(message);
+  const organizedSingleTask = /\b(create|add|make)\b.{0,30}\btask\b.{0,50}\b(?:under|in|for)\b.{0,30}\b(?:project|subject|class)\b/i.test(message);
+  const taskPlacedUnder = /\b(create|add|make|move|assign)\b.{0,40}\btask\b.{0,60}\bunder\b/i.test(message);
+  return management || setMetadata || multiCreate || organizedSingleTask || taskPlacedUnder;
+}
+
 function getPlanExpectations(message: string): PlanExpectations {
   const projectName = message.match(/\bproject\s+(?:called|named)\s+["']?(.+?)["']?(?=\s+(?:and|with|for|under|keep|subject)\b|[,.]|$)/i)?.[1]?.trim() ?? null;
   const subject = message.match(/\bsubject(?:\s+(?:is|as|to|should be))?\s+["']?([a-z][a-z &-]{1,30}?)["']?(?=\s+(?:and|with|for|then|add|create|make|schedule)\b|[,.]|$)/i)?.[1]?.trim() ?? null;
@@ -907,6 +936,143 @@ async function generateActionPlan(message: string, history: ChatHistoryMessage[]
   return { plan, provider: first.provider };
 }
 
+function validPriority(value: unknown): Priority | undefined {
+  return typeof value === "string" && ["critical", "high", "medium", "low"].includes(value) ? value as Priority : undefined;
+}
+
+function validDate(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
+function validColor(value: unknown) {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : undefined;
+}
+
+function validateWorkspacePlan(
+  value: Record<string, unknown> | null,
+  current: {
+    tasks: Array<typeof tasksTable.$inferSelect>;
+    projects: Array<typeof projectsTable.$inferSelect>;
+    subjects: Array<typeof subjectsTable.$inferSelect>;
+  },
+): WorkspaceActionPlan | null {
+  if (!value || !Array.isArray(value.operations)) return null;
+  const taskIds = new Set(current.tasks.map((item) => item.id));
+  const projectIds = new Set(current.projects.map((item) => item.id));
+  const subjectIds = new Set(current.subjects.map((item) => item.id));
+  const taskById = new Map(current.tasks.map((item) => [item.id, item]));
+  const projectById = new Map(current.projects.map((item) => [item.id, item]));
+  const subjectById = new Map(current.subjects.map((item) => [item.id, item]));
+  const projectNames = new Set(current.projects.map((item) => item.name.toLowerCase()));
+  const subjectNames = new Set(current.subjects.map((item) => item.name.toLowerCase()));
+  const operations: WorkspaceOperation[] = [];
+
+  for (const item of value.operations.slice(0, 25)) {
+    if (!item || typeof item !== "object") continue;
+    const raw = item as Record<string, unknown>;
+    const type = typeof raw.type === "string" ? raw.type : "";
+    const targetId = Number(raw.targetId);
+    const name = typeof raw.name === "string" ? normalizeTitle(raw.name).slice(0, 100) : "";
+    const title = typeof raw.title === "string" ? normalizeTitle(raw.title).slice(0, 160) : "";
+    const subject = raw.subject === null ? null : typeof raw.subject === "string" ? normalizeTitle(raw.subject).slice(0, 50) : undefined;
+    const projectName = raw.projectName === null ? null : typeof raw.projectName === "string" ? normalizeTitle(raw.projectName).slice(0, 100) : undefined;
+    const priority = validPriority(raw.priority);
+    const dueDate = validDate(raw.dueDate);
+    const description = raw.description === null ? null : typeof raw.description === "string" ? raw.description.trim().slice(0, 1000) || null : undefined;
+    const estimatedMinutes = raw.estimatedMinutes === null ? null : Number.isFinite(Number(raw.estimatedMinutes)) ? Math.min(480, Math.max(5, Number(raw.estimatedMinutes))) : undefined;
+    const difficulty = Number.isInteger(Number(raw.difficulty)) ? Math.min(3, Math.max(1, Number(raw.difficulty))) : undefined;
+    const blocked = typeof raw.blocked === "boolean" ? raw.blocked : undefined;
+    const archived = typeof raw.archived === "boolean" ? raw.archived : undefined;
+
+    if (type === "create_subject" && name && !subjectNames.has(name.toLowerCase())) {
+      operations.push({ type, label: `Create subject ${name}`, name: name.slice(0, 40), color: validColor(raw.color) ?? "#2563eb" });
+      subjectNames.add(name.toLowerCase());
+    } else if (type === "update_subject" && subjectIds.has(targetId)) {
+      const existing = subjectById.get(targetId);
+      const safeName = name && (name.toLowerCase() === existing?.name.toLowerCase() || !subjectNames.has(name.toLowerCase())) ? name.slice(0, 40) : "";
+      const color = validColor(raw.color);
+      const changes = [safeName ? `name to ${safeName}` : "", color ? `color to ${color}` : "", archived !== undefined ? archived ? "archive" : "restore" : ""].filter(Boolean).join(", ");
+      if (changes) {
+        operations.push({ type, label: `Update subject ${existing?.name ?? `#${targetId}`}: ${changes}`, targetId, ...(safeName ? { name: safeName } : {}), ...(color ? { color } : {}), ...(archived !== undefined ? { archived } : {}) });
+        if (safeName && existing) {
+          subjectNames.delete(existing.name.toLowerCase());
+          subjectNames.add(safeName.toLowerCase());
+        }
+      }
+    } else if (type === "delete_subject" && subjectIds.has(targetId) && subjectById.get(targetId)?.name.toLowerCase() !== "other") {
+      operations.push({ type, label: `Delete subject ${subjectById.get(targetId)?.name ?? `#${targetId}`}`, targetId });
+    } else if (type === "create_project" && name) {
+      const status = typeof raw.status === "string" && ["active", "planning", "waiting", "completed"].includes(raw.status) ? raw.status : "active";
+      operations.push({ type, label: `Create project ${name}${subject ? ` in ${subject}` : ""}`, name, subject: subject ?? null, priority: priority ?? "medium", dueDate: dueDate ?? null, description: description ?? null, status });
+      projectNames.add(name.toLowerCase());
+    } else if (type === "update_project" && projectIds.has(targetId)) {
+      const status = typeof raw.status === "string" && ["active", "planning", "waiting", "completed"].includes(raw.status) ? raw.status : undefined;
+      const changes = [name ? `name to ${name}` : "", subject !== undefined ? `subject to ${subject ?? "none"}` : "", priority ? `priority to ${priority}` : "", dueDate !== undefined ? `due to ${dueDate ?? "none"}` : "", description !== undefined ? "description" : "", status ? `status to ${status}` : "", archived !== undefined ? archived ? "archive" : "restore" : ""].filter(Boolean).join(", ");
+      if (changes) {
+        operations.push({ type, label: `Update project ${projectById.get(targetId)?.name ?? `#${targetId}`}: ${changes}`, targetId, ...(name ? { name } : {}), ...(subject !== undefined ? { subject } : {}), ...(priority ? { priority } : {}), ...(dueDate !== undefined ? { dueDate } : {}), ...(description !== undefined ? { description } : {}), ...(status ? { status } : {}), ...(archived !== undefined ? { archived } : {}) });
+        if (name) projectNames.add(name.toLowerCase());
+      }
+    } else if (type === "delete_project" && projectIds.has(targetId)) {
+      operations.push({ type, label: `Delete project ${projectById.get(targetId)?.name ?? `#${targetId}`}`, targetId });
+    } else if (type === "create_task" && title) {
+      if (projectName && !projectNames.has(projectName.toLowerCase())) return null;
+      const status = typeof raw.status === "string" && ["todo", "backlog", "in_progress"].includes(raw.status) ? raw.status : "todo";
+      operations.push({ type, label: `Create task ${title}${projectName ? ` in ${projectName}` : subject ? ` in ${subject}` : ""}`, title, subject: subject ?? null, projectName: projectName ?? null, priority: priority ?? "medium", dueDate: dueDate ?? null, estimatedMinutes: estimatedMinutes ?? null, difficulty: difficulty ?? 2, status, blocked: blocked ?? false });
+    } else if (type === "update_task" && taskIds.has(targetId)) {
+      if (projectName && !projectNames.has(projectName.toLowerCase())) return null;
+      const status = typeof raw.status === "string" && ["todo", "backlog", "in_progress"].includes(raw.status) ? raw.status : undefined;
+      const changes = [title ? `title to ${title}` : "", subject !== undefined ? `subject to ${subject ?? "none"}` : "", projectName !== undefined ? `project to ${projectName ?? "none"}` : "", priority ? `priority to ${priority}` : "", dueDate !== undefined ? `due to ${dueDate ?? "none"}` : "", estimatedMinutes !== undefined ? `estimate to ${estimatedMinutes ?? "none"}${estimatedMinutes ? " min" : ""}` : "", difficulty !== undefined ? `difficulty to ${difficulty}` : "", status ? `status to ${status}` : "", blocked !== undefined ? blocked ? "mark blocked" : "unblock" : ""].filter(Boolean).join(", ");
+      if (changes) {
+        operations.push({ type, label: `Update task ${taskById.get(targetId)?.title ?? `#${targetId}`}: ${changes}`, targetId, ...(title ? { title } : {}), ...(subject !== undefined ? { subject } : {}), ...(projectName !== undefined ? { projectName } : {}), ...(priority ? { priority } : {}), ...(dueDate !== undefined ? { dueDate } : {}), ...(estimatedMinutes !== undefined ? { estimatedMinutes } : {}), ...(difficulty !== undefined ? { difficulty } : {}), ...(status ? { status } : {}), ...(blocked !== undefined ? { blocked } : {}) });
+      }
+    } else if (type === "delete_task" && taskIds.has(targetId)) {
+      operations.push({ type, label: `Delete task ${taskById.get(targetId)?.title ?? `#${targetId}`}`, targetId });
+    } else if (type === "add_checklist_item" && taskIds.has(targetId) && title) {
+      operations.push({ type, label: `Add checklist item to ${taskById.get(targetId)?.title ?? `task #${targetId}`}: ${title}`, targetId, title: title.slice(0, 200) });
+    }
+  }
+
+  if (operations.length === 0) return null;
+  return {
+    summary: typeof value.summary === "string" ? value.summary.trim().slice(0, 300) : "Review these workspace changes before applying them.",
+    operations,
+  };
+}
+
+async function generateWorkspaceActionPlan(userId: string, message: string, history: ChatHistoryMessage[], log?: AssistantLogger) {
+  const [tasks, projects, subjects] = await Promise.all([
+    db.select().from(tasksTable).where(eq(tasksTable.userId, userId)),
+    db.select().from(projectsTable).where(eq(projectsTable.userId, userId)),
+    db.select().from(subjectsTable).where(eq(subjectsTable.userId, userId)),
+  ]);
+  const current = { tasks, projects, subjects };
+  const context = {
+    tasks: tasks.slice(0, 100).map((task) => ({ id: task.id, title: task.title, priority: task.priority, status: task.status, subject: task.subject, projectId: task.projectId, dueDate: task.dueDate })),
+    projects: projects.slice(0, 60).map((project) => ({ id: project.id, name: project.name, subject: project.subject, priority: project.priority, status: project.status, archived: project.archived })),
+    subjects: subjects.slice(0, 40).map((subjectItem) => ({ id: subjectItem.id, name: subjectItem.name, archived: subjectItem.archived })),
+  };
+  const instruction = [
+    "Convert the user's requested workspace changes into strict JSON. Return JSON only.",
+    'Schema: {"summary":string,"operations":[{"type":"create_subject"|"update_subject"|"delete_subject"|"create_project"|"update_project"|"delete_project"|"create_task"|"update_task"|"delete_task"|"add_checklist_item","targetId"?:number,"name"?:string,"title"?:string,"color"?:string,"subject"?:string|null,"projectName"?:string|null,"priority"?:"critical"|"high"|"medium"|"low","dueDate"?:"YYYY-MM-DD"|null,"description"?:string|null,"estimatedMinutes"?:number|null,"difficulty"?:1|2|3,"status"?:string,"blocked"?:boolean,"archived"?:boolean}]}.',
+    "Use targetId from the supplied data for updates and deletes. Never guess an ID.",
+    "For a new project, include its subject. If that subject does not exist, create_subject must appear before create_project.",
+    "For tasks under a project, set projectName exactly. For tasks under only a subject, set subject and projectName null.",
+    "When asked to generate a study plan or several tasks, create specific actionable task operations, not one task containing the request.",
+    "Preserve explicit priority, dates, durations, names, and relationships. Do not navigate or claim execution.",
+    "Do not mark a task completed; completion awards require the normal task UI. You may change todo, backlog, and in_progress status.",
+    `Today is ${formatDate(new Date())}. Current workspace: ${JSON.stringify(context)}. User request: ${JSON.stringify(message)}`,
+  ].join(" ");
+  const first = await generateAssistantReply(instruction, "This is a structured workspace action-planning call. Output JSON only.", history.slice(-6), log);
+  let plan = validateWorkspacePlan(extractJsonObject(first.reply), current);
+  if (!plan) {
+    const repair = await generateAssistantReply(`Repair this result into the required operation schema using only valid IDs from this workspace: ${JSON.stringify(context)}. Preserve the request: ${JSON.stringify(message)}. Invalid result: ${first.reply}`, "Output one valid JSON object only.", [], log);
+    plan = validateWorkspacePlan(extractJsonObject(repair.reply), current);
+  }
+  if (!plan) throw new Error("The assistant could not produce a safe workspace preview. Please name the task or project more specifically.");
+  return { plan, provider: first.provider };
+}
+
 async function inferTaskIntent(message: string, history: ChatHistoryMessage[], log?: AssistantLogger): Promise<ParsedTaskCommand | null> {
   if (looksLikeMathRequest(message) || looksLikeGeneralCreationRequest(message) || looksLikePlanningRequest(message) || looksLikeTaskDataQuestion(message)) return null;
   try {
@@ -994,6 +1160,26 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     }
 
     const history = parseHistory(req.body?.history);
+    if (looksLikeWorkspaceOperation(message)) {
+      const generated = await generateWorkspaceActionPlan(req.user.id, message, history, req.log);
+      res.json({
+        reply: [
+          generated.plan.summary,
+          "**Proposed changes**",
+          ...generated.plan.operations.map((operation) => `- ${operation.label}`),
+          "Would you like me to apply these changes?",
+        ].join("\n\n"),
+        provider: generated.provider,
+        taskCreated: false,
+        task: null,
+        tasks: [],
+        taskPreview: [],
+        workspacePreview: generated.plan,
+        planPreview: null,
+        actionPreview: null,
+      });
+      return;
+    }
     if (looksLikeMultiActionRequest(message)) {
       const generated = await generateActionPlan(message, history, req.log);
       const projectLine = generated.plan.project ? `**Project:** ${generated.plan.project.name}${generated.plan.project.subject ? ` · ${generated.plan.project.subject}` : ""}` : "";
@@ -1110,6 +1296,126 @@ router.post("/ai/tasks/confirm", async (req, res): Promise<void> => {
   if (commands.length === 0) { res.status(400).json({ error: "No valid tasks to create." }); return; }
   const inserted = await db.insert(tasksTable).values(commands.map((command) => ({ title: command.title, description: buildTaskDescription(command), priority: command.priority, dueDate: command.date, calendarDate: command.date, notes: buildTaskNotes(command), userId: req.user.id, vpValue: getVpValue(command.priority) }))).returning();
   res.status(201).json({ tasks: inserted.map((task) => ({ ...task, checklistCount: 0, checklistCompleted: 0 })) });
+});
+
+router.post("/ai/workspace/confirm", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const [tasks, projects, subjects] = await Promise.all([
+    db.select().from(tasksTable).where(eq(tasksTable.userId, req.user.id)),
+    db.select().from(projectsTable).where(eq(projectsTable.userId, req.user.id)),
+    db.select().from(subjectsTable).where(eq(subjectsTable.userId, req.user.id)),
+  ]);
+  const plan = validateWorkspacePlan(req.body?.plan && typeof req.body.plan === "object" ? req.body.plan as Record<string, unknown> : null, { tasks, projects, subjects });
+  if (!plan) { res.status(400).json({ error: "The workspace preview is no longer valid. Ask the assistant to refresh it." }); return; }
+
+  const applied = await db.transaction(async (tx) => {
+    const taskMap = new Map(tasks.map((item) => [item.id, item]));
+    const projectMap = new Map(projects.map((item) => [item.id, item]));
+    const projectNameMap = new Map(projects.map((item) => [item.name.toLowerCase(), item]));
+    const subjectMap = new Map(subjects.map((item) => [item.id, item]));
+    const subjectNameMap = new Map(subjects.map((item) => [item.name.toLowerCase(), item]));
+    const results: string[] = [];
+
+    const ensureSubject = async (name: string) => {
+      const existing = subjectNameMap.get(name.toLowerCase());
+      if (existing) return existing;
+      const [created] = await tx.insert(subjectsTable).values({ userId: req.user.id, name: name.slice(0, 40), color: "#2563eb" }).returning();
+      subjectMap.set(created.id, created);
+      subjectNameMap.set(created.name.toLowerCase(), created);
+      return created;
+    };
+
+    for (const operation of plan.operations) {
+      if (operation.type === "create_subject") {
+        const existing = subjectNameMap.get(operation.name.toLowerCase());
+        if (!existing) {
+          const [created] = await tx.insert(subjectsTable).values({ userId: req.user.id, name: operation.name, color: operation.color }).returning();
+          subjectMap.set(created.id, created);
+          subjectNameMap.set(created.name.toLowerCase(), created);
+        }
+      } else if (operation.type === "update_subject") {
+        const existing = subjectMap.get(operation.targetId);
+        if (!existing) throw new Error("Subject no longer exists.");
+        const update = { ...(operation.name ? { name: operation.name } : {}), ...(operation.color ? { color: operation.color } : {}), ...(operation.archived !== undefined ? { archived: operation.archived } : {}) };
+        const [updated] = await tx.update(subjectsTable).set(update).where(and(eq(subjectsTable.id, existing.id), eq(subjectsTable.userId, req.user.id))).returning();
+        if (operation.name && operation.name !== existing.name) {
+          await Promise.all([
+            tx.update(tasksTable).set({ subject: operation.name }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.subject, existing.name))),
+            tx.update(projectsTable).set({ subject: operation.name }).where(and(eq(projectsTable.userId, req.user.id), eq(projectsTable.subject, existing.name))),
+          ]);
+          subjectNameMap.delete(existing.name.toLowerCase());
+        }
+        subjectMap.set(updated.id, updated);
+        subjectNameMap.set(updated.name.toLowerCase(), updated);
+      } else if (operation.type === "delete_subject") {
+        const existing = subjectMap.get(operation.targetId);
+        if (!existing) throw new Error("Subject no longer exists.");
+        const fallback = await ensureSubject("Other");
+        await Promise.all([
+          tx.update(tasksTable).set({ subject: fallback.name }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.subject, existing.name))),
+          tx.update(projectsTable).set({ subject: fallback.name }).where(and(eq(projectsTable.userId, req.user.id), eq(projectsTable.subject, existing.name))),
+        ]);
+        await tx.delete(subjectsTable).where(and(eq(subjectsTable.id, existing.id), eq(subjectsTable.userId, req.user.id)));
+        subjectMap.delete(existing.id);
+        subjectNameMap.delete(existing.name.toLowerCase());
+      } else if (operation.type === "create_project") {
+        if (operation.subject) await ensureSubject(operation.subject);
+        const existing = projectNameMap.get(operation.name.toLowerCase());
+        if (!existing) {
+          const [created] = await tx.insert(projectsTable).values({ userId: req.user.id, name: operation.name, subject: operation.subject, priority: operation.priority, dueDate: operation.dueDate, description: operation.description, status: operation.status, color: "#2563eb" }).returning();
+          projectMap.set(created.id, created);
+          projectNameMap.set(created.name.toLowerCase(), created);
+        }
+      } else if (operation.type === "update_project") {
+        const existing = projectMap.get(operation.targetId);
+        if (!existing) throw new Error("Project no longer exists.");
+        if (operation.subject) await ensureSubject(operation.subject);
+        const update = { ...(operation.name ? { name: operation.name } : {}), ...(operation.subject !== undefined ? { subject: operation.subject } : {}), ...(operation.priority ? { priority: operation.priority } : {}), ...(operation.dueDate !== undefined ? { dueDate: operation.dueDate } : {}), ...(operation.description !== undefined ? { description: operation.description } : {}), ...(operation.status ? { status: operation.status } : {}), ...(operation.archived !== undefined ? { archived: operation.archived } : {}) };
+        const [updated] = await tx.update(projectsTable).set(update).where(and(eq(projectsTable.id, existing.id), eq(projectsTable.userId, req.user.id))).returning();
+        if (operation.subject !== undefined) {
+          await tx.update(tasksTable).set({ subject: operation.subject }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, existing.id)));
+        }
+        projectNameMap.delete(existing.name.toLowerCase());
+        projectMap.set(updated.id, updated);
+        projectNameMap.set(updated.name.toLowerCase(), updated);
+      } else if (operation.type === "delete_project") {
+        const existing = projectMap.get(operation.targetId);
+        if (!existing) throw new Error("Project no longer exists.");
+        await tx.update(tasksTable).set({ projectId: null }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, existing.id)));
+        await tx.delete(projectsTable).where(and(eq(projectsTable.id, existing.id), eq(projectsTable.userId, req.user.id)));
+        projectMap.delete(existing.id);
+        projectNameMap.delete(existing.name.toLowerCase());
+      } else if (operation.type === "create_task") {
+        const project = operation.projectName ? projectNameMap.get(operation.projectName.toLowerCase()) : null;
+        if (operation.projectName && !project) throw new Error(`Project ${operation.projectName} no longer exists.`);
+        const subject = operation.subject ?? project?.subject ?? null;
+        if (subject) await ensureSubject(subject);
+        const [created] = await tx.insert(tasksTable).values({ userId: req.user.id, title: operation.title, subject, projectId: project?.id ?? null, priority: operation.priority, vpValue: getVpValue(operation.priority), dueDate: operation.dueDate, calendarDate: operation.dueDate, estimatedMinutes: operation.estimatedMinutes, difficulty: operation.difficulty, status: operation.status, blocked: operation.blocked, organized: Boolean(subject || project) }).returning();
+        taskMap.set(created.id, created);
+      } else if (operation.type === "update_task") {
+        const existing = taskMap.get(operation.targetId);
+        if (!existing) throw new Error("Task no longer exists.");
+        const project = operation.projectName ? projectNameMap.get(operation.projectName.toLowerCase()) : operation.projectName === null ? null : undefined;
+        if (operation.projectName && !project) throw new Error(`Project ${operation.projectName} no longer exists.`);
+        const resolvedSubject = operation.subject !== undefined ? operation.subject : project !== undefined ? project?.subject ?? null : undefined;
+        if (resolvedSubject) await ensureSubject(resolvedSubject);
+        const update = { ...(operation.title ? { title: operation.title } : {}), ...(resolvedSubject !== undefined ? { subject: resolvedSubject } : {}), ...(project !== undefined ? { projectId: project?.id ?? null } : {}), ...(operation.priority ? { priority: operation.priority, vpValue: getVpValue(operation.priority) } : {}), ...(operation.dueDate !== undefined ? { dueDate: operation.dueDate, calendarDate: operation.dueDate } : {}), ...(operation.estimatedMinutes !== undefined ? { estimatedMinutes: operation.estimatedMinutes } : {}), ...(operation.difficulty !== undefined ? { difficulty: operation.difficulty } : {}), ...(operation.status ? { status: operation.status } : {}), ...(operation.blocked !== undefined ? { blocked: operation.blocked } : {}) };
+        const [updated] = await tx.update(tasksTable).set(update).where(and(eq(tasksTable.id, existing.id), eq(tasksTable.userId, req.user.id))).returning();
+        taskMap.set(updated.id, updated);
+      } else if (operation.type === "delete_task") {
+        const existing = taskMap.get(operation.targetId);
+        if (!existing) throw new Error("Task no longer exists.");
+        await tx.delete(tasksTable).where(and(eq(tasksTable.id, existing.id), eq(tasksTable.userId, req.user.id)));
+        taskMap.delete(existing.id);
+      } else if (operation.type === "add_checklist_item") {
+        if (!taskMap.has(operation.targetId)) throw new Error("Task no longer exists.");
+        await tx.insert(checklistItemsTable).values({ taskId: operation.targetId, title: operation.title });
+      }
+      results.push(operation.label);
+    }
+    return results;
+  });
+  res.json({ applied, count: applied.length });
 });
 
 router.post("/ai/plans/confirm", async (req, res): Promise<void> => {

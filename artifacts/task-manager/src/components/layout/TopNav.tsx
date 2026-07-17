@@ -82,7 +82,7 @@ export function TopNav() {
       <header className="h-16 border-b neon-rule bg-background/78 backdrop-blur-xl flex items-center px-4 sm:px-6 gap-4 sm:gap-6 shrink-0 sticky top-0 z-40 shadow-[0_12px_40px_rgba(0,0,0,0.32)]">
         <Link href="/">
           <motion.div
-            className="flex items-center gap-2.5 mr-2 cursor-pointer"
+            className="flex shrink-0 items-center gap-2.5 cursor-pointer"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
@@ -94,7 +94,7 @@ export function TopNav() {
           </motion.div>
         </Link>
 
-        <nav className="hidden xl:flex items-center gap-0.5">
+        <nav className="mx-auto hidden min-w-0 max-w-3xl flex-1 items-center justify-evenly gap-1 xl:flex">
           {links.map((link) => {
             const isActive = location === link.href;
             return (
@@ -128,7 +128,7 @@ export function TopNav() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 2xl:gap-3">
           <div className="relative hidden lg:block" ref={themesRef}>
             <motion.button
               type="button"

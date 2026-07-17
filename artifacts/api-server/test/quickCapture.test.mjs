@@ -41,3 +41,23 @@ test("does not silently attach unknown organization tokens", () => {
   assert.equal(parsed.subject, null);
   assert.equal(parsed.warnings.length, 2);
 });
+
+test("understands natural priority language and handles negation first", () => {
+  const urgent = parseQuickCapture("Finish lab report very important", projects, subjects, now);
+  const relaxed = parseQuickCapture("Organize downloads not important", projects, subjects, now);
+  const noRush = parseQuickCapture("Clean notes no rush", projects, subjects, now);
+
+  assert.equal(urgent.title, "Finish lab report");
+  assert.equal(urgent.priority, "critical");
+  assert.equal(relaxed.title, "Organize downloads");
+  assert.equal(relaxed.priority, "low");
+  assert.equal(noRush.title, "Clean notes");
+  assert.equal(noRush.priority, "low");
+});
+
+test("explicit p-level tokens override natural priority words", () => {
+  const parsed = parseQuickCapture("Review notes urgent p4", projects, subjects, now);
+
+  assert.equal(parsed.title, "Review notes");
+  assert.equal(parsed.priority, "low");
+});
