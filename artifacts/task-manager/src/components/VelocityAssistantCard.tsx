@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
-import { Check, FolderKanban, Loader2, Send, Sparkles, Zap } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, FolderKanban, Loader2, Send, Sparkles, X, Zap } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetDashboardOverviewQueryKey,
@@ -145,6 +145,7 @@ export function VelocityAssistantCard() {
     },
   ]);
   const [input, setInput] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
@@ -283,84 +284,79 @@ export function VelocityAssistantCard() {
   }
 
   return (
-    <motion.section
-      layout
-      initial={{ opacity: 0, y: 14, filter: 'blur(3px)' }}
-      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-      transition={{ delay: 0.16, duration: 0.38, ease: 'easeOut' }}
-      className={cn(
-        'bento-card relative overflow-hidden p-4 sm:p-5 transition-all',
-        isFocused && 'ring-2 ring-primary/35 shadow-[0_0_42px_hsl(var(--primary)/0.18)]',
-      )}
-    >
-      <div className="absolute right-8 top-0 h-24 w-24 rounded-full bg-primary/20 blur-3xl" />
-
-      <div className="relative flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <AssistantLogo circular className="h-10 w-10 [&_svg]:h-5 [&_svg]:w-5" />
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="tech-title text-lg">Velocity Assistant</h2>
-              <Sparkles className="h-4 w-4 text-secondary" />
-            </div>
-            <p className="text-xs text-muted-foreground">Plan, capture, and create tasks from natural language.</p>
-          </div>
-        </div>
-      </div>
-
-      <div
-        ref={scrollRef}
-        className="relative mt-4 max-h-72 min-h-44 space-y-3 overflow-y-auto pr-1"
-        aria-live="polite"
-      >
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={cn(
-              'flex gap-2.5',
-              message.role === 'user' && 'justify-end',
-            )}
-          >
-            {message.role === 'assistant' && <AssistantLogo circular className="mt-0.5 h-6 w-6 [&_svg]:h-3 [&_svg]:w-3" />}
-            <div
-              className={cn(
-                'max-w-[82%] rounded-2xl border px-3 py-2 text-sm leading-relaxed',
-                message.role === 'assistant'
-                  ? 'border-primary/25 bg-primary/8 text-foreground'
-                  : 'border-secondary/30 bg-secondary/15 text-foreground',
-              )}
-            >
-              {message.content ? <MarkdownMessage content={message.content} /> : (message.typing ? <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-.2s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-.1s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" /></span> : '')}
-              {message.typing && message.content && <span className="ml-0.5 animate-pulse text-primary">|</span>}
-              {message.taskPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmTaskPreview(message.id, message.taskPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Adding tasks</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Tasks added</> : `Add ${message.taskPreview.length} tasks`}</button>}
-              {message.actionPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmAction(message.id, message.actionPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-secondary px-3 py-2 text-xs font-black text-secondary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Updating</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Confirmed</> : `${message.actionPreview.label} (${message.actionPreview.count})`}</button>}
-              {message.planPreview && !message.typing && <div className="mt-3 rounded-xl border border-primary/25 bg-background/70 p-3"><div className="flex items-center gap-2 text-xs font-black"><FolderKanban className="h-3.5 w-3.5 text-primary"/>{message.planPreview.project?.name ?? 'Multi-step plan'}<span className="ml-auto text-muted-foreground">{message.planPreview.tasks.length > 0 ? `${message.planPreview.tasks.length} tasks` : 'Project'}</span></div><button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmPlan(message.id, message.planPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating plan</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Plan created</> : planCommandLabel(message.planPreview)}</button></div>}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <form onSubmit={sendMessage} className="relative mt-4 flex items-center gap-2 rounded-2xl border border-primary/25 bg-black/20 p-2 focus-within:border-primary/60">
-        <span className="px-2 font-mono text-xs font-bold text-primary">$</span>
-        <input
-          value={input}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder={placeholder}
-          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-        />
-        <motion.button
-          type="submit"
-          disabled={!canSend}
-          whileHover={canSend ? { scale: 1.04 } : undefined}
-          whileTap={canSend ? { scale: 0.96 } : undefined}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40"
-          aria-label="Send assistant command"
+    <AnimatePresence>
+      {isOpen ? (
+        <motion.section
+          key="assistant-panel"
+          initial={{ opacity: 0, y: 16, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 12, scale: 0.97 }}
+          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+          className={cn(
+            'bento-card fixed bottom-3 left-3 right-3 z-50 flex h-[min(38rem,calc(100dvh-6rem))] flex-col overflow-hidden p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:w-[28rem] sm:p-5',
+            isFocused && 'ring-2 ring-primary/35 shadow-[0_0_42px_hsl(var(--primary)/0.18)]',
+          )}
+          aria-label="Velocity Assistant"
         >
-          <Send className="h-4 w-4" />
+          <div className="flex shrink-0 items-center gap-3 border-b border-border/70 pb-3">
+            <AssistantLogo circular className="h-9 w-9 [&_svg]:h-4 [&_svg]:w-4" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="tech-title truncate text-base">Velocity Assistant</h2>
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-secondary" />
+              </div>
+              <p className="text-[11px] text-muted-foreground">Nothing changes until you confirm.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Close Velocity Assistant"
+              title="Close assistant"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div ref={scrollRef} className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-live="polite">
+            {messages.map((message) => (
+              <div key={message.id} className={cn('flex gap-2.5', message.role === 'user' && 'justify-end')}>
+                {message.role === 'assistant' && <AssistantLogo circular className="mt-0.5 h-6 w-6 [&_svg]:h-3 [&_svg]:w-3" />}
+                <div className={cn('max-w-[84%] rounded-2xl border px-3 py-2 text-sm leading-relaxed', message.role === 'assistant' ? 'border-primary/25 bg-primary/8 text-foreground' : 'border-secondary/30 bg-secondary/15 text-foreground')}>
+                  {message.content ? <MarkdownMessage content={message.content} /> : (message.typing ? <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-.2s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-.1s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" /></span> : '')}
+                  {message.typing && message.content && <span className="ml-0.5 animate-pulse text-primary">|</span>}
+                  {message.taskPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmTaskPreview(message.id, message.taskPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Created</> : message.taskPreview.length === 1 ? 'Create task' : `Create ${message.taskPreview.length} tasks`}</button>}
+                  {message.actionPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmAction(message.id, message.actionPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-secondary px-3 py-2 text-xs font-black text-secondary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Updating</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Confirmed</> : `${message.actionPreview.label} (${message.actionPreview.count})`}</button>}
+                  {message.planPreview && !message.typing && <div className="mt-3 rounded-xl border border-primary/25 bg-background/70 p-3"><div className="flex items-center gap-2 text-xs font-black"><FolderKanban className="h-3.5 w-3.5 text-primary"/>{message.planPreview.project?.name ?? 'Multi-step plan'}<span className="ml-auto text-muted-foreground">{message.planPreview.tasks.length > 0 ? `${message.planPreview.tasks.length} tasks` : 'Project'}</span></div><button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmPlan(message.id, message.planPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating plan</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Plan created</> : planCommandLabel(message.planPreview)}</button></div>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={sendMessage} className="mt-3 flex shrink-0 items-center gap-2 rounded-2xl border border-primary/25 bg-black/20 p-2 focus-within:border-primary/60">
+            <span className="px-2 font-mono text-xs font-bold text-primary">$</span>
+            <input value={input} onFocus={() => setIsFocused(true)} onBlur={() => setIsFocused(false)} onChange={(event) => setInput(event.target.value)} placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+            <motion.button type="submit" disabled={!canSend} whileHover={canSend ? { scale: 1.04 } : undefined} whileTap={canSend ? { scale: 0.96 } : undefined} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40" aria-label="Send assistant command">
+              <Send className="h-4 w-4" />
+            </motion.button>
+          </form>
+        </motion.section>
+      ) : (
+        <motion.button
+          key="assistant-launcher"
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.85 }}
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.94 }}
+          onClick={() => setIsOpen(true)}
+          className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-[#141414] text-white shadow-[0_12px_34px_rgba(0,0,0,0.34)]"
+          aria-label="Open Velocity Assistant"
+          title="Velocity Assistant"
+        >
+          <Zap className="h-6 w-6 fill-white text-white" />
         </motion.button>
-      </form>
-    </motion.section>
+      )}
+    </AnimatePresence>
   );
 }

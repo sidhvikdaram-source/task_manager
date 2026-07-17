@@ -98,11 +98,6 @@ interface ParsedTaskCommand {
   priority: Priority;
 }
 
-type CreatedTaskResponse = typeof tasksTable.$inferSelect & {
-  checklistCount: number;
-  checklistCompleted: number;
-};
-
 interface AssistantProjectPlan {
   name: string;
   subject: string | null;
@@ -1005,8 +1000,11 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       const taskLines = generated.plan.tasks.length > 0
         ? ["**Proposed tasks**", ...generated.plan.tasks.map((task, index) => `${index + 1}. ${task.title}${task.dueDate ? ` · ${task.dueDate}` : ""}`)]
         : [];
+      const confirmationLine = generated.plan.project
+        ? "Would you like me to create this project and its proposed tasks?"
+        : "Would you like me to create these tasks?";
       res.json({
-        reply: [generated.plan.summary, projectLine, ...taskLines].filter(Boolean).join("\n\n"),
+        reply: [generated.plan.summary, projectLine, ...taskLines, confirmationLine].filter(Boolean).join("\n\n"),
         provider: generated.provider,
         taskCreated: false,
         task: null,
@@ -1025,7 +1023,6 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     if (!parsedCommand && bulkCommands.length === 0 && !agendaWithTasks && !dataQuestion && !bulkReschedule) {
       parsedCommand = await inferTaskIntent(message, history, req.log);
     }
-    let createdTasks: CreatedTaskResponse[] = [];
     let taskPreview: ParsedTaskCommand[] = [];
     let agendaReply: string | null = null;
 
@@ -1050,24 +1047,9 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     if (!agendaWithTasks && bulkCommands.length > 0) {
       taskPreview = bulkCommands;
     } else if (parsedCommand) {
-      const [task] = await db
-        .insert(tasksTable)
-        .values({
-          title: parsedCommand.title,
-          description: buildTaskDescription(parsedCommand),
-          priority: parsedCommand.priority,
-          dueDate: parsedCommand.date,
-          calendarDate: parsedCommand.date,
-          notes: buildTaskNotes(parsedCommand),
-          userId: req.user.id,
-          vpValue: getVpValue(parsedCommand.priority),
-        })
-        .returning();
-
-      createdTasks = [{ ...task, checklistCount: 0, checklistCompleted: 0 }];
+      taskPreview = [parsedCommand];
     }
 
-    const primaryTask = createdTasks[0] ?? null;
     const activeTasks = dataQuestion ? await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"))) : [];
     const relevantTasks = activeTasks.sort((a, b) => (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31")).slice(0, 12);
     const taskContext = bulkReschedule
@@ -1076,34 +1058,29 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
         ? relevantTasks.length > 0
           ? `Use only these actual active tasks to answer: ${relevantTasks.map((task) => `${task.title} [due ${task.dueDate ?? "unscheduled"}, priority ${task.priority}]`).join("; ")}. Do not invent tasks or dates.`
           : "The user's stored active task list is empty. State that clearly."
-      : createdTasks.length > 1
-      ? [
-        `Backend action completed: created ${createdTasks.length} tasks from the previous agenda/plan.`,
-        `Task titles: ${createdTasks.map((task) => task.title).join("; ")}.`,
-        "Respond in clean Markdown with a short confirmation and the added task titles.",
-      ].filter(Boolean).join(" ")
-      : primaryTask
+      : taskPreview.length > 0
         ? [
-          `Backend action completed: created task "${primaryTask.title}".`,
-          parsedCommand ? `Task type: ${taskTypeSymbols[parsedCommand.taskType]} ${taskTypeLabels[parsedCommand.taskType]}.` : "",
-          parsedCommand?.scheduleLabel ? `Schedule reference: ${parsedCommand.scheduleLabel}.` : "",
-          parsedCommand?.time ? `Time captured: ${parsedCommand.time}.` : "",
-          "Respond in clean Markdown with a short confirmation and no extra chatter.",
+          "No database action has been performed.",
+          `A confirmation preview is ready for: ${taskPreview.map((task) => task.title).join("; ")}.`,
+          "Ask the user whether they want to create the proposed task or tasks.",
         ].filter(Boolean).join(" ")
         : "Backend action completed: no task was created for this message.";
     const generated = agendaReply
       ? { reply: agendaReply, provider: "agenda" as const }
+      : taskPreview.length > 0
+        ? { reply: "", provider: "preview" as const }
       : await generateAssistantReply(message, taskContext, history, req.log);
-    const reply = taskPreview.length > 0 && agendaReply
-      ? `${agendaReply}\n\n**Review before adding**\n${taskPreview.map((task) => `- ${task.title}`).join("\n")}`
+    const previewQuestion = `Would you like me to create ${taskPreview.length === 1 ? "this task" : "these tasks"}?`;
+    const reply = taskPreview.length > 0
+      ? `${agendaReply ? `${agendaReply}\n\n` : ""}**Review before adding**\n${taskPreview.map((task) => `- ${task.title}${task.scheduleLabel ? ` · ${task.scheduleLabel}` : ""}`).join("\n")}\n\n${previewQuestion}`
       : generated.reply;
 
     res.json({
       reply: cleanAssistantReply(reply),
       provider: generated.provider,
-      taskCreated: createdTasks.length > 0,
-      task: primaryTask,
-      tasks: createdTasks,
+      taskCreated: false,
+      task: null,
+      tasks: [],
       taskPreview,
       actionPreview: bulkReschedule ? { type: "reschedule-unfinished-tomorrow", count: (await db.select({ id: tasksTable.id }).from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed")))).length, label: "Move unfinished tasks to tomorrow" } : null,
     });

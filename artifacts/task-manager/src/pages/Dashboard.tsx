@@ -15,7 +15,6 @@ import { TaskDetailsModal } from '@/components/TaskDetailsModal';
 import { OverdueTriageModal } from '@/components/OverdueTriageModal';
 import { IntroAnimation } from '@/components/IntroAnimation';
 import { DailyChecklist } from '@/components/DailyChecklist';
-import { VelocityAssistantCard } from '@/components/VelocityAssistantCard';
 import { QuickCapture } from '@/components/QuickCapture';
 import { playCompletionSound, primeCompletionSound } from '@/lib/completionSound';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -329,7 +328,21 @@ export default function Dashboard() {
               ))}
             </div>
 
-            <VelocityAssistantCard />
+            <motion.section
+              {...fadeIn(0.14)}
+              initial="hidden"
+              animate="visible"
+              className="bento-card p-4 sm:p-5"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">Quick capture</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Add a task now, with optional checklist steps.</p>
+                </div>
+                <Plus className="h-4 w-4 text-primary" />
+              </div>
+              <QuickCapture onCreated={invalidate} />
+            </motion.section>
 
             {/* Main Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -481,25 +494,6 @@ export default function Dashboard() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-
-                {totalActive === 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.35, type: 'spring', stiffness: 300, damping: 24 }}
-                    className="bento-card text-center py-16 border-dashed"
-                  >
-                    <motion.div
-                      animate={{ rotate: [0, 8, -8, 0], scale: [1, 1.05, 1] }}
-                      transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 3 }}
-                    >
-                      <CheckCircle2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-                    </motion.div>
-                    <p className="font-semibold text-foreground">All clear</p>
-                    <p className="text-sm text-muted-foreground mt-1">Capture one task and optional steps.</p>
-                    <QuickCapture onCreated={invalidate} />
-                  </motion.div>
-                )}
 
                 {/* Daily Habits */}
                 <DailyChecklist />

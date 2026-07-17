@@ -1,5 +1,6 @@
 import React from 'react';
 import { TopNav } from './TopNav';
+import { VelocityAssistantCard } from '@/components/VelocityAssistantCard';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +11,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+      <VelocityAssistantCard />
     </div>
   );
 }
