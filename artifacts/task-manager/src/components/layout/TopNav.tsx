@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound, Library, ListChecks, Check } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, Timer, LineChart, Zap, Bell, Plus, LogOut, LogIn, Palette, AlertTriangle, Users, UserRound, Library, ListChecks, Check, FolderKanban } from 'lucide-react';
 import {
   getListTasksQueryKey,
   useGetUserStats,
@@ -64,11 +64,12 @@ export function TopNav() {
   const links = [
     { href: '/', label: 'Home', icon: LayoutDashboard },
     { href: '/workspace', label: 'Tasks', icon: ListChecks },
-    { href: '/school', label: 'Academics', icon: Library },
+    { href: '/projects', label: 'Projects', icon: FolderKanban },
+    { href: '/school', label: 'School', icon: Library },
     { href: '/calendar', label: 'Calendar', icon: CalendarDays },
     { href: '/focus', label: 'Focus', icon: Timer },
-    { href: '/social', label: 'Community', icon: Users },
-    { href: '/analytics', label: 'Progress', icon: LineChart },
+    { href: '/social', label: 'Social', icon: Users },
+    { href: '/analytics', label: 'Insights', icon: LineChart },
   ];
 
   const upcomingNotifications = (tasks ?? [])
@@ -79,29 +80,29 @@ export function TopNav() {
 
   return (
     <>
-      <header className="h-16 border-b neon-rule bg-background/78 backdrop-blur-xl flex items-center px-4 sm:px-6 gap-4 sm:gap-6 shrink-0 sticky top-0 z-40 shadow-[0_12px_40px_rgba(0,0,0,0.32)]">
+      <header className="h-14 border-b neon-rule bg-background/78 backdrop-blur-xl flex items-center px-3 sm:px-4 gap-3 shrink-0 sticky top-0 z-40 shadow-[0_12px_40px_rgba(0,0,0,0.32)]">
         <Link href="/">
           <motion.div
-            className="flex shrink-0 items-center gap-2.5 cursor-pointer"
+            className="flex shrink-0 items-center gap-2 cursor-pointer"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-[0.85rem] bg-[#141414] text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <Zap className="h-5 w-5 fill-white text-white" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-[0.78rem] bg-[#141414] text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+              <Zap className="h-4 w-4 fill-white text-white" />
             </div>
-            <span className="text-xl font-black tracking-tight text-foreground">Velocity</span>
+            <span className="text-lg font-black tracking-tight text-foreground">Velocity</span>
           </motion.div>
         </Link>
 
-        <nav className="mx-auto hidden min-w-0 max-w-3xl flex-1 items-center justify-evenly gap-1 xl:flex">
+        <nav className="mx-auto hidden min-w-0 max-w-4xl flex-1 items-center justify-between gap-0.5 xl:flex">
           {links.map((link) => {
             const isActive = location === link.href;
             return (
               <Link key={link.href} href={link.href}>
                 <motion.div
                   data-testid={`nav-link-${link.label.toLowerCase().replace(' ', '-')}`}
-                  className={`relative flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                  className={`relative flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-colors ${
                     isActive ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                   whileTap={{ scale: 0.96 }}
@@ -120,7 +121,7 @@ export function TopNav() {
                       transition={{ duration: 0.15 }}
                     />
                   )}
-                  <link.icon className="w-4 h-4 relative z-10" />
+                  <link.icon className="w-3.5 h-3.5 relative z-10" />
                   <span className="relative z-10">{link.label}</span>
                 </motion.div>
               </Link>
@@ -128,7 +129,7 @@ export function TopNav() {
           })}
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2 2xl:gap-3">
+        <div className="flex shrink-0 items-center gap-1.5">
           <div className="relative hidden lg:block" ref={themesRef}>
             <motion.button
               type="button"
@@ -291,7 +292,7 @@ export function TopNav() {
                 initial={{ opacity: 0, scale: 0.85, x: 8 }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 transition={{ type: 'spring', stiffness: 380, damping: 24 }}
-                className="hidden sm:flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-3 py-2 shadow-[0_0_24px_rgba(0,213,255,0.12)]"
+                className="hidden 2xl:flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-2.5 py-1.5 shadow-[0_0_24px_rgba(0,213,255,0.12)]"
               >
                 {stats.multiplier > 1.0 && (
                   <motion.div
@@ -320,13 +321,14 @@ export function TopNav() {
           <motion.button
             onClick={() => setIsCreateModalOpen(true)}
             data-testid="button-new-task-nav"
-            className="flex items-center gap-1.5 bg-secondary text-secondary-foreground text-sm font-extrabold px-3 py-2 rounded-xl shadow-[0_0_26px_rgba(255,111,26,0.24)]"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-secondary-foreground shadow-[0_0_26px_rgba(255,111,26,0.24)]"
+            aria-label="Create task"
+            title="Create task"
             whileHover={{ scale: 1.03, boxShadow: '0 4px 14px rgba(0,0,0,0.18)' }}
             whileTap={{ scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
             <Plus className="w-4 h-4" />
-            New Task
           </motion.button>
         </div>
       </header>

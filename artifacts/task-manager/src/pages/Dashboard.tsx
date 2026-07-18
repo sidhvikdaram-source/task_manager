@@ -249,7 +249,8 @@ export default function Dashboard() {
   const activeTasks = (allTasks ?? []).filter(t => t.status !== 'completed');
   const criticalTasks = activeTasks.filter(t => t.priority === 'critical');
   const inFlightTasks = activeTasks.filter(t => t.status === 'in_progress' && t.priority !== 'critical');
-  const backlogTasks = activeTasks.filter(t => t.status === 'todo' && t.priority !== 'critical');
+  const unscheduledTasks = activeTasks.filter(t => t.status === 'todo' && t.priority !== 'critical' && !t.dueDate && !t.calendarDate);
+  const backlogTasks = activeTasks.filter(t => t.status === 'todo' && t.priority !== 'critical' && (t.dueDate || t.calendarDate));
 
   const totalActive = activeTasks.length;
   const vpToNextTier = 100 - stats.tierProgress;
@@ -494,6 +495,33 @@ export default function Dashboard() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                <motion.div
+                  {...fadeIn(0.4)}
+                  initial="hidden"
+                  animate="visible"
+                  className="bento-card overflow-hidden"
+                >
+                  <div className="flex items-center justify-between border-b neon-rule bg-white/[0.035] px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold">No due date</span>
+                      <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{unscheduledTasks.length}</span>
+                    </div>
+                  </div>
+                  <div className="divide-y divide-border/50">
+                    {unscheduledTasks.length > 0 ? unscheduledTasks.map((task, index) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        onComplete={handleComplete}
+                        completing={completingId === task.id}
+                        onClick={setSelectedTask}
+                        delay={index * 0.03}
+                      />
+                    )) : <p className="px-4 py-5 text-sm text-muted-foreground">Tasks without deadlines will stay visible here.</p>}
+                  </div>
+                </motion.div>
 
                 {/* Daily Habits */}
                 <DailyChecklist />

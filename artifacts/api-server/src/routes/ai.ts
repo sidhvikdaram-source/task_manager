@@ -23,11 +23,10 @@ const systemPrompt = [
   "Do not include malformed tables, decorative characters, fake JSON, or hidden chain-of-thought.",
 ].join(" ");
 
-// qwen/qwen3-32b is the official Velocity model because its free-tier 60 RPM gives
-// more concurrency cushion than openai/gpt-oss-120b and qwen/qwen3.6-27b at 30 RPM.
 const velocityGeminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
-const velocityGroqModels = ["qwen/qwen3-32b", "openai/gpt-oss-120b"];
-const assistantMaxOutputTokens = 1800;
+// GPT-OSS 120B supports Groq's strict JSON Schema mode; qwen3-32b was retired.
+const velocityGroqModels = ["openai/gpt-oss-120b", "qwen/qwen3.6-27b"];
+const assistantMaxOutputTokens = 3000;
 const groqMinRequestIntervalMs = 1_100;
 const geminiMinRequestIntervalMs = 700;
 let geminiQueue: Promise<unknown> = Promise.resolve();
@@ -137,6 +136,45 @@ interface WorkspaceActionPlan {
   summary: string;
   operations: WorkspaceOperation[];
 }
+
+const workspaceDecisionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["intent", "summary", "operations"],
+  properties: {
+    intent: { type: "string", enum: ["workspace_changes", "workspace_query", "general"] },
+    summary: { type: "string" },
+    operations: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["type", "targetId", "name", "title", "color", "subject", "projectName", "priority", "dueDate", "description", "estimatedMinutes", "difficulty", "status", "blocked", "archived", "clearSubject", "clearProject", "clearDueDate", "clearDescription"],
+        properties: {
+          type: { type: "string", enum: ["create_subject", "update_subject", "delete_subject", "create_project", "update_project", "delete_project", "create_task", "update_task", "delete_task", "add_checklist_item"] },
+          targetId: { type: ["integer", "null"] },
+          name: { type: ["string", "null"] },
+          title: { type: ["string", "null"] },
+          color: { type: ["string", "null"] },
+          subject: { type: ["string", "null"] },
+          projectName: { type: ["string", "null"] },
+          priority: { type: ["string", "null"], enum: ["critical", "high", "medium", "low", null] },
+          dueDate: { type: ["string", "null"] },
+          description: { type: ["string", "null"] },
+          estimatedMinutes: { type: ["integer", "null"] },
+          difficulty: { type: ["integer", "null"] },
+          status: { type: ["string", "null"] },
+          blocked: { type: ["boolean", "null"] },
+          archived: { type: ["boolean", "null"] },
+          clearSubject: { type: "boolean" },
+          clearProject: { type: "boolean" },
+          clearDueDate: { type: "boolean" },
+          clearDescription: { type: "boolean" },
+        },
+      },
+    },
+  },
+} as const;
 
 interface PlanExpectations {
   projectRequested: boolean;
@@ -860,6 +898,39 @@ async function generateAssistantReply(message: string, taskContext: string, hist
   }
 }
 
+async function generateStrictWorkspaceDecision(instruction: string, history: ChatHistoryMessage[]) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error("GROQ_API_KEY is not configured");
+
+  const client = new Groq({ apiKey });
+  const response = await scheduleGroqRequest(() => client.chat.completions.create({
+    model: "openai/gpt-oss-120b",
+    messages: [
+      {
+        role: "system",
+        content: "You are Velocity's workspace action planner. Infer meaning from the whole conversation. Return only the requested structured decision and never claim an action already happened.",
+      },
+      ...history.slice(-6).map((item) => ({ role: item.role, content: item.content })),
+      { role: "user", content: instruction },
+    ],
+    max_tokens: 5000,
+    temperature: 0.1,
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "velocity_workspace_decision",
+        description: "Classify the request and propose safe task manager operations.",
+        strict: true,
+        schema: workspaceDecisionSchema,
+      },
+    },
+  }));
+  const text = response.choices[0]?.message?.content;
+  if (!text) throw new Error("Groq returned an empty workspace decision");
+  const parsed = JSON.parse(text) as Record<string, unknown>;
+  return parsed;
+}
+
 function extractJsonObject(text: string) {
   const match = text.replace(/```(?:json)?/gi, "").match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -975,12 +1046,12 @@ function validateWorkspacePlan(
     const targetId = Number(raw.targetId);
     const name = typeof raw.name === "string" ? normalizeTitle(raw.name).slice(0, 100) : "";
     const title = typeof raw.title === "string" ? normalizeTitle(raw.title).slice(0, 160) : "";
-    const subject = raw.subject === null ? null : typeof raw.subject === "string" ? normalizeTitle(raw.subject).slice(0, 50) : undefined;
-    const projectName = raw.projectName === null ? null : typeof raw.projectName === "string" ? normalizeTitle(raw.projectName).slice(0, 100) : undefined;
+    const subject = typeof raw.subject === "string" ? normalizeTitle(raw.subject).slice(0, 50) : raw.clearSubject === true ? null : undefined;
+    const projectName = typeof raw.projectName === "string" ? normalizeTitle(raw.projectName).slice(0, 100) : raw.clearProject === true ? null : undefined;
     const priority = validPriority(raw.priority);
-    const dueDate = validDate(raw.dueDate);
-    const description = raw.description === null ? null : typeof raw.description === "string" ? raw.description.trim().slice(0, 1000) || null : undefined;
-    const estimatedMinutes = raw.estimatedMinutes === null ? null : Number.isFinite(Number(raw.estimatedMinutes)) ? Math.min(480, Math.max(5, Number(raw.estimatedMinutes))) : undefined;
+    const dueDate = raw.clearDueDate === true ? null : typeof raw.dueDate === "string" ? validDate(raw.dueDate) : undefined;
+    const description = raw.clearDescription === true ? null : typeof raw.description === "string" ? raw.description.trim().slice(0, 1000) || null : undefined;
+    const estimatedMinutes = typeof raw.estimatedMinutes === "number" && Number.isFinite(raw.estimatedMinutes) ? Math.min(480, Math.max(5, raw.estimatedMinutes)) : undefined;
     const difficulty = Number.isInteger(Number(raw.difficulty)) ? Math.min(3, Math.max(1, Number(raw.difficulty))) : undefined;
     const blocked = typeof raw.blocked === "boolean" ? raw.blocked : undefined;
     const archived = typeof raw.archived === "boolean" ? raw.archived : undefined;
@@ -1053,24 +1124,44 @@ async function generateWorkspaceActionPlan(userId: string, message: string, hist
     subjects: subjects.slice(0, 40).map((subjectItem) => ({ id: subjectItem.id, name: subjectItem.name, archived: subjectItem.archived })),
   };
   const instruction = [
-    "Convert the user's requested workspace changes into strict JSON. Return JSON only.",
-    'Schema: {"summary":string,"operations":[{"type":"create_subject"|"update_subject"|"delete_subject"|"create_project"|"update_project"|"delete_project"|"create_task"|"update_task"|"delete_task"|"add_checklist_item","targetId"?:number,"name"?:string,"title"?:string,"color"?:string,"subject"?:string|null,"projectName"?:string|null,"priority"?:"critical"|"high"|"medium"|"low","dueDate"?:"YYYY-MM-DD"|null,"description"?:string|null,"estimatedMinutes"?:number|null,"difficulty"?:1|2|3,"status"?:string,"blocked"?:boolean,"archived"?:boolean}]}.',
-    "Use targetId from the supplied data for updates and deletes. Never guess an ID.",
-    "For a new project, include its subject. If that subject does not exist, create_subject must appear before create_project.",
-    "For tasks under a project, set projectName exactly. For tasks under only a subject, set subject and projectName null.",
-    "When asked to generate a study plan or several tasks, create specific actionable task operations, not one task containing the request.",
-    "Preserve explicit priority, dates, durations, names, and relationships. Do not navigate or claim execution.",
-    "Do not mark a task completed; completion awards require the normal task UI. You may change todo, backlog, and in_progress status.",
-    `Today is ${formatDate(new Date())}. Current workspace: ${JSON.stringify(context)}. User request: ${JSON.stringify(message)}`,
+    "Decide whether the user wants Velocity data changed or is asking for a general answer.",
+    "Set intent to workspace_changes whenever the desired result includes creating, saving, editing, organizing, rescheduling, archiving, or deleting tasks, projects, subjects, or checklist steps. Infer this semantically from the full request; do not depend on exact command words.",
+    "Set intent to workspace_query when the user wants to inspect, filter, count, or get advice about their saved Velocity data without changing it.",
+    "Set intent to general for math, explanations, essays, brainstorming, or a plan that should only be shown in chat. If the user asks both to develop a plan and add its work to Velocity, use workspace_changes and create every concrete operation needed.",
+    "For general and workspace_query intents, return an empty operations array. For workspace_changes, return all operations in dependency order.",
+    "For every unused nullable operation field return null. Set clearSubject, clearProject, clearDueDate, or clearDescription true only when the user explicitly asks to remove that value; otherwise each flag must be false. Use targetId from the current workspace for updates and deletes; never guess an ID.",
+    "A new project with a subject and tasks normally requires: create_subject only when missing, then create_project, then specific create_task operations whose projectName exactly matches the project name and whose subject matches the project subject.",
+    "Do not copy the user's whole sentence into a title. Make each title concise, specific, and actionable. Correct obvious typos while preserving names and meaning.",
+    "Preserve priorities, dates, durations, statuses, and relationships. A task or project without an explicit deadline must have dueDate null and must still be created.",
+    "When an update refers to an existing item, resolve it from the supplied workspace by meaning and use its exact ID. If the reference is genuinely ambiguous, choose general and explain the ambiguity in summary instead of guessing.",
+    "Task statuses may be todo, backlog, or in_progress. Project statuses may be active, planning, waiting, or completed. Task completion must use the normal task UI because it awards VP.",
+    `Today is ${formatDate(new Date())}. Current workspace: ${JSON.stringify(context)}. Current user request: ${JSON.stringify(message)}`,
   ].join(" ");
-  const first = await generateAssistantReply(instruction, "This is a structured workspace action-planning call. Output JSON only.", history.slice(-6), log);
-  let plan = validateWorkspacePlan(extractJsonObject(first.reply), current);
-  if (!plan) {
-    const repair = await generateAssistantReply(`Repair this result into the required operation schema using only valid IDs from this workspace: ${JSON.stringify(context)}. Preserve the request: ${JSON.stringify(message)}. Invalid result: ${first.reply}`, "Output one valid JSON object only.", [], log);
-    plan = validateWorkspacePlan(extractJsonObject(repair.reply), current);
+
+  try {
+    let value = await generateStrictWorkspaceDecision(instruction, history);
+    if (value.intent === "general" || value.intent === "workspace_query") return { intent: value.intent, plan: null, provider: "groq" as const };
+    let plan = value.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
+    if (!plan) {
+      value = await generateStrictWorkspaceDecision(`${instruction} Your previous decision could not be safely validated. Rebuild it with valid IDs, exact project names, complete dependency ordering, and at least one valid operation.`, history);
+      plan = value.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
+    }
+    if (!plan) throw new Error("The structured workspace decision was not actionable");
+    return { intent: "workspace_changes" as const, plan, provider: "groq" as const };
+  } catch (groqError) {
+    log?.warn?.({ err: groqError }, "Strict Groq workspace planning failed; using provider fallback");
+    const fallback = await generateAssistantReply(
+      `${instruction} Return JSON only using {"intent":"workspace_changes"|"workspace_query"|"general","summary":string,"operations":array}.`,
+      "This is a semantic intent and workspace planning call. Output one JSON object only.",
+      history.slice(-6),
+      log,
+    );
+    const value = extractJsonObject(fallback.reply);
+    if (value?.intent === "general" || value?.intent === "workspace_query") return { intent: value.intent, plan: null, provider: fallback.provider };
+    const plan = value?.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
+    if (!plan) throw new Error("The assistant could not produce a safe workspace preview. Please retry the request.");
+    return { intent: "workspace_changes" as const, plan, provider: fallback.provider };
   }
-  if (!plan) throw new Error("The assistant could not produce a safe workspace preview. Please name the task or project more specifically.");
-  return { plan, provider: first.provider };
 }
 
 async function inferTaskIntent(message: string, history: ChatHistoryMessage[], log?: AssistantLogger): Promise<ParsedTaskCommand | null> {
@@ -1160,26 +1251,56 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     }
 
     const history = parseHistory(req.body?.history);
-    if (looksLikeWorkspaceOperation(message)) {
-      const generated = await generateWorkspaceActionPlan(req.user.id, message, history, req.log);
+    const decision = await generateWorkspaceActionPlan(req.user.id, message, history, req.log);
+    if (decision.plan) {
       res.json({
         reply: [
-          generated.plan.summary,
+          decision.plan.summary,
           "**Proposed changes**",
-          ...generated.plan.operations.map((operation) => `- ${operation.label}`),
+          ...decision.plan.operations.map((operation) => `- ${operation.label}`),
           "Would you like me to apply these changes?",
         ].join("\n\n"),
-        provider: generated.provider,
+        provider: decision.provider,
         taskCreated: false,
         task: null,
         tasks: [],
         taskPreview: [],
-        workspacePreview: generated.plan,
+        workspacePreview: decision.plan,
         planPreview: null,
         actionPreview: null,
       });
       return;
     }
+
+    let semanticContext = "This is a general request. Do not create, update, or claim to save any Velocity data.";
+    if (decision.intent === "workspace_query") {
+      const [tasks, projects, subjects] = await Promise.all([
+        db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"))),
+        db.select().from(projectsTable).where(eq(projectsTable.userId, req.user.id)),
+        db.select().from(subjectsTable).where(eq(subjectsTable.userId, req.user.id)),
+      ]);
+      semanticContext = [
+        "Answer using only the user's actual Velocity workspace data. Do not invent records or claim changes.",
+        `Tasks: ${JSON.stringify(tasks.slice(0, 100).map((task) => ({ title: task.title, dueDate: task.dueDate, priority: task.priority, status: task.status, subject: task.subject, projectId: task.projectId, estimatedMinutes: task.estimatedMinutes, blocked: task.blocked })))}`,
+        `Projects: ${JSON.stringify(projects.slice(0, 60).map((project) => ({ id: project.id, name: project.name, subject: project.subject, priority: project.priority, dueDate: project.dueDate, status: project.status })))}`,
+        `Subjects: ${JSON.stringify(subjects.slice(0, 40).map((subject) => subject.name))}`,
+      ].join(" ");
+    }
+    const semanticReply = await generateAssistantReply(message, semanticContext, history, req.log);
+    res.json({
+      reply: cleanAssistantReply(semanticReply.reply),
+      provider: semanticReply.provider,
+      taskCreated: false,
+      task: null,
+      tasks: [],
+      taskPreview: [],
+      workspacePreview: null,
+      planPreview: null,
+      actionPreview: null,
+    });
+    return;
+
+    /* Legacy parser source retained temporarily for rollback reference.
     if (looksLikeMultiActionRequest(message)) {
       const generated = await generateActionPlan(message, history, req.log);
       const projectLine = generated.plan.project ? `**Project:** ${generated.plan.project.name}${generated.plan.project.subject ? ` · ${generated.plan.project.subject}` : ""}` : "";
@@ -1270,6 +1391,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       taskPreview,
       actionPreview: bulkReschedule ? { type: "reschedule-unfinished-tomorrow", count: (await db.select({ id: tasksTable.id }).from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed")))).length, label: "Move unfinished tasks to tomorrow" } : null,
     });
+    */
   } catch (err) {
     req.log?.error({ err }, "AI chat request failed");
     const message = err instanceof Error && err.message === "GROQ_API_KEY is not configured"
