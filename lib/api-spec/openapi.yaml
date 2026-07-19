@@ -686,6 +686,24 @@ components:
             $ref: "#/components/schemas/TaskLink"
         notes:
           type: ["string", "null"]
+        subject:
+          type: ["string", "null"]
+        taskKind:
+          type: string
+        externalSource:
+          type: ["string", "null"]
+        externalId:
+          type: ["string", "null"]
+        externalCourseId:
+          type: ["string", "null"]
+        externalUrl:
+          type: ["string", "null"]
+        dueAt:
+          type: ["string", "null"]
+        externalState:
+          type: ["string", "null"]
+        archived:
+          type: boolean
         checklistCount:
           type: integer
         checklistCompleted:

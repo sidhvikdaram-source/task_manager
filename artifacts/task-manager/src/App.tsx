@@ -19,6 +19,7 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { Loader2, Lock, Mail, User, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "@/theme";
+import { useCanvasSync } from "@/hooks/useCanvasSync";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -191,6 +192,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
+  useCanvasSync(true);
   return (
     <AppLayout>
       <Switch>

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { db, projectRequirementsTable, projectsTable, tasksTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -24,7 +24,7 @@ function projectInput(body: unknown, partial = false) {
 }
 
 async function enriched(project: typeof projectsTable.$inferSelect, userId: string) {
-  const [taskRows, requirements] = await Promise.all([db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), eq(tasksTable.userId, userId))), db.select().from(projectRequirementsTable).where(eq(projectRequirementsTable.projectId, project.id))]);
+  const [taskRows, requirements] = await Promise.all([db.select().from(tasksTable).where(and(eq(tasksTable.projectId, project.id), eq(tasksTable.userId, userId), eq(tasksTable.archived, false))), db.select().from(projectRequirementsTable).where(eq(projectRequirementsTable.projectId, project.id))]);
   const completed = taskRows.filter((task) => task.status === "completed").length;
   const taskById = new Map(taskRows.map((task) => [task.id, task]));
   const syncedRequirements = requirements.map((item) => ({ ...item, completed: item.taskId ? taskById.get(item.taskId)?.status === "completed" : item.completed }));
@@ -50,7 +50,7 @@ router.patch("/projects/:id", async (req, res): Promise<void> => {
   const [project] = await db.transaction(async (tx) => {
     const updated = await tx.update(projectsTable).set(input).where(and(eq(projectsTable.id, Number(req.params.id)), eq(projectsTable.userId, req.user.id))).returning();
     if (updated[0] && input.subject !== undefined) {
-      await tx.update(tasksTable).set({ subject: input.subject }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, updated[0].id)));
+      await tx.update(tasksTable).set({ subject: input.subject }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, updated[0].id), isNull(tasksTable.externalSource)));
     }
     return updated;
   });

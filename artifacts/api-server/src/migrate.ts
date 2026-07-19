@@ -143,6 +143,17 @@ export async function runMigrations(): Promise<void> {
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "difficulty" integer DEFAULT 2 NOT NULL;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "blocked" boolean DEFAULT false NOT NULL;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "organized" boolean DEFAULT true NOT NULL;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "external_integration_id" integer;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "external_source" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "external_id" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "external_course_id" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "external_url" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "due_at" timestamp with time zone;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "external_state" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "external_payload_hash" text;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "external_last_seen_at" timestamp with time zone;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "archived" boolean DEFAULT false NOT NULL;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "completion_awarded_at" timestamp with time zone;
 
       IF EXISTS (
         SELECT 1 FROM information_schema.columns
@@ -165,6 +176,99 @@ export async function runMigrations(): Promise<void> {
         ALTER TABLE "tasks" ALTER COLUMN "calendar_date" TYPE text USING "calendar_date"::date::text;
       END IF;
     END $$;
+  `);
+
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "tasks_external_source_unique"
+      ON "tasks" ("user_id", "external_source", "external_id")
+      WHERE "external_source" IS NOT NULL AND "external_id" IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS "external_integrations" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" varchar NOT NULL,
+      "provider" text DEFAULT 'canvas' NOT NULL,
+      "mode" text NOT NULL,
+      "base_url" text,
+      "access_token_encrypted" text,
+      "refresh_token_encrypted" text,
+      "feed_url_encrypted" text,
+      "token_expires_at" timestamp with time zone,
+      "external_user_id" text,
+      "status" text DEFAULT 'connected' NOT NULL,
+      "last_synced_at" timestamp with time zone,
+      "last_error" text,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("user_id", "provider")
+    );
+    CREATE TABLE IF NOT EXISTS "external_courses" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "integration_id" integer NOT NULL REFERENCES "external_integrations"("id") ON DELETE CASCADE,
+      "external_course_id" text NOT NULL,
+      "name" text NOT NULL,
+      "course_code" text,
+      "subject_id" integer,
+      "enabled" boolean DEFAULT true NOT NULL,
+      "workflow_state" text,
+      "last_seen_at" timestamp with time zone,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("integration_id", "external_course_id")
+    );
+    CREATE TABLE IF NOT EXISTS "external_calendar_events" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" varchar NOT NULL,
+      "integration_id" integer NOT NULL REFERENCES "external_integrations"("id") ON DELETE CASCADE,
+      "external_event_id" text NOT NULL,
+      "external_course_id" text,
+      "title" text NOT NULL,
+      "description" text,
+      "category" text DEFAULT 'Other' NOT NULL,
+      "starts_at" timestamp with time zone,
+      "ends_at" timestamp with time zone,
+      "all_day" boolean DEFAULT false NOT NULL,
+      "location" text,
+      "external_url" text,
+      "source_hash" text,
+      "last_seen_at" timestamp with time zone,
+      "archived" boolean DEFAULT false NOT NULL,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("integration_id", "external_event_id")
+    );
+    CREATE TABLE IF NOT EXISTS "integration_sync_runs" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "integration_id" integer NOT NULL REFERENCES "external_integrations"("id") ON DELETE CASCADE,
+      "status" text DEFAULT 'queued' NOT NULL,
+      "summary" jsonb DEFAULT '{}'::jsonb NOT NULL,
+      "error" text,
+      "started_at" timestamp with time zone,
+      "completed_at" timestamp with time zone,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS "external_sync_ignores" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "integration_id" integer NOT NULL REFERENCES "external_integrations"("id") ON DELETE CASCADE,
+      "external_type" text NOT NULL,
+      "external_id" text NOT NULL,
+      "title" text,
+      "reason" text,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("integration_id", "external_type", "external_id")
+    );
+    CREATE TABLE IF NOT EXISTS "project_suggestions" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "integration_id" integer NOT NULL REFERENCES "external_integrations"("id") ON DELETE CASCADE,
+      "external_course_id" text NOT NULL,
+      "fingerprint" text NOT NULL,
+      "name" text NOT NULL,
+      "external_task_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+      "status" text DEFAULT 'pending' NOT NULL,
+      "project_id" integer,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("integration_id", "fingerprint")
+    );
   `);
 
   // Create projects table

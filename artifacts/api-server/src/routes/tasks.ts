@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc, and, inArray } from "drizzle-orm";
-import { db, tasksTable, checklistItemsTable, userStatsTable, milestonesTable, projectsTable } from "@workspace/db";
+import { db, tasksTable, checklistItemsTable, projectsTable } from "@workspace/db";
+import { completeTaskAndAward, TaskNotFoundError } from "../lib/completeTask";
 import {
   ListTasksQueryParams,
   CreateTaskBody,
@@ -23,13 +24,6 @@ function taskMetadata(body: unknown) {
   if (typeof value.blocked === "boolean") update.blocked = value.blocked;
   if (typeof value.organized === "boolean") update.organized = value.organized;
   return update;
-}
-
-async function getOrCreateUserStats(userId: string) {
-  const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
-  if (stats) return stats;
-  const [newStats] = await db.insert(userStatsTable).values({ userId }).returning();
-  return newStats;
 }
 
 async function getTaskWithCounts(id: number, userId: string) {
@@ -69,7 +63,7 @@ router.get("/tasks", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const { status, priority, sortBy, projectId } = parsed.data;
-  const conditions: ReturnType<typeof eq>[] = [eq(tasksTable.userId, userId)];
+  const conditions: ReturnType<typeof eq>[] = [eq(tasksTable.userId, userId), eq(tasksTable.archived, false)];
   if (status) conditions.push(eq(tasksTable.status, status));
   if (priority) conditions.push(eq(tasksTable.priority, priority));
   if (projectId) conditions.push(eq(tasksTable.projectId, projectId));
@@ -132,6 +126,9 @@ router.patch("/tasks/bulk-reschedule", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const { taskIds, newDate } = parsed.data;
+  const selected = await db.select({ externalSource: tasksTable.externalSource }).from(tasksTable)
+    .where(and(inArray(tasksTable.id, taskIds), eq(tasksTable.userId, userId)));
+  if (selected.some((task) => task.externalSource)) { res.status(409).json({ error: "Canvas controls imported due dates. Remove Canvas tasks from this bulk action." }); return; }
   const updated = await db
     .update(tasksTable)
     .set({ dueDate: newDate })
@@ -161,6 +158,15 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
   const parsed = UpdateTaskBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const [existing] = await db.select().from(tasksTable)
+    .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)));
+  if (!existing) { res.status(404).json({ error: "Task not found" }); return; }
+  const protectedFields = ["title", "dueDate", "calendarDate", "startDate", "subject", "status"];
+  if (existing.externalSource && protectedFields.some((field) => Object.prototype.hasOwnProperty.call(parsed.data, field))) {
+    res.status(409).json({ error: "Canvas controls this task's title, course, due time, and submission state." });
+    return;
+  }
+
   const [task] = await db
     .update(tasksTable)
     .set({ ...parsed.data, ...taskMetadata(req.body) })
@@ -179,6 +185,9 @@ router.delete("/tasks/:id", async (req, res): Promise<void> => {
   const params = DeleteTaskParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
+  const [existing] = await db.select().from(tasksTable).where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)));
+  if (existing?.externalSource) { res.status(409).json({ error: "Use Remove from Velocity for Canvas tasks so they remain ignored on future syncs." }); return; }
+
   const [task] = await db
     .delete(tasksTable)
     .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)))
@@ -194,76 +203,20 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
 
   const params = CompleteTaskParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const taskId = params.data.id;
+  const [existing] = await db.select({ externalSource: tasksTable.externalSource }).from(tasksTable).where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)));
+  if (existing?.externalSource) { res.status(409).json({ error: "Canvas controls submission completion for this task." }); return; }
 
-  const [existing] = await db
-    .select()
-    .from(tasksTable)
-    .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)));
-  if (!existing) { res.status(404).json({ error: "Task not found" }); return; }
-
-  const [task] = await db
-    .update(tasksTable)
-    .set({ status: "completed", completedAt: new Date() })
-    .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)))
-    .returning();
-
-  const stats = await getOrCreateUserStats(userId);
-  const multiplier = stats.multiplier ?? 1.0;
-  const rawVp = task.vpValue ?? 10;
-  const vpAwarded = Math.round(rawVp * multiplier);
-  const newTotal = stats.totalVp + vpAwarded;
-  const newTierProgress = stats.tierProgress + vpAwarded;
-  const tierUps = Math.floor(newTierProgress / 100);
-  const newTier = stats.tier + tierUps;
-  const remainingProgress = newTierProgress % 100;
-
-  const today = new Date().toDateString();
-  const lastActivity = stats.lastActivityDate ? new Date(stats.lastActivityDate).toDateString() : null;
-  const yesterday = new Date(Date.now() - 86400000).toDateString();
-  let newStreak = stats.streakDays;
-  if (lastActivity === today) {
-    // same day, streak unchanged
-  } else if (lastActivity === yesterday) {
-    newStreak = stats.streakDays + 1;
-  } else {
-    newStreak = 1;
+  try {
+    const result = await completeTaskAndAward(userId, taskId);
+    const full = await getTaskWithCounts(result.task.id, userId);
+    res.json({ ...result, task: full });
+    return;
+  } catch (error) {
+    if (error instanceof TaskNotFoundError) { res.status(404).json({ error: error.message }); return; }
+    throw error;
   }
 
-  let newMultiplier = 1.0;
-  if (newStreak >= 14) newMultiplier = 2.0;
-  else if (newStreak >= 7) newMultiplier = 1.5;
-  else if (newStreak >= 3) newMultiplier = 1.2;
-
-  await db.update(userStatsTable).set({
-    totalVp: newTotal,
-    tier: newTier,
-    tierProgress: remainingProgress,
-    tasksCompleted: stats.tasksCompleted + 1,
-    streakDays: newStreak,
-    multiplier: newMultiplier,
-    lastActivityDate: new Date(),
-    updatedAt: new Date(),
-  }).where(eq(userStatsTable.id, stats.id));
-
-  const milestoneThresholds = [50, 100, 250, 500, 1000, 2500, 5000];
-  for (const threshold of milestoneThresholds) {
-    if (stats.totalVp < threshold && newTotal >= threshold) {
-      const titles: Record<number, [string, string]> = {
-        50: ["First Sprint", "Earned your first 50 VP"],
-        100: ["Century Mark", "Reached 100 total VP"],
-        250: ["Momentum Builder", "250 VP milestone achieved"],
-        500: ["High Velocity", "500 VP — serious momentum"],
-        1000: ["Elite Operator", "1000 VP — top 1% territory"],
-        2500: ["Velocity Master", "2500 VP milestone"],
-        5000: ["Legendary Status", "5000 VP achieved"],
-      };
-      const [title, description] = titles[threshold] ?? [`${threshold} VP`, `Reached ${threshold} VP`];
-      await db.insert(milestonesTable).values({ title, description, vpThreshold: threshold, achievedAt: new Date(), userId });
-    }
-  }
-
-  const full = await getTaskWithCounts(task.id, userId);
-  res.json({ task: full, vpAwarded, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null });
 });
 
 export default router;

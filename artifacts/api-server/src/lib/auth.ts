@@ -14,6 +14,8 @@ export interface SessionData {
   access_token: string;
   refresh_token?: string;
   expires_at?: number;
+  canvas_oauth_state?: string;
+  canvas_oauth_base_url?: string;
 }
 
 let oidcConfig: client.Configuration | null = null;

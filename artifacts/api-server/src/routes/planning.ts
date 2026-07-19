@@ -89,7 +89,7 @@ router.get("/recommendations/next", async (req, res): Promise<void> => {
   const minutes = Math.min(60, Math.max(10, Number(req.query.minutes) || 30));
   const energy: RecommendationEnergy = ["low","medium","high"].includes(String(req.query.energy)) ? String(req.query.energy) as RecommendationEnergy : "medium";
   const today = dateOnly(new Date());
-  const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"), eq(tasksTable.blocked, false)));
+  const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"), eq(tasksTable.blocked, false)));
   const scored = tasks.map((task) => ({ task, ranking: scoreTaskRecommendation(task, { minutes, energy, today }) }))
     .filter((item) => item.ranking.eligible)
     .sort((a,b) => b.ranking.score - a.ranking.score || a.task.title.localeCompare(b.task.title));
@@ -105,7 +105,7 @@ router.get("/weekly-review", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const weekStart = startOfWeek(); const weekEnd = addDays(weekStart, 7); const nextEnd = addDays(weekEnd, 7); const today = dateOnly(new Date());
   const [tasks, sessions, stats, projects, receipt] = await Promise.all([
-    db.select().from(tasksTable).where(eq(tasksTable.userId, req.user.id)),
+    db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false))),
     db.select().from(focusSessionsTable).where(and(eq(focusSessionsTable.userId, req.user.id), gte(focusSessionsTable.createdAt, weekStart), lt(focusSessionsTable.createdAt, weekEnd))),
     db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id)).then((rows) => rows[0]),
     db.select().from(projectsTable).where(and(eq(projectsTable.userId, req.user.id), eq(projectsTable.archived, false))),

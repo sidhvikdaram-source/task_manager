@@ -19,7 +19,7 @@ router.get("/analytics/summary", async (req, res): Promise<void> => {
   const criticalCompleted = await db
     .select()
     .from(tasksTable)
-    .where(and(eq(tasksTable.userId, userId), eq(tasksTable.status, "completed"), eq(tasksTable.priority, "critical")));
+    .where(and(eq(tasksTable.userId, userId), eq(tasksTable.archived, false), eq(tasksTable.status, "completed"), eq(tasksTable.priority, "critical")));
 
   res.json({
     totalVp: stats.totalVp,
@@ -40,7 +40,7 @@ router.get("/analytics/velocity", async (req, res): Promise<void> => {
   const completed = await db
     .select()
     .from(tasksTable)
-    .where(and(eq(tasksTable.userId, userId), eq(tasksTable.status, "completed"), gte(tasksTable.completedAt, thirtyDaysAgo)));
+    .where(and(eq(tasksTable.userId, userId), eq(tasksTable.archived, false), eq(tasksTable.status, "completed"), gte(tasksTable.completedAt, thirtyDaysAgo)));
 
   const dayMap: Record<string, { vp: number; tasksCompleted: number }> = {};
   for (let i = 29; i >= 0; i--) {
@@ -76,7 +76,7 @@ router.get("/analytics/milestones", async (req, res): Promise<void> => {
 router.get("/analytics/insights", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const stats = await getOrCreateUserStats(req.user.id);
-  const completed = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.status, "completed")));
+  const completed = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), eq(tasksTable.status, "completed")));
   const insights: Array<{ type: string; text: string; sampleSize: number }> = [];
 
   const hourCounts = new Array<number>(24).fill(0);
@@ -107,7 +107,7 @@ router.get("/dashboard/overview", async (req, res): Promise<void> => {
   const allTasks = await db
     .select()
     .from(tasksTable)
-    .where(eq(tasksTable.userId, userId))
+    .where(and(eq(tasksTable.userId, userId), eq(tasksTable.archived, false)))
     .orderBy(desc(tasksTable.createdAt));
 
   const today = new Date().toISOString().split("T")[0];

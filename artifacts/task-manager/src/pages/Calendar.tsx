@@ -17,15 +17,22 @@ import {
 } from 'date-fns';
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock, Flame, Plus, Target, Zap } from 'lucide-react';
 import { getListTasksQueryKey, Task, useListTasks } from '@workspace/api-client-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { TaskDetailsModal } from '@/components/TaskDetailsModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { CanvasSyncButton } from '@/components/CanvasSyncButton';
+import { toast } from 'sonner';
+
+type CanvasEvent={id:number;externalEventId:string;title:string;description:string|null;category:'Quiz/Test'|'Meeting'|'Class Event'|'Deadline'|'Other';startsAt:string|null;endsAt:string|null;allDay:boolean;location:string|null;externalUrl:string|null};
+const canvasCategories=['Quiz/Test','Meeting','Class Event','Deadline','Other'] as const;
 
 const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function taskDate(task: Task) {
+  if (task.dueAt) return format(new Date(task.dueAt), 'yyyy-MM-dd');
   return task.calendarDate || task.dueDate || task.startDate || null;
 }
 
@@ -52,15 +59,21 @@ function urgencyClass(tasks: Task[]) {
 }
 
 export default function Calendar() {
+  const queryClient=useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [createDate, setCreateDate] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [eventCategories,setEventCategories]=useState<Set<string>>(new Set(canvasCategories));
 
   const { data: tasks = [], isLoading } = useListTasks(
     { sortBy: 'dueDate' },
     { query: { queryKey: getListTasksQueryKey({ sortBy: 'dueDate' }), refetchOnMount: 'always' } },
   );
+  const {data:canvasEvents=[]}=useQuery({queryKey:['canvas-events'],queryFn:async()=>{const response=await fetch('/api/canvas/events',{credentials:'include'});if(!response.ok)return[];return response.json() as Promise<CanvasEvent[]>}});
+  const visibleEvents=canvasEvents.filter((event)=>eventCategories.has(event.category));
+  const eventsOn=(day:Date)=>visibleEvents.filter((event)=>event.startsAt&&isSameDay(new Date(event.startsAt),day));
+  const ignoreEvent=async(event:CanvasEvent)=>{if(!window.confirm('Remove this event from Velocity? Canvas itself will not be changed.'))return;const response=await fetch('/api/canvas/ignore',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({externalType:'event',externalId:event.externalEventId})});if(response.ok){await queryClient.invalidateQueries({queryKey:['canvas-events']});toast.success('Canvas event removed from Velocity')}};
 
   const days = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -108,6 +121,7 @@ export default function Calendar() {
           </div>
 
           <div className="flex items-center gap-2">
+            <CanvasSyncButton />
             <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -126,6 +140,8 @@ export default function Calendar() {
         </div>
       </section>
 
+      {canvasEvents.length>0&&<div className="flex flex-wrap items-center gap-2"><span className="text-xs font-bold text-muted-foreground">Canvas events</span>{canvasCategories.map((category)=><button key={category} onClick={()=>setEventCategories((current)=>{const next=new Set(current);if(next.has(category))next.delete(category);else next.add(category);return next})} className={cn('rounded-lg border px-2 py-1 text-[11px] font-bold',eventCategories.has(category)?'border-primary/50 bg-primary/10 text-primary':'text-muted-foreground')}>{category}</button>)}</div>}
+
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-5">
         <section className="bento-card overflow-hidden">
           <div className="grid grid-cols-7 border-b neon-rule bg-white/[0.03]">
@@ -139,6 +155,7 @@ export default function Calendar() {
           <div className="grid grid-cols-7">
             {days.map((day, index) => {
               const dayTasks = activeTasks.filter((task) => matchesDate(task, day));
+              const dayEvents=eventsOn(day);
               const isCurrentMonth = isSameMonth(day, currentMonth);
               const selected = isSameDay(day, selectedDate);
 
@@ -201,6 +218,7 @@ export default function Calendar() {
                         +{dayTasks.length - 3} more
                       </span>
                     )}
+                    {dayEvents.slice(0,Math.max(0,3-Math.min(dayTasks.length,3))).map((event)=><span key={`event-${event.id}`} className="block truncate rounded-lg border border-[#0f6cbf]/40 bg-[#0f6cbf]/10 px-2 py-1 text-[11px] font-bold text-[#0f6cbf]">{event.title}</span>)}
                   </div>
                 </motion.div>
               );
@@ -261,6 +279,7 @@ export default function Calendar() {
               ))
             )}
           </div>
+          {eventsOn(selectedDate).length>0&&<div className="mt-5 border-t pt-4"><p className="mb-2 text-xs font-black uppercase text-muted-foreground">Canvas events</p><div className="space-y-2">{eventsOn(selectedDate).map((event)=><div key={event.id} className="rounded-xl border border-[#0f6cbf]/30 p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-bold">{event.title}</p><p className="mt-1 text-xs text-muted-foreground">{event.category}{event.startsAt?` · ${new Date(event.startsAt).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`:''}</p></div><button onClick={()=>void ignoreEvent(event)} className="text-[10px] font-bold text-destructive">Remove</button></div>{event.externalUrl&&<a href={event.externalUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-bold text-primary">Open in Canvas</a>}</div>)}</div></div>}
         </aside>
       </div>
 

@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import Groq from "groq-sdk";
 import { Router, type IRouter } from "express";
 import { checklistItemsTable, db, projectsTable, subjectsTable, tasksTable } from "@workspace/db";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -1113,7 +1113,7 @@ function validateWorkspacePlan(
 
 async function generateWorkspaceActionPlan(userId: string, message: string, history: ChatHistoryMessage[], log?: AssistantLogger) {
   const [tasks, projects, subjects] = await Promise.all([
-    db.select().from(tasksTable).where(eq(tasksTable.userId, userId)),
+    db.select().from(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.archived, false))),
     db.select().from(projectsTable).where(eq(projectsTable.userId, userId)),
     db.select().from(subjectsTable).where(eq(subjectsTable.userId, userId)),
   ]);
@@ -1275,7 +1275,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
     let semanticContext = "This is a general request. Do not create, update, or claim to save any Velocity data.";
     if (decision.intent === "workspace_query") {
       const [tasks, projects, subjects] = await Promise.all([
-        db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"))),
+        db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"))),
         db.select().from(projectsTable).where(eq(projectsTable.userId, req.user.id)),
         db.select().from(subjectsTable).where(eq(subjectsTable.userId, req.user.id)),
       ]);
@@ -1357,7 +1357,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       taskPreview = [parsedCommand];
     }
 
-    const activeTasks = dataQuestion ? await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"))) : [];
+    const activeTasks = dataQuestion ? await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"))) : [];
     const relevantTasks = activeTasks.sort((a, b) => (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31")).slice(0, 12);
     const taskContext = bulkReschedule
       ? "The user requested a bulk reschedule. Do not claim it happened. Tell them a confirmation preview is ready."
@@ -1389,7 +1389,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       task: null,
       tasks: [],
       taskPreview,
-      actionPreview: bulkReschedule ? { type: "reschedule-unfinished-tomorrow", count: (await db.select({ id: tasksTable.id }).from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed")))).length, label: "Move unfinished tasks to tomorrow" } : null,
+      actionPreview: bulkReschedule ? { type: "reschedule-unfinished-tomorrow", count: (await db.select({ id: tasksTable.id }).from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"), isNull(tasksTable.externalSource)))).length, label: "Move unfinished tasks to tomorrow" } : null,
     });
     */
   } catch (err) {
@@ -1423,7 +1423,7 @@ router.post("/ai/tasks/confirm", async (req, res): Promise<void> => {
 router.post("/ai/workspace/confirm", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const [tasks, projects, subjects] = await Promise.all([
-    db.select().from(tasksTable).where(eq(tasksTable.userId, req.user.id)),
+    db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false))),
     db.select().from(projectsTable).where(eq(projectsTable.userId, req.user.id)),
     db.select().from(subjectsTable).where(eq(subjectsTable.userId, req.user.id)),
   ]);
@@ -1517,6 +1517,7 @@ router.post("/ai/workspace/confirm", async (req, res): Promise<void> => {
       } else if (operation.type === "update_task") {
         const existing = taskMap.get(operation.targetId);
         if (!existing) throw new Error("Task no longer exists.");
+        if (existing.externalSource && (operation.title || operation.subject !== undefined || operation.dueDate !== undefined || operation.status)) throw new Error("Canvas controls that task's title, course, due time, and submission state.");
         const project = operation.projectName ? projectNameMap.get(operation.projectName.toLowerCase()) : operation.projectName === null ? null : undefined;
         if (operation.projectName && !project) throw new Error(`Project ${operation.projectName} no longer exists.`);
         const resolvedSubject = operation.subject !== undefined ? operation.subject : project !== undefined ? project?.subject ?? null : undefined;
@@ -1527,6 +1528,7 @@ router.post("/ai/workspace/confirm", async (req, res): Promise<void> => {
       } else if (operation.type === "delete_task") {
         const existing = taskMap.get(operation.targetId);
         if (!existing) throw new Error("Task no longer exists.");
+        if (existing.externalSource) throw new Error("Use Remove from Velocity for Canvas tasks so future syncs keep them ignored.");
         await tx.delete(tasksTable).where(and(eq(tasksTable.id, existing.id), eq(tasksTable.userId, req.user.id)));
         taskMap.delete(existing.id);
       } else if (operation.type === "add_checklist_item") {
@@ -1564,7 +1566,7 @@ router.post("/ai/plans/confirm", async (req, res): Promise<void> => {
       }
     }
     const existingProjectTasks = project
-      ? await tx.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, project.id)))
+      ? await tx.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, project.id), eq(tasksTable.archived, false)))
       : [];
     const tasksToCreate = plan.tasks.filter((task) => !existingProjectTasks.some((existing) =>
       existing.title.toLowerCase() === task.title.toLowerCase() && existing.dueDate === task.dueDate
@@ -1599,7 +1601,7 @@ router.post("/ai/actions/confirm", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   if (req.body?.type !== "reschedule-unfinished-tomorrow") { res.status(400).json({ error: "Unknown action." }); return; }
   const tomorrow = formatDate(addDays(1));
-  const updated = await db.update(tasksTable).set({ dueDate: tomorrow, calendarDate: tomorrow }).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"))).returning({ id: tasksTable.id });
+  const updated = await db.update(tasksTable).set({ dueDate: tomorrow, calendarDate: tomorrow }).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"), isNull(tasksTable.externalSource))).returning({ id: tasksTable.id });
   res.json({ updated: updated.length, date: tomorrow });
 });
 

@@ -24,6 +24,16 @@ services:
         generateValue: true
       - key: OIDC_ISSUER_URL
         value: https://accounts.google.com
+      - key: CANVAS_BASE_URL
+        value: https://fisd.instructure.com
+      - key: CANVAS_INTEGRATION_ENCRYPTION_KEY
+        generateValue: true
+      - key: CANVAS_CLIENT_ID
+        sync: false
+      - key: CANVAS_CLIENT_SECRET
+        sync: false
+      - key: CANVAS_REDIRECT_URI
+        sync: false
 
 databases:
   - name: task-manager-db

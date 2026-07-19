@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Trash2, Plus, X, Link as LinkIcon, Clock, ExternalLink } from 'lucide-react';
+import { Trash2, Plus, X, Link as LinkIcon, Clock, ExternalLink, BookOpenCheck } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
@@ -115,6 +115,7 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
   const checklistTotal = checklist?.length ?? 0;
   const checklistDone = checklist?.filter((item) => item.completed).length ?? 0;
   const checklistProgress = checklistTotal > 0 ? (checklistDone / checklistTotal) * 100 : 0;
+  const isCanvasTask = task?.externalSource === 'canvas';
 
   const handleBreakDownTask = () => {
     if (!task || createChecklistItem.isPending) return;
@@ -138,6 +139,15 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
     toast.success('Action steps added');
   };
 
+  const handleRemoveCanvasTask = async () => {
+    if (!task?.externalId || !window.confirm('Remove this assignment from Velocity? Canvas itself will not be changed, and future syncs will keep it ignored.')) return;
+    const response = await fetch('/api/canvas/ignore', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ externalType: 'assignment', externalId: task.externalId }) });
+    if (!response.ok) { toast.error('Could not remove the Canvas assignment'); return; }
+    toast.success('Removed from Velocity. Canvas was not changed.');
+    await queryClient.invalidateQueries();
+    onOpenChange(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
@@ -153,10 +163,12 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
           </div>
         ) : task ? (
           <div className="space-y-5 mt-2">
+            {isCanvasTask && <div className="rounded-lg border border-[#0f6cbf]/35 bg-[#0f6cbf]/8 p-3"><div className="flex items-center gap-2"><BookOpenCheck className="h-4 w-4 text-[#0f6cbf]"/><span className="text-sm font-bold">Synced from Canvas</span><span className="ml-auto text-[10px] font-bold uppercase text-muted-foreground">{task.externalState?.replace('_',' ')}</span></div><p className="mt-1 text-xs text-muted-foreground">Canvas controls the title, course, due time, and submission state. Your priority, estimates, notes, project, and checklist stay private to Velocity.</p>{task.externalUrl&&<a href={task.externalUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#0f6cbf]">Open in Canvas <ExternalLink className="h-3 w-3"/></a>}</div>}
             <div>
               <label className="text-sm font-medium mb-1.5 block">Title</label>
               <Input
                 defaultValue={task.title}
+                disabled={isCanvasTask}
                 onBlur={(e) => { if (e.target.value !== task.title) handleUpdate('title', e.target.value); }}
               />
             </div>
@@ -187,7 +199,7 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Status</label>
                 <Select value={task.status} onValueChange={(val) => handleUpdate('status', val)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger disabled={isCanvasTask}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>
@@ -223,6 +235,7 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
                 <Input
                   type="date"
                   defaultValue={task.startDate || ''}
+                  disabled={isCanvasTask}
                   onBlur={(e) => handleUpdate('startDate', e.target.value || null)}
                 />
               </div>
@@ -233,6 +246,7 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
                 <Input
                   type="date"
                   defaultValue={task.dueDate || ''}
+                  disabled={isCanvasTask}
                   onBlur={(e) => handleUpdate('dueDate', e.target.value || null)}
                 />
               </div>
@@ -408,9 +422,9 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
             </div>
 
             <DialogFooter className="pt-3 border-t sm:justify-between">
-              <Button variant="destructive" onClick={handleDeleteTask} disabled={deleteTask.isPending}>
+              <Button variant="destructive" onClick={isCanvasTask ? handleRemoveCanvasTask : handleDeleteTask} disabled={deleteTask.isPending}>
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete
+                {isCanvasTask ? 'Remove from Velocity' : 'Delete'}
               </Button>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close

@@ -13,6 +13,7 @@ import socialRouter from "./social";
 import rewardsRouter from "./rewards";
 import planningRouter from "./planning";
 import quickCaptureRouter from "./quickCapture";
+import canvasRouter from "./canvas";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(socialRouter);
 router.use(rewardsRouter);
 router.use(planningRouter);
 router.use(quickCaptureRouter);
+router.use(canvasRouter);
 
 export default router;
