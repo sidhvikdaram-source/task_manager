@@ -115,7 +115,8 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
   const checklistTotal = checklist?.length ?? 0;
   const checklistDone = checklist?.filter((item) => item.completed).length ?? 0;
   const checklistProgress = checklistTotal > 0 ? (checklistDone / checklistTotal) * 100 : 0;
-  const isCanvasTask = task?.externalSource === 'canvas';
+  const isCanvasTask = Boolean(task?.externalSource?.startsWith('canvas'));
+  const canvasControlsCompletion = task?.externalSource === 'canvas';
 
   const handleBreakDownTask = () => {
     if (!task || createChecklistItem.isPending) return;
@@ -141,7 +142,7 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
 
   const handleRemoveCanvasTask = async () => {
     if (!task?.externalId || !window.confirm('Remove this assignment from Velocity? Canvas itself will not be changed, and future syncs will keep it ignored.')) return;
-    const response = await fetch('/api/canvas/ignore', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ externalType: 'assignment', externalId: task.externalId }) });
+    const response = await fetch('/api/canvas/ignore', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ externalType: task.externalSource === 'canvas_event' ? 'event' : 'assignment', externalId: task.externalId }) });
     if (!response.ok) { toast.error('Could not remove the Canvas assignment'); return; }
     toast.success('Removed from Velocity. Canvas was not changed.');
     await queryClient.invalidateQueries();
@@ -163,7 +164,7 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
           </div>
         ) : task ? (
           <div className="space-y-5 mt-2">
-            {isCanvasTask && <div className="rounded-lg border border-[#0f6cbf]/35 bg-[#0f6cbf]/8 p-3"><div className="flex items-center gap-2"><BookOpenCheck className="h-4 w-4 text-[#0f6cbf]"/><span className="text-sm font-bold">Synced from Canvas</span><span className="ml-auto text-[10px] font-bold uppercase text-muted-foreground">{task.externalState?.replace('_',' ')}</span></div><p className="mt-1 text-xs text-muted-foreground">Canvas controls the title, course, due time, and submission state. Your priority, estimates, notes, project, and checklist stay private to Velocity.</p>{task.externalUrl&&<a href={task.externalUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#0f6cbf]">Open in Canvas <ExternalLink className="h-3 w-3"/></a>}</div>}
+            {isCanvasTask && <div className="rounded-lg border border-[#0f6cbf]/35 bg-[#0f6cbf]/8 p-3"><div className="flex items-center gap-2"><BookOpenCheck className="h-4 w-4 text-[#0f6cbf]"/><span className="text-sm font-bold">Synced from Canvas</span><span className="ml-auto text-[10px] font-bold uppercase text-muted-foreground">{task.externalState?.replace('_',' ')}</span></div><p className="mt-1 text-xs text-muted-foreground">Canvas controls the title, course, and due time.{canvasControlsCompletion?' Canvas submission status controls completion.':' You can complete this calendar item inside Velocity.'} Your priority, estimates, notes, project, and checklist stay private to Velocity.</p>{task.externalUrl&&<a href={task.externalUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[#0f6cbf]">Open in Canvas <ExternalLink className="h-3 w-3"/></a>}</div>}
             <div>
               <label className="text-sm font-medium mb-1.5 block">Title</label>
               <Input
@@ -199,7 +200,7 @@ export function TaskDetailsModal({ taskId, open, onOpenChange }: TaskDetailsModa
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Status</label>
                 <Select value={task.status} onValueChange={(val) => handleUpdate('status', val)}>
-                  <SelectTrigger disabled={isCanvasTask}><SelectValue /></SelectTrigger>
+                  <SelectTrigger disabled={canvasControlsCompletion}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todo">To Do</SelectItem>
                     <SelectItem value="in_progress">In Progress</SelectItem>

@@ -10,6 +10,7 @@ import { getSession, getSessionId, updateSession } from "../lib/auth";
 import { validateCanvasUrl, validateOAuthState } from "../lib/canvasClient";
 import { discoverCanvasCourses, runCanvasSync } from "../lib/canvasSync";
 import { encryptIntegrationSecret, redactIntegrationError } from "../lib/integrationCrypto";
+import { suggestCanvasSubject } from "../lib/canvasRules";
 
 const router: IRouter = Router();
 const allowedCategories = new Set(["Quiz/Test", "Meeting", "Class Event", "Deadline", "Other"]);
@@ -154,7 +155,7 @@ router.post("/canvas/ignore", async (req, res): Promise<void> => {
   for (const externalId of ids.filter(Boolean)) {
     let title: string | null = null;
     if (externalType === "assignment") { const [task] = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalId, externalId))); title = task?.title ?? null; await db.update(tasksTable).set({ archived: true }).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalId, externalId))); }
-    else { const [event] = await db.select().from(externalCalendarEventsTable).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.externalEventId, externalId))); title = event?.title ?? null; await db.update(externalCalendarEventsTable).set({ archived: true }).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.externalEventId, externalId))); }
+    else { const [event] = await db.select().from(externalCalendarEventsTable).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.externalEventId, externalId))); title = event?.title ?? null; await db.update(externalCalendarEventsTable).set({ archived: true }).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.externalEventId, externalId))); await db.update(tasksTable).set({ archived: true }).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalSource, "canvas_event"), eq(tasksTable.externalId, externalId))); }
     await db.insert(externalSyncIgnoresTable).values({ integrationId: integration.id, externalType, externalId, title, reason: typeof req.body?.reason === "string" ? req.body.reason.slice(0, 200) : "Removed from Velocity" }).onConflictDoNothing();
   }
   res.status(201).json({ ignored: ids.filter(Boolean).length });
@@ -166,7 +167,7 @@ router.post("/canvas/ignored/:id/restore", async (req, res): Promise<void> => {
   const [item] = await db.delete(externalSyncIgnoresTable).where(and(eq(externalSyncIgnoresTable.id, Number(req.params.id)), eq(externalSyncIgnoresTable.integrationId, integration.id))).returning();
   if (!item) { res.status(404).json({ error: "Ignored item not found" }); return; }
   if (item.externalType === "assignment") await db.update(tasksTable).set({ archived: false }).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalId, item.externalId)));
-  else await db.update(externalCalendarEventsTable).set({ archived: false }).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.externalEventId, item.externalId)));
+  else { await db.update(externalCalendarEventsTable).set({ archived: false }).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.externalEventId, item.externalId))); await db.update(tasksTable).set({ archived: false }).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalSource, "canvas_event"), eq(tasksTable.externalId, item.externalId))); }
   res.json({ restored: true, syncRequired: true });
 });
 
@@ -176,8 +177,50 @@ router.delete("/canvas/ignored/:id", async (req, res): Promise<void> => {
   const [item] = await db.select().from(externalSyncIgnoresTable).where(and(eq(externalSyncIgnoresTable.id, Number(req.params.id)), eq(externalSyncIgnoresTable.integrationId, integration.id)));
   if (!item) { res.status(404).json({ error: "Ignored item not found" }); return; }
   if (item.externalType === "assignment") await db.delete(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalId, item.externalId)));
-  else await db.delete(externalCalendarEventsTable).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.externalEventId, item.externalId)));
+  else { await db.delete(externalCalendarEventsTable).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.externalEventId, item.externalId))); await db.delete(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalSource, "canvas_event"), eq(tasksTable.externalId, item.externalId))); }
   res.sendStatus(204);
+});
+
+router.get("/canvas/organization-suggestions", async (req, res): Promise<void> => {
+  const userId = requireUser(req, res); if (!userId) return; const integration = await integrationFor(userId);
+  if (!integration) { res.json([]); return; }
+  const [tasks, subjects] = await Promise.all([
+    db.select().from(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalSource, "canvas_event"), eq(tasksTable.archived, false), eq(tasksTable.organized, false))),
+    db.select().from(subjectsTable).where(and(eq(subjectsTable.userId, userId), eq(subjectsTable.archived, false))),
+  ]);
+  res.json(tasks.map((task) => ({ taskId: task.id, title: task.title, category: task.taskKind, suggestion: suggestCanvasSubject(task.title, subjects) })));
+});
+
+router.post("/canvas/organization-suggestions/apply", async (req, res): Promise<void> => {
+  const userId = requireUser(req, res); if (!userId) return; const integration = await integrationFor(userId);
+  if (!integration) { res.status(404).json({ error: "Canvas connection not found" }); return; }
+  const requested = Array.isArray(req.body?.suggestions) ? req.body.suggestions.slice(0, 500) as Array<{ taskId?: unknown; subjectId?: unknown }> : [];
+  const subjects = await db.select().from(subjectsTable).where(and(eq(subjectsTable.userId, userId), eq(subjectsTable.archived, false)));
+  const subjectById = new Map(subjects.map((subject) => [subject.id, subject])); let updated = 0;
+  for (const item of requested) {
+    const taskId = Number(item.taskId); const subject = subjectById.get(Number(item.subjectId)); if (!Number.isInteger(taskId) || !subject) continue;
+    const [task] = await db.update(tasksTable).set({ subject: subject.name, organized: true }).where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalSource, "canvas_event"))).returning({ id: tasksTable.id });
+    if (task) updated += 1;
+  }
+  res.json({ updated });
+});
+
+router.delete("/canvas/items", async (req, res): Promise<void> => {
+  const userId = requireUser(req, res); if (!userId) return; const integration = await integrationFor(userId);
+  if (!integration) { res.status(404).json({ error: "Canvas connection not found" }); return; }
+  const [tasks, events] = await Promise.all([
+    db.select().from(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id))),
+    db.select().from(externalCalendarEventsTable).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id))),
+  ]);
+  const ignores = new Map<string, { integrationId: number; externalType: string; externalId: string; title: string; reason: string }>();
+  for (const task of tasks) if (task.externalId) { const externalType = task.externalSource === "canvas_event" ? "event" : "assignment"; ignores.set(`${externalType}:${task.externalId}`, { integrationId: integration.id, externalType, externalId: task.externalId, title: task.title, reason: "Removed all Canvas items" }); }
+  for (const event of events) ignores.set(`event:${event.externalEventId}`, { integrationId: integration.id, externalType: "event", externalId: event.externalEventId, title: event.title, reason: "Removed all Canvas items" });
+  await db.transaction(async (tx) => {
+    if (ignores.size) await tx.insert(externalSyncIgnoresTable).values([...ignores.values()]).onConflictDoNothing();
+    await tx.update(tasksTable).set({ archived: true }).where(and(eq(tasksTable.userId, userId), eq(tasksTable.externalIntegrationId, integration.id)));
+    await tx.update(externalCalendarEventsTable).set({ archived: true, updatedAt: new Date() }).where(and(eq(externalCalendarEventsTable.userId, userId), eq(externalCalendarEventsTable.integrationId, integration.id)));
+  });
+  res.json({ removedTasks: tasks.length, removedEvents: events.length, ignoredItems: ignores.size });
 });
 
 router.get("/canvas/suggestions", async (req, res): Promise<void> => {

@@ -161,7 +161,7 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(tasksTable)
     .where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)));
   if (!existing) { res.status(404).json({ error: "Task not found" }); return; }
-  const protectedFields = ["title", "dueDate", "calendarDate", "startDate", "subject", "status"];
+  const protectedFields = ["title", "dueDate", "calendarDate", "startDate", "subject", ...(existing.externalSource === "canvas" ? ["status"] : [])];
   if (existing.externalSource && protectedFields.some((field) => Object.prototype.hasOwnProperty.call(parsed.data, field))) {
     res.status(409).json({ error: "Canvas controls this task's title, course, due time, and submission state." });
     return;
@@ -205,7 +205,7 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const taskId = params.data.id;
   const [existing] = await db.select({ externalSource: tasksTable.externalSource }).from(tasksTable).where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)));
-  if (existing?.externalSource) { res.status(409).json({ error: "Canvas controls submission completion for this task." }); return; }
+  if (existing?.externalSource === "canvas") { res.status(409).json({ error: "Canvas controls submission completion for this task." }); return; }
 
   try {
     const result = await completeTaskAndAward(userId, taskId);

@@ -9,7 +9,7 @@ import {
 import { canvasPaginated } from "./canvasClient";
 import { completeTaskAndAward } from "./completeTask";
 import { decryptIntegrationSecret, encryptIntegrationSecret, redactIntegrationError } from "./integrationCrypto";
-import { canvasEventCategory, icalOccurrenceId, isMeaningfulProjectCandidate, normalizeCanvasChainTitle } from "./canvasRules";
+import { canvasCategoryTaskKind, canvasEventCategory, icalOccurrenceId, isMeaningfulProjectCandidate, normalizeCanvasChainTitle } from "./canvasRules";
 
 type Integration = typeof externalIntegrationsTable.$inferSelect;
 type CanvasCourse = { id: number; name: string; course_code?: string; workflow_state?: string };
@@ -53,7 +53,8 @@ async function upsertAssignment(integration: Integration, course: typeof externa
   const now = new Date();
   const dueAt = assignment.due_at ? new Date(assignment.due_at) : null;
   const dueDate = assignment.due_at?.slice(0, 10) ?? null;
-  const taskKind = assignment.is_quiz_assignment || assignment.quiz_id ? "quiz" : "assignment";
+  const category = assignment.is_quiz_assignment || assignment.quiz_id ? "Quiz/Test" : canvasEventCategory(assignment.name);
+  const taskKind = canvasCategoryTaskKind(category);
   const externalState = assignment.submission?.workflow_state ?? (assignment.published === false ? "unpublished" : "unsubmitted");
   const sourceHash = hash({ name: assignment.name, due: assignment.due_at, url: assignment.html_url, state: externalState, course: course.externalCourseId });
   const [existing] = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, integration.userId), eq(tasksTable.externalSource, "canvas"), eq(tasksTable.externalId, externalId)));
@@ -65,7 +66,7 @@ async function upsertAssignment(integration: Integration, course: typeof externa
   } as const;
   let taskId: number;
   if (!existing) {
-    const [created] = await db.insert(tasksTable).values({ ...values, status: "todo", priority: "medium", vpValue: taskKind === "quiz" ? 15 : 10 }).returning();
+    const [created] = await db.insert(tasksTable).values({ ...values, status: "todo", priority: "medium", vpValue: category === "Quiz/Test" ? 15 : 10 }).returning();
     taskId = created.id; summary.newTasks += 1;
   } else {
     taskId = existing.id;
@@ -77,6 +78,34 @@ async function upsertAssignment(integration: Integration, course: typeof externa
     if (result.vpAwarded > 0 || existing?.status !== "completed") summary.completedTasks += 1;
   } else if (existing?.status === "completed" && existing.externalState && completedSubmission({ ...assignment, submission: { workflow_state: existing.externalState } })) {
     await db.update(tasksTable).set({ status: "todo", completedAt: null }).where(eq(tasksTable.id, taskId));
+  }
+}
+
+async function upsertCalendarTask(input: {
+  integration: Integration; externalId: string; title: string; description: string | null;
+  startsAt: Date; externalCourseId: string | null; externalUrl: string | null;
+  externalState: string | null; subjectName: string | null; archived: boolean; summary: SyncSummary;
+}) {
+  const category = canvasEventCategory(input.title);
+  const sourceHash = hash({ title: input.title, description: input.description, startsAt: input.startsAt, category, state: input.externalState });
+  const [existing] = await db.select().from(tasksTable).where(and(
+    eq(tasksTable.userId, input.integration.userId), eq(tasksTable.externalSource, "canvas_event"), eq(tasksTable.externalId, input.externalId),
+  ));
+  const now = new Date(); const dueDate = input.startsAt.toISOString().slice(0, 10);
+  const subject = input.subjectName ?? existing?.subject ?? null;
+  const values = {
+    userId: input.integration.userId, title: input.title.trim().slice(0, 300), description: input.description,
+    subject, taskKind: canvasCategoryTaskKind(category), dueDate, calendarDate: dueDate, dueAt: input.startsAt,
+    organized: Boolean(subject), externalIntegrationId: input.integration.id, externalSource: "canvas_event",
+    externalId: input.externalId, externalCourseId: input.externalCourseId, externalUrl: input.externalUrl,
+    externalState: input.externalState, externalPayloadHash: sourceHash, externalLastSeenAt: now, archived: input.archived,
+  } as const;
+  if (!existing) {
+    await db.insert(tasksTable).values({ ...values, status: "todo", priority: category === "Quiz/Test" ? "high" : "medium", vpValue: category === "Quiz/Test" ? 15 : 5 }).returning();
+    input.summary.newTasks += 1;
+  } else {
+    if (existing.externalPayloadHash !== sourceHash || existing.archived !== input.archived) input.summary.updatedTasks += 1;
+    await db.update(tasksTable).set(values).where(eq(tasksTable.id, existing.id));
   }
 }
 
@@ -149,6 +178,8 @@ async function syncOAuth(integration: Integration, summary: SyncSummary) {
   eventUrl.searchParams.set("type", "event"); eventUrl.searchParams.set("start_date", start.toISOString()); eventUrl.searchParams.set("end_date", end.toISOString()); eventUrl.searchParams.set("per_page", "100");
   for (const course of courses) eventUrl.searchParams.append("context_codes[]", `course_${course.externalCourseId}`);
   const events = courses.length ? await canvasPaginated<CanvasEvent>(eventUrl.toString(), token) : [];
+  const mappedSubjects = await db.select().from(subjectsTable).where(eq(subjectsTable.userId, integration.userId));
+  const subjectNameByCourse = new Map(courses.map((course) => [course.externalCourseId, mappedSubjects.find((subject) => subject.id === course.subjectId)?.name ?? null]));
   const seenEvents = new Set<string>();
   for (const event of events) {
     const externalId = String(event.id); if (ignored.has(`event:${externalId}`)) continue;
@@ -162,11 +193,19 @@ async function syncOAuth(integration: Integration, summary: SyncSummary) {
         description: event.description ?? null, category: canvasEventCategory(event.title), startsAt: event.start_at ? new Date(event.start_at) : null,
         endsAt: event.end_at ? new Date(event.end_at) : null, allDay: Boolean(event.all_day), location: event.location_name ?? null,
         externalUrl: event.html_url ?? null, sourceHash: payloadHash, lastSeenAt: now, archived: event.workflow_state === "deleted", updatedAt: now } });
+    const externalCourseId = event.context_code?.replace(/^course_/, "") ?? null;
+    if (event.start_at) await upsertCalendarTask({ integration, externalId, title: event.title, description: event.description ?? null,
+      startsAt: new Date(event.start_at), externalCourseId, externalUrl: event.html_url ?? null, externalState: event.workflow_state ?? null,
+      subjectName: externalCourseId ? subjectNameByCourse.get(externalCourseId) ?? null : null, archived: event.workflow_state === "deleted", summary });
     summary.calendarEvents += 1;
   }
   const importedEvents = await db.select().from(externalCalendarEventsTable).where(and(eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.archived, false)));
   for (const event of importedEvents) {
     if (!seenEvents.has(event.externalEventId)) { await db.update(externalCalendarEventsTable).set({ archived: true, updatedAt: new Date() }).where(eq(externalCalendarEventsTable.id, event.id)); summary.archivedItems += 1; }
+  }
+  const importedEventTasks = await db.select().from(tasksTable).where(and(eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalSource, "canvas_event"), eq(tasksTable.archived, false)));
+  for (const task of importedEventTasks) {
+    if (task.externalId && !seenEvents.has(task.externalId)) { await db.update(tasksTable).set({ archived: true }).where(eq(tasksTable.id, task.id)); summary.archivedItems += 1; }
   }
 }
 
@@ -188,7 +227,7 @@ async function syncFeed(integration: Integration, summary: SyncSummary) {
     const starts = event.start instanceof Date ? [event.start] : [];
     if (event.rrule) starts.push(...event.rrule.between(new Date(Date.now() - 90 * 86_400_000), new Date(Date.now() + 365 * 86_400_000), true));
     for (const start of new Map(starts.map((date) => [date.toISOString(), date])).values()) {
-      const externalId = icalOccurrenceId(event.uid, start); if (ignored.has(`event:${externalId}`)) continue;
+      const externalId = icalOccurrenceId(event.uid, start); if (ignored.has(`event:${externalId}`) || ignored.has(`assignment:${externalId}`)) continue;
       seen.add(externalId);
       const duration = event.end instanceof Date && event.start instanceof Date ? event.end.getTime() - event.start.getTime() : 0;
       const end = duration > 0 ? new Date(start.getTime() + duration) : null;
@@ -200,12 +239,19 @@ async function syncFeed(integration: Integration, summary: SyncSummary) {
         .onConflictDoUpdate({ target: [externalCalendarEventsTable.integrationId, externalCalendarEventsTable.externalEventId], set: { title,
           description: typeof event.description === "string" ? event.description : null, category: canvasEventCategory(title), startsAt: start, endsAt: end,
           location: typeof event.location === "string" ? event.location : null, lastSeenAt: now, archived: event.status === "CANCELLED", updatedAt: now } });
+      await upsertCalendarTask({ integration, externalId, title, description: typeof event.description === "string" ? event.description : null,
+        startsAt: start, externalCourseId: null, externalUrl: null, externalState: event.status ?? null, subjectName: null,
+        archived: event.status === "CANCELLED", summary });
       summary.calendarEvents += 1;
     }
   }
   const imported = await db.select().from(externalCalendarEventsTable).where(and(eq(externalCalendarEventsTable.integrationId, integration.id), eq(externalCalendarEventsTable.archived, false)));
   for (const event of imported) {
     if (!seen.has(event.externalEventId)) { await db.update(externalCalendarEventsTable).set({ archived: true, updatedAt: new Date() }).where(eq(externalCalendarEventsTable.id, event.id)); summary.archivedItems += 1; }
+  }
+  const importedTasks = await db.select().from(tasksTable).where(and(eq(tasksTable.externalIntegrationId, integration.id), eq(tasksTable.externalSource, "canvas_event"), eq(tasksTable.archived, false)));
+  for (const task of importedTasks) {
+    if (task.externalId && !seen.has(task.externalId)) { await db.update(tasksTable).set({ archived: true }).where(eq(tasksTable.id, task.id)); summary.archivedItems += 1; }
   }
 }
 

@@ -1517,7 +1517,7 @@ router.post("/ai/workspace/confirm", async (req, res): Promise<void> => {
       } else if (operation.type === "update_task") {
         const existing = taskMap.get(operation.targetId);
         if (!existing) throw new Error("Task no longer exists.");
-        if (existing.externalSource && (operation.title || operation.subject !== undefined || operation.dueDate !== undefined || operation.status)) throw new Error("Canvas controls that task's title, course, due time, and submission state.");
+        if (existing.externalSource && (operation.title || operation.subject !== undefined || operation.dueDate !== undefined || (existing.externalSource === "canvas" && operation.status))) throw new Error("Canvas controls that task's title, course, due time, and submission state.");
         const project = operation.projectName ? projectNameMap.get(operation.projectName.toLowerCase()) : operation.projectName === null ? null : undefined;
         if (operation.projectName && !project) throw new Error(`Project ${operation.projectName} no longer exists.`);
         const resolvedSubject = operation.subject !== undefined ? operation.subject : project !== undefined ? project?.subject ?? null : undefined;
