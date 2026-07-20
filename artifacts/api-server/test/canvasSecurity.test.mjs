@@ -12,6 +12,7 @@ import {
   isMeaningfulProjectCandidate,
   normalizeCanvasChainTitle,
   shouldCreateCanvasTask,
+  shouldRestoreCanvasTask,
   suggestCanvasSubject,
 } from "../src/lib/canvasRules.ts";
 
@@ -66,6 +67,15 @@ test("calendar rules provide stable occurrence IDs and limited categories", () =
   assert.equal(shouldCreateCanvasTask("No School"), false);
   assert.equal(shouldCreateCanvasTask("End of Second Nine Weeks"), false);
   assert.equal(shouldCreateCanvasTask("Bad Weather Make-Up Day"), false);
+  assert.equal(shouldRestoreCanvasTask("canvas", "Math assignment"), true);
+  assert.equal(
+    shouldRestoreCanvasTask("canvas_event", "Bad Weather Make-Up Day"),
+    false,
+  );
+  assert.equal(
+    shouldRestoreCanvasTask("canvas_event", "Algebra worksheet due"),
+    true,
+  );
 });
 
 test("suggests subjects from explicit names and academic keywords without auto-applying", () => {

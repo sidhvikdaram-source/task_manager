@@ -13,6 +13,7 @@ import {
   Unplug,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCanvasSync } from "@/hooks/useCanvasSync";
 
 type Subject = { id: number; name: string; color: string };
@@ -44,6 +45,7 @@ export function CanvasSyncPanel({
   onChanged: () => Promise<void>;
 }) {
   const { status, statusQuery, sync, running, json } = useCanvasSync(false);
+  const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(false);
   const [feed, setFeed] = useState("");
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -139,15 +141,33 @@ export function CanvasSyncPanel({
     toast.success("Restored. It will refresh on the next sync.");
   };
   const restoreAll = async () => {
+    if (
+      !window.confirm(
+        "Restore every hidden Canvas assignment and calendar item to Velocity? Canvas itself will not change.",
+      )
+    )
+      return;
+    const reopenCompleted = window.confirm(
+      "Would you like to restore tasks marked as complete as well? Choose OK to return them to your active task lists.",
+    );
     try {
-      const result = await json<{ restored: number }>(
-        "/api/canvas/ignored/restore-all",
-        { method: "POST" },
-      );
-      await sync();
-      await Promise.all([statusQuery.refetch(), loadDetails(), onChanged()]);
+      const result = await json<{
+        restoredTasks: number;
+        restoredEvents: number;
+        reopenedCompletedTasks: number;
+      }>("/api/canvas/ignored/restore-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reopenCompleted }),
+      });
+      await Promise.all([
+        statusQuery.refetch(),
+        loadDetails(),
+        onChanged(),
+        queryClient.invalidateQueries(),
+      ]);
       toast.success(
-        `Restored ${result.restored} Canvas item${result.restored === 1 ? "" : "s"}`,
+        `Restored ${result.restoredTasks} tasks and ${result.restoredEvents} calendar items${result.reopenedCompletedTasks ? `; reopened ${result.reopenedCompletedTasks} completed` : ""}`,
       );
     } catch (error) {
       toast.error(
@@ -511,14 +531,12 @@ export function CanvasSyncPanel({
                     <span className="text-xs text-muted-foreground">
                       {ignored.length} hidden
                     </span>
-                    {ignored.length > 0 && (
-                      <button
-                        onClick={() => void restoreAll()}
-                        className="text-xs font-bold text-primary"
-                      >
-                        Restore all
-                      </button>
-                    )}
+                    <button
+                      onClick={() => void restoreAll()}
+                      className="text-xs font-bold text-primary"
+                    >
+                      Restore all
+                    </button>
                   </div>
                 </div>
                 <div className="mt-2 flex gap-2">

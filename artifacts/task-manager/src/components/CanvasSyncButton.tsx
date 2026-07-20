@@ -1,21 +1,39 @@
 import { RefreshCw, Undo2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCanvasSync } from "@/hooks/useCanvasSync";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 export function CanvasSyncButton({ className }: { className?: string }) {
   const { status, statusQuery, sync, running, json } = useCanvasSync(false);
+  const queryClient = useQueryClient();
   if (!status?.connected) return null;
   const restoreAll = async () => {
+    if (
+      !window.confirm(
+        "Restore every hidden Canvas assignment and calendar item to Velocity? Canvas itself will not change.",
+      )
+    )
+      return;
+    const reopenCompleted = window.confirm(
+      "Would you like to restore tasks marked as complete as well? Choose OK to return them to your active task lists.",
+    );
     try {
-      const result = await json<{ restored: number }>(
-        "/api/canvas/ignored/restore-all",
-        { method: "POST" },
-      );
-      await statusQuery.refetch();
-      await sync();
+      const result = await json<{
+        restoredTasks: number;
+        restoredEvents: number;
+        reopenedCompletedTasks: number;
+      }>("/api/canvas/ignored/restore-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reopenCompleted }),
+      });
+      await Promise.all([
+        statusQuery.refetch(),
+        queryClient.invalidateQueries(),
+      ]);
       toast.success(
-        `Restored ${result.restored} Canvas item${result.restored === 1 ? "" : "s"}`,
+        `Restored ${result.restoredTasks} tasks and ${result.restoredEvents} calendar items${result.reopenedCompletedTasks ? `; reopened ${result.reopenedCompletedTasks} completed` : ""}`,
       );
     } catch (error) {
       toast.error(
@@ -41,16 +59,14 @@ export function CanvasSyncButton({ className }: { className?: string }) {
         <RefreshCw className={cn("h-3.5 w-3.5", running && "animate-spin")} />
         {running ? "Syncing" : "Sync changes"}
       </button>
-      {(status.ignoredCount ?? 0) > 0 && (
-        <button
-          type="button"
-          onClick={() => void restoreAll()}
-          disabled={running}
-          className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-xs font-bold disabled:opacity-50"
-        >
-          <Undo2 className="h-3.5 w-3.5" /> Restore all
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => void restoreAll()}
+        disabled={running}
+        className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-xs font-bold disabled:opacity-50"
+      >
+        <Undo2 className="h-3.5 w-3.5" /> Restore all
+      </button>
     </div>
   );
 }

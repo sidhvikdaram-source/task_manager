@@ -69,6 +69,16 @@ export function shouldCreateCanvasTask(title: string) {
   );
 }
 
+export function shouldRestoreCanvasTask(
+  externalSource: string | null,
+  title: string,
+) {
+  return (
+    externalSource === "canvas" ||
+    (externalSource === "canvas_event" && shouldCreateCanvasTask(title))
+  );
+}
+
 const subjectKeywords: Array<[string, RegExp]> = [
   [
     "Math",
