@@ -25,6 +25,8 @@ Until the developer key is approved, users can open **School > Canvas sync** and
 - Manual **Sync changes** controls are available in School and Calendar.
 - Removing a Canvas item from Velocity creates a persistent ignore rule. It never deletes or edits the Canvas source.
 - **Remove all items** archives every imported assignment and event and creates ignore rules so another sync cannot immediately recreate them. Canvas itself is never changed.
+- **Restore all** removes the integration's ignore rules, restores matching local records, and immediately starts a fresh sync.
 - Imported items are categorized as Quiz/Test, Meeting, Class Event, Deadline, or Other from Canvas metadata and deterministic title rules.
+- Institutional dates such as school closures, holidays, grading-period boundaries, breaks, and weather makeup days remain on Calendar but are not turned into actionable tasks.
 - Feed items without course metadata receive reviewable subject suggestions. Users choose the final subject before Velocity applies it.
 - Canvas owns imported titles, course mappings, due times, URLs, and submission state. Velocity owns planning metadata such as priority, estimate, project, notes, and checklists.

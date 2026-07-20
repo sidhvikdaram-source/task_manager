@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 
 type WorkTask = {
@@ -72,6 +73,7 @@ export default function Workspace() {
   const [tasks, setTasks] = useState<WorkTask[]>([]);
   const [view, setView] = useState<ViewId>("today");
   const [selected, setSelected] = useState<number | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [capture, setCapture] = useState("");
   const [captureDate, setCaptureDate] = useState("");
   const [capturePriority, setCapturePriority] = useState("medium");
@@ -214,43 +216,54 @@ export default function Workspace() {
           </div>
           <form
             onSubmit={captureTask}
-            className="flex min-w-0 flex-1 flex-wrap gap-2 lg:max-w-3xl"
+            className="grid min-w-0 flex-1 gap-2 lg:max-w-3xl"
           >
-            <input
-              value={capture}
-              onChange={(e) => setCapture(e.target.value)}
-              placeholder="Quick capture a task"
-              className="min-w-[220px] flex-1 rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-            />
-            <input
-              type="date"
-              value={captureDate}
-              onChange={(e) => setCaptureDate(e.target.value)}
-              className="rounded-xl border bg-background px-2 text-sm"
-            />
-            <select
-              value={captureSubject}
-              onChange={(e) => setCaptureSubject(e.target.value)}
-              className="rounded-xl border bg-background px-2 text-sm"
-            >
-              <option value="">No subject</option>
-              {subjects.map((subject) => (
-                <option key={subject.id}>{subject.name}</option>
-              ))}
-            </select>
-            <select
-              value={capturePriority}
-              onChange={(e) => setCapturePriority(e.target.value)}
-              className="rounded-xl border bg-background px-2 text-sm"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-            <button className="rounded-xl bg-primary p-2.5 text-primary-foreground">
-              <Plus className="h-4 w-4" />
-            </button>
+            <div className="flex gap-2">
+              <input
+                aria-label="Task title"
+                value={capture}
+                onChange={(e) => setCapture(e.target.value)}
+                placeholder="Quick capture a task"
+                className="min-w-0 flex-1 rounded-xl border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+              />
+              <button
+                aria-label="Capture task"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input
+                aria-label="Due date"
+                type="date"
+                value={captureDate}
+                onChange={(e) => setCaptureDate(e.target.value)}
+                className="min-w-36 flex-1 rounded-lg border bg-background px-2 py-1.5 text-xs sm:flex-none"
+              />
+              <select
+                aria-label="Subject"
+                value={captureSubject}
+                onChange={(e) => setCaptureSubject(e.target.value)}
+                className="min-w-32 flex-1 rounded-lg border bg-background px-2 py-1.5 text-xs sm:flex-none"
+              >
+                <option value="">No subject</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id}>{subject.name}</option>
+                ))}
+              </select>
+              <select
+                aria-label="Priority"
+                value={capturePriority}
+                onChange={(e) => setCapturePriority(e.target.value)}
+                className="min-w-28 flex-1 rounded-lg border bg-background px-2 py-1.5 text-xs sm:flex-none"
+              >
+                <option value="low">Low priority</option>
+                <option value="medium">Medium priority</option>
+                <option value="high">High priority</option>
+                <option value="critical">Critical priority</option>
+              </select>
+            </div>
           </form>
         </div>
       </section>
@@ -305,7 +318,8 @@ export default function Workspace() {
                     void complete(task.id);
                   }}
                   disabled={
-                    task.status === "completed" || task.externalSource === "canvas"
+                    task.status === "completed" ||
+                    task.externalSource === "canvas"
                   }
                   title={
                     task.externalSource === "canvas"
@@ -371,6 +385,12 @@ export default function Workspace() {
                 <p className="mt-1 text-sm text-muted-foreground">
                   This smart view updates automatically as tasks change.
                 </p>
+                <button
+                  onClick={() => setCreateOpen(true)}
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground"
+                >
+                  <Plus className="h-4 w-4" /> Add task
+                </button>
               </div>
             )}
           </div>
@@ -393,7 +413,7 @@ export default function Workspace() {
                 <button
                   key={value}
                   onClick={() => setMinutes(value)}
-                  className={`rounded-lg px-2 py-2 text-xs font-bold ${minutes === value ? "bg-primary text-primary-foreground" : "bg-muted"}`}
+                  className={`rounded-lg border px-2 py-2 text-xs font-bold ${minutes === value ? "border-foreground/35 bg-muted text-foreground" : "border-transparent bg-muted/55 text-muted-foreground"}`}
                 >
                   {value}m
                 </button>
@@ -409,7 +429,7 @@ export default function Workspace() {
                 <button
                   key={value}
                   onClick={() => setEnergy(value)}
-                  className={`rounded-lg px-2 py-2 text-xs font-bold capitalize ${energy === value ? "bg-secondary text-secondary-foreground" : "bg-muted"}`}
+                  className={`rounded-lg border px-2 py-2 text-xs font-bold capitalize ${energy === value ? "border-foreground/35 bg-muted text-foreground" : "border-transparent bg-muted/55 text-muted-foreground"}`}
                 >
                   {value}
                 </button>
@@ -455,6 +475,11 @@ export default function Workspace() {
           onOpenChange={(open) => !open && setSelected(null)}
         />
       )}
+      <CreateTaskModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSuccess={load}
+      />
     </div>
   );
 }

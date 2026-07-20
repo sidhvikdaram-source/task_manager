@@ -138,6 +138,25 @@ export function CanvasSyncPanel({
     await loadDetails();
     toast.success("Restored. It will refresh on the next sync.");
   };
+  const restoreAll = async () => {
+    try {
+      const result = await json<{ restored: number }>(
+        "/api/canvas/ignored/restore-all",
+        { method: "POST" },
+      );
+      await sync();
+      await Promise.all([statusQuery.refetch(), loadDetails(), onChanged()]);
+      toast.success(
+        `Restored ${result.restored} Canvas item${result.restored === 1 ? "" : "s"}`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Canvas items could not be restored",
+      );
+    }
+  };
   const purge = async (id: number) => {
     if (
       !window.confirm(
@@ -273,8 +292,9 @@ export function CanvasSyncPanel({
               <div className="rounded-lg border p-4">
                 <h3 className="font-bold">Calendar feed fallback</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Imports dated Canvas items into Home, Workspace, and Calendar. Accurate course mapping,
-                  submissions, and project suggestions require OAuth.
+                  Imports dated Canvas items into Home, Workspace, and Calendar.
+                  Accurate course mapping, submissions, and project suggestions
+                  require OAuth.
                 </p>
                 <div className="mt-3 flex gap-2">
                   <input
@@ -430,7 +450,8 @@ export function CanvasSyncPanel({
                         Subject suggestions
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        Review name-based suggestions before organizing feed items.
+                        Review name-based suggestions before organizing feed
+                        items.
                       </p>
                     </div>
                     <button
@@ -449,16 +470,34 @@ export function CanvasSyncPanel({
                         <div className="min-w-0">
                           <p className="text-sm font-bold">{item.title}</p>
                           <p className="mt-0.5 text-[11px] text-muted-foreground">
-                            {item.suggestion?.reason ?? "Choose a subject"} · {item.category.replace("_", " ")}
+                            {item.suggestion?.reason ?? "Choose a subject"} ·{" "}
+                            {item.category.replace("_", " ")}
                           </p>
                         </div>
                         <select
                           value={item.selectedSubjectId ?? ""}
-                          onChange={(event) => setOrganization((items) => items.map((current) => current.taskId === item.taskId ? { ...current, selectedSubjectId: event.target.value ? Number(event.target.value) : null } : current))}
+                          onChange={(event) =>
+                            setOrganization((items) =>
+                              items.map((current) =>
+                                current.taskId === item.taskId
+                                  ? {
+                                      ...current,
+                                      selectedSubjectId: event.target.value
+                                        ? Number(event.target.value)
+                                        : null,
+                                    }
+                                  : current,
+                              ),
+                            )
+                          }
                           className="rounded-md border bg-background px-2 py-1.5 text-xs"
                         >
                           <option value="">Leave in Inbox</option>
-                          {subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
+                          {subjects.map((subject) => (
+                            <option key={subject.id} value={subject.id}>
+                              {subject.name}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     ))}
@@ -468,9 +507,19 @@ export function CanvasSyncPanel({
               <div>
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold">Ignored Canvas items</h3>
-                  <span className="text-xs text-muted-foreground">
-                    {ignored.length} hidden
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground">
+                      {ignored.length} hidden
+                    </span>
+                    {ignored.length > 0 && (
+                      <button
+                        onClick={() => void restoreAll()}
+                        className="text-xs font-bold text-primary"
+                      >
+                        Restore all
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-2 flex gap-2">
                   <input
@@ -527,7 +576,10 @@ export function CanvasSyncPanel({
                   Open Canvas <ExternalLink className="h-3 w-3" />
                 </a>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => void removeAll()} className="inline-flex items-center gap-1 text-xs font-bold text-destructive">
+                  <button
+                    onClick={() => void removeAll()}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-destructive"
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                     Remove all items
                   </button>

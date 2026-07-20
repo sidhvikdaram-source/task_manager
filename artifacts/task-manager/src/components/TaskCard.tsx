@@ -1,16 +1,25 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { CheckCircle2, Circle, Clock, Maximize2, Timer } from 'lucide-react';
-import { Task, useCompleteTask, getListTasksQueryKey, getGetDashboardOverviewQueryKey, getGetUserStatsQueryKey } from '@workspace/api-client-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { format, isPast, parseISO } from 'date-fns';
-import { useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { TaskDetailsModal } from '@/components/TaskDetailsModal';
-import { useLocation } from 'wouter';
-import { playCompletionSound, primeCompletionSound } from '@/lib/completionSound';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { CheckCircle2, Circle, Clock, Maximize2, Timer } from "lucide-react";
+import {
+  Task,
+  useCompleteTask,
+  getListTasksQueryKey,
+  getGetDashboardOverviewQueryKey,
+  getGetUserStatsQueryKey,
+} from "@workspace/api-client-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { format, isPast, parseISO } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { TaskDetailsModal } from "@/components/TaskDetailsModal";
+import { useLocation } from "wouter";
+import {
+  playCompletionSound,
+  primeCompletionSound,
+} from "@/lib/completionSound";
 
 interface TaskCardProps {
   task: Task;
@@ -18,10 +27,10 @@ interface TaskCardProps {
 }
 
 const priorityColors = {
-  critical: 'bg-destructive/10 text-destructive border-destructive/20',
-  high: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-  medium: 'bg-primary/10 text-primary border-primary/20',
-  low: 'bg-slate-500/10 text-slate-500 border-slate-500/20',
+  critical: "bg-destructive/10 text-destructive border-destructive/20",
+  high: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  medium: "bg-primary/10 text-primary border-primary/20",
+  low: "bg-slate-500/10 text-slate-500 border-slate-500/20",
 };
 
 function parseVelocityType(notes?: string | null) {
@@ -37,7 +46,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
   const completeTask = useCompleteTask();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [completionPop, setCompletionPop] = useState(false);
-  const isCompleted = task.status === 'completed';
+  const isCompleted = task.status === "completed";
   const velocityType = parseVelocityType(task.notes);
 
   const handleComplete = (e: React.MouseEvent) => {
@@ -53,37 +62,45 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
           setCompletionPop(true);
           window.setTimeout(() => setCompletionPop(false), 1300);
           toast.success(`Task complete. +${result.vpAwarded} VP`, {
-            description: 'Nice execution. Momentum banked.',
+            description: "Nice execution. Momentum banked.",
           });
           if (result.tierUp) {
-            toast('Tier Up!', {
+            toast("Tier Up!", {
               description: `You have reached Tier ${result.newTier}!`,
-              icon: '🎉',
+              icon: "🎉",
             });
           }
-          
+
           queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey() });
+          queryClient.invalidateQueries({
+            queryKey: getGetDashboardOverviewQueryKey(),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getGetUserStatsQueryKey(),
+          });
         },
-      }
+      },
     );
   };
 
   const startFocusSpace = (e: React.MouseEvent) => {
     e.stopPropagation();
-    window.localStorage.setItem('velocity_focus_task', JSON.stringify({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      dueDate: task.dueDate,
-      estimatedMinutes: task.estimatedMinutes,
-    }));
-    setLocation('/focus');
+    window.localStorage.setItem(
+      "velocity_focus_task",
+      JSON.stringify({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        dueDate: task.dueDate,
+        estimatedMinutes: task.estimatedMinutes,
+      }),
+    );
+    setLocation("/focus");
   };
 
-  const isOverdue = task.dueDate && isPast(parseISO(task.dueDate)) && !isCompleted;
-  
+  const isOverdue =
+    task.dueDate && isPast(parseISO(task.dueDate)) && !isCompleted;
+
   return (
     <>
       <motion.div
@@ -93,7 +110,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
         exit={{ opacity: 0, scale: 0.95 }}
         whileHover={{ scale: 1.02 }}
         onClick={() => setDetailsOpen(true)}
-        className={`relative group bg-card p-4 rounded-xl border cursor-pointer ${isCompleted ? 'opacity-60 grayscale-[0.5]' : ''} shadow-sm hover:shadow-md transition-shadow`}
+        className={`relative group bg-card p-4 rounded-xl border cursor-pointer ${isCompleted ? "opacity-60 grayscale-[0.5]" : ""} shadow-sm hover:shadow-md transition-shadow`}
       >
         {completionPop && (
           <motion.div
@@ -106,20 +123,36 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
         )}
 
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={startFocusSpace} title="Focus Space">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={startFocusSpace}
+            title="Focus Space"
+          >
             <Timer className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setDetailsOpen(true); }}>
+          <Button
+            aria-label="Open task details"
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDetailsOpen(true);
+            }}
+          >
             <Maximize2 className="h-3.5 w-3.5 text-muted-foreground" />
           </Button>
         </div>
 
         <div className="flex items-start gap-3">
           <button
+            aria-label={isCompleted ? "Task completed" : "Mark task complete"}
             onClick={handleComplete}
             disabled={completeTask.isPending || isCompleted}
             className={`mt-1 flex-shrink-0 text-muted-foreground hover:text-primary transition-colors ${
-              isCompleted ? 'text-primary' : ''
+              isCompleted ? "text-primary" : ""
             }`}
           >
             {isCompleted ? (
@@ -128,62 +161,83 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
               <Circle className="w-5 h-5" />
             )}
           </button>
-          
+
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mr-6">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   {velocityType && !isCompleted && (
-                    <Badge variant="outline" className="h-5 shrink-0 border-primary/25 bg-primary/10 px-1.5 font-mono text-[10px] text-primary" title={velocityType.label}>
+                    <Badge
+                      variant="outline"
+                      className="h-5 shrink-0 border-primary/25 bg-primary/10 px-1.5 font-mono text-[10px] text-primary"
+                      title={velocityType.label}
+                    >
                       {velocityType.symbol}
                     </Badge>
                   )}
-                  <h3 className={`font-medium text-sm leading-tight ${isCompleted ? 'line-through text-muted-foreground' : 'text-card-foreground'}`}>
+                  <h3
+                    className={`font-medium text-sm leading-tight ${isCompleted ? "line-through text-muted-foreground" : "text-card-foreground"}`}
+                  >
                     {task.title}
                   </h3>
                 </div>
               </div>
-              <Badge variant="outline" className={`${priorityColors[task.priority]} whitespace-nowrap text-xs py-0 h-5`}>
+              <Badge
+                variant="outline"
+                className={`${priorityColors[task.priority]} whitespace-nowrap text-xs py-0 h-5`}
+              >
                 {task.priority}
               </Badge>
             </div>
-            
+
             {task.description && (
               <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
                 {task.description}
               </p>
             )}
-            
+
             <div className="mt-3 flex items-center gap-3 text-xs">
               <Badge variant="secondary" className="font-mono font-medium">
                 +{task.vpValue} VP
               </Badge>
-              
+
               {task.dueDate && (
-                <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                <div
+                  className={`flex items-center gap-1.5 ${isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                >
                   <Clock className="w-3.5 h-3.5" />
-                  {format(parseISO(task.dueDate), 'MMM d')}
+                  {format(parseISO(task.dueDate), "MMM d")}
                 </div>
               )}
             </div>
-            
+
             {(task.checklistCount ?? 0) > 0 && (
               <div className="mt-3 space-y-1.5">
                 <div className="flex justify-between text-[10px] text-muted-foreground font-medium">
                   <span>Action steps</span>
-                  <span>{task.checklistCompleted}/{task.checklistCount}</span>
+                  <span>
+                    {task.checklistCompleted}/{task.checklistCount}
+                  </span>
                 </div>
-                <Progress value={((task.checklistCompleted ?? 0) / (task.checklistCount ?? 1)) * 100} className="h-1.5" />
+                <Progress
+                  aria-label="Checklist progress"
+                  value={
+                    ((task.checklistCompleted ?? 0) /
+                      (task.checklistCount ?? 1)) *
+                    100
+                  }
+                  className="h-1.5"
+                />
               </div>
             )}
           </div>
         </div>
       </motion.div>
 
-      <TaskDetailsModal 
-        taskId={task.id} 
-        open={detailsOpen} 
-        onOpenChange={setDetailsOpen} 
+      <TaskDetailsModal
+        taskId={task.id}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
       />
     </>
   );
