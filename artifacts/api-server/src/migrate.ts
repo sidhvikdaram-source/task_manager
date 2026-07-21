@@ -28,10 +28,12 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "equipped_cosmetic" varchar DEFAULT 'starter-bolt' NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_frame" varchar DEFAULT 'none' NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_pet" varchar DEFAULT 'none' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_title" varchar DEFAULT 'none' NOT NULL,
       ADD COLUMN IF NOT EXISTS "main_goal" varchar,
       ADD COLUMN IF NOT EXISTS "onboarding_completed" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "advanced_features_enabled" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "tutorial_completed" boolean DEFAULT false NOT NULL,
+      ADD COLUMN IF NOT EXISTS "social_enabled" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "timezone" varchar DEFAULT 'UTC' NOT NULL;
   `);
   await db.execute(
@@ -99,6 +101,7 @@ export async function runMigrations(): Promise<void> {
       "id" serial PRIMARY KEY NOT NULL,
       "user_id" varchar,
       "total_vp" integer DEFAULT 0 NOT NULL,
+      "lifetime_vp" integer DEFAULT 0 NOT NULL,
       "tier" integer DEFAULT 1 NOT NULL,
       "tier_progress" integer DEFAULT 0 NOT NULL,
       "streak_days" integer DEFAULT 0 NOT NULL,
@@ -109,6 +112,8 @@ export async function runMigrations(): Promise<void> {
       "updated_at" timestamp with time zone DEFAULT now() NOT NULL
     );
   `);
+  await db.execute(sql`ALTER TABLE "user_stats" ADD COLUMN IF NOT EXISTS "lifetime_vp" integer DEFAULT 0 NOT NULL;`);
+  await db.execute(sql`UPDATE "user_stats" SET "lifetime_vp" = GREATEST("lifetime_vp", "total_vp", (("tier" - 1) * 100) + "tier_progress");`);
 
   // Create tasks table
   await db.execute(sql`

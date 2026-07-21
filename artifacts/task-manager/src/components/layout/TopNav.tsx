@@ -28,8 +28,9 @@ import { useAuth } from "@workspace/replit-auth-web";
 import { themes, useTheme, type ThemeId } from "@/theme";
 import { useExperience } from "@/experience";
 import { useQuery } from "@tanstack/react-query";
-import { ProfileAvatar } from "@/components/ProfileCosmetics";
+import { ProfilePhoto } from "@/components/ProfileCosmetics";
 import type { RewardsResponse } from "@/pages/Profile";
+import { toast } from "sonner";
 
 const CreateTaskModal = lazy(() =>
   import("@/components/CreateTaskModal").then((module) => ({
@@ -77,6 +78,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [themesOpen, setThemesOpen] = useState(false);
+  const equippedTitle = rewards?.items.find((item) => item.id === rewards.equipped.title)?.name;
   const accountRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const themesRef = useRef<HTMLDivElement>(null);
@@ -102,6 +104,14 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  useEffect(() => {
+    if (rewards?.newlyUnlockedTitles.length) {
+      toast.success(`Title unlocked: ${rewards.newlyUnlockedTitles[0]}`, {
+        description: "Equip it from your profile.",
+      });
+    }
+  }, [rewards?.newlyUnlockedTitles]);
 
   const upcomingNotifications = (tasks ?? [])
     .filter((task) => task.status !== "completed")
@@ -259,16 +269,16 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
             <motion.button
               type="button"
               aria-label="Open account menu"
+              data-tour="settings-access"
               onClick={() => setAccountOpen((o) => !o)}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.94 }}
               className="h-9 w-9 rounded-xl ring-2 ring-transparent transition-all hover:ring-primary/40"
               title="Account"
             >
-              <ProfileAvatar
-                avatarId={rewards?.equipped.avatar}
+              <ProfilePhoto
                 frameId={rewards?.equipped.frame}
-                profileImageUrl={user?.profileImageUrl}
+                profileImageUrl={rewards?.profileImageUrl ?? user?.profileImageUrl}
                 name={user?.firstName ?? user?.email ?? "Account"}
                 className="w-9"
               />
@@ -293,10 +303,11 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                           {user.email}
                         </p>
                       )}
+                      {equippedTitle && <p className="mt-1 truncate text-[10px] font-black uppercase text-primary">{equippedTitle}</p>}
                       {stats && (
-                        <div className="mt-2 flex items-center justify-between rounded-lg bg-primary/10 px-2 py-1.5 text-[11px] font-bold text-primary">
-                          <span>Tier {stats.tier}</span>
-                          <span>{stats.tierProgress}/100 VP</span>
+                        <div className="mt-2 rounded-lg bg-primary/10 px-2 py-1.5 text-[11px] font-bold text-primary">
+                          <div className="flex items-center justify-between"><span>Tier {stats.tier}</span><span>{100 - stats.tierProgress} VP to next</span></div>
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-primary/15"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${stats.tierProgress}%` }} /></div>
                         </div>
                       )}
                     </div>
@@ -308,6 +319,14 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                     >
                       <UserRound className="w-3.5 h-3.5" />
                       Profile
+                    </button>
+                  </Link>
+                  <Link href="/settings">
+                    <button
+                      onClick={() => setAccountOpen(false)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" /> Settings
                     </button>
                   </Link>
                   <div className="border-t px-2 py-2">
@@ -374,14 +393,14 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                           <LineChart className="h-3.5 w-3.5" /> Insights
                         </button>
                       </Link>
-                      <Link href="/social">
+                      {preferences.socialEnabled && <Link href="/social">
                         <button
                           onClick={() => setAccountOpen(false)}
                           className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                         >
                           <Users className="h-3.5 w-3.5" /> Social
                         </button>
-                      </Link>
+                      </Link>}
                     </div>
                   )}
                   {isAuthenticated ? (

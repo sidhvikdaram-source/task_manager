@@ -697,7 +697,7 @@ export default function Dashboard() {
             <div className="space-y-1.5">
               <AnimatedProgressBar value={stats.tierProgress} />
               <div className="flex justify-between text-[11px] text-muted-foreground">
-                <span>{stats.tierProgress} / 100 VP</span>
+                <span>{stats.tierProgress} VP earned</span>
                 <span>{stats.tierProgress}%</span>
               </div>
             </div>

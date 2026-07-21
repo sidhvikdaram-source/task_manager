@@ -166,7 +166,7 @@ function SidebarBody({
               </button>
             </div>
             <nav className="mt-2 space-y-1" aria-label="Advanced navigation">
-              {advancedLinks.slice(1).map((item) => {
+              {advancedLinks.slice(1).filter((item) => item.href !== "/social" || preferences.socialEnabled).map((item) => {
                 const Icon = item.icon;
                 const active = location === item.href;
                 return (
@@ -195,7 +195,7 @@ function SidebarBody({
             </div>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
               Turn on Advanced Workspace whenever you want Calendar, Projects,
-              Insights, and Social.
+              and Insights.
             </p>
             <button
               type="button"
@@ -206,6 +206,14 @@ function SidebarBody({
             </button>
           </section>
         ) : null}
+      </div>
+
+      <div className={cn("shrink-0 border-t border-border/70", collapsed ? "p-2" : "px-3 py-2")}>
+        <Link href="/settings" onClick={onNavigate}>
+          <div className={cn("flex cursor-pointer items-center rounded-lg text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground", collapsed ? "h-10 justify-center" : "gap-3 px-2.5 py-2")} title={collapsed ? "Settings" : undefined}>
+            <Settings2 className="h-4 w-4" />{!collapsed && <span>Settings</span>}
+          </div>
+        </Link>
       </div>
 
       {stats && (
@@ -223,7 +231,7 @@ function SidebarBody({
               )}
               title={
                 collapsed
-                  ? `Tier ${stats.tier} - ${stats.tierProgress}/100 VP`
+                  ? `Tier ${stats.tier} - ${100 - stats.tierProgress} VP to next tier`
                   : undefined
               }
             >
@@ -242,7 +250,7 @@ function SidebarBody({
                     </div>
                   </div>
                   <span className="text-[10px] font-bold text-muted-foreground">
-                    {stats.tierProgress}/100
+                    {100 - stats.tierProgress} left
                   </span>
                 </>
               )}

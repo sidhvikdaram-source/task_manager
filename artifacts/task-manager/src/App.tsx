@@ -1,15 +1,15 @@
 import { lazy, Suspense, useState } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Link, Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@workspace/replit-auth-web";
-import { Loader2, Lock, Mail, User, Zap } from "lucide-react";
+import { Loader2, Lock, Mail, User, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "@/theme";
 import { useCanvasSync } from "@/hooks/useCanvasSync";
-import { ExperienceProvider } from "@/experience";
+import { ExperienceProvider, useExperience } from "@/experience";
 
 const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
@@ -21,6 +21,7 @@ const Workspace = lazy(() => import("@/pages/Workspace"));
 const SchoolPlanner = lazy(() => import("@/pages/SchoolPlanner"));
 const Projects = lazy(() => import("@/pages/Projects"));
 const WeeklyReview = lazy(() => import("@/pages/WeeklyReview"));
+const Settings = lazy(() => import("@/pages/Settings"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient({
@@ -45,6 +46,17 @@ function LoginScreen() {
   const isEmbedded = window.self !== window.top;
   const appUrl = window.location.origin + (import.meta.env.BASE_URL ?? "/");
 
+  async function offerCredentialSave() {
+    type PasswordCredentialConstructor = new (data: { id: string; password: string; name?: string }) => Credential;
+    const PasswordCredentialApi = (window as typeof window & { PasswordCredential?: PasswordCredentialConstructor }).PasswordCredential;
+    if (!PasswordCredentialApi || !navigator.credentials?.store) return;
+    try {
+      await navigator.credentials.store(new PasswordCredentialApi({ id: email, password, name: firstName || email }));
+    } catch {
+      // Password managers may decline silently; the semantic form still offers native saving.
+    }
+  }
+
   async function submitLocalAuth(event: React.FormEvent) {
     event.preventDefault();
     setAuthError("");
@@ -56,6 +68,7 @@ function LoginScreen() {
       } else {
         await loginWithPassword(email, password);
       }
+      await offerCredentialSave();
     } catch (error) {
       setAuthError(
         error instanceof Error ? error.message : "Authentication failed.",
@@ -125,14 +138,17 @@ function LoginScreen() {
               </button>
             </div>
 
-            <form onSubmit={submitLocalAuth} className="space-y-3">
+            <form onSubmit={submitLocalAuth} autoComplete="on" className="space-y-3">
               {mode === "register" && (
                 <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-3 py-2.5">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <input
+                    id="given-name"
+                    name="given-name"
                     value={firstName}
                     onChange={(event) => setFirstName(event.target.value)}
                     placeholder="First name"
+                    autoComplete="given-name"
                     className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   />
                 </label>
@@ -140,11 +156,16 @@ function LoginScreen() {
               <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-3 py-2.5">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <input
+                  id="email"
+                  name="username"
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="Email"
-                  autoComplete="email"
+                  autoComplete="username"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   required
                 />
@@ -152,6 +173,8 @@ function LoginScreen() {
               <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-3 py-2.5">
                 <Lock className="h-4 w-4 text-muted-foreground" />
                 <input
+                  id="password"
+                  name="password"
                   type="password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -230,6 +253,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function SocialRoute() {
+  const { preferences } = useExperience();
+  if (preferences.socialEnabled) return <Social />;
+  return (
+    <div className="bento-card mx-auto max-w-xl p-6 text-center">
+      <Users className="mx-auto h-7 w-7 text-primary" />
+      <h1 className="mt-3 text-xl font-black">Social is optional</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Turn it on when you want friends, messages, and shared challenges.</p>
+      <Link href="/settings"><button className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Open settings</button></Link>
+    </div>
+  );
+}
+
 function Router() {
   useCanvasSync(true);
   return (
@@ -254,9 +290,10 @@ function Router() {
             <Route path="/projects" component={Projects} />
             <Route path="/review" component={WeeklyReview} />
             <Route path="/focus" component={FocusArena} />
-            <Route path="/social" component={Social} />
+            <Route path="/social" component={SocialRoute} />
             <Route path="/analytics" component={Analytics} />
             <Route path="/profile" component={Profile} />
+            <Route path="/settings" component={Settings} />
             <Route component={NotFound} />
           </Switch>
         </Suspense>

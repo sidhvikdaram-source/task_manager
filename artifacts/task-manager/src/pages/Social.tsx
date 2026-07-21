@@ -18,16 +18,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@workspace/replit-auth-web";
-import { ProfileAvatar } from "@/components/ProfileCosmetics";
+import { ProfilePhoto } from "@/components/ProfileCosmetics";
 
 type Profile = {
   id: string;
   displayName: string | null;
   username: string | null;
   profileImageUrl: string | null;
-  avatarStyle: string;
-  equippedCosmetic: string;
   equippedFrame: string;
+  equippedTitle: string;
   level: number;
   streakDays: number;
   online: boolean;
@@ -53,6 +52,17 @@ type Message = {
   mine: boolean;
 };
 
+function titleLabel(id: string) {
+  if (!id || id === "none") return null;
+  const special: Record<string, string> = {
+    "3-am-strategist": "3 AM Strategist",
+    "submitting-1159": "Submitting at 11:59 PM",
+    "4-0-grind": "4.0 Grind",
+    "gg-wp": "GG WP",
+  };
+  return special[id] ?? id.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     credentials: "include",
@@ -69,7 +79,7 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
 function ProfileMark({ person }: { person: Profile }) {
   return (
     <div className="relative h-10 w-10 shrink-0">
-      <ProfileAvatar avatarId={person.equippedCosmetic} frameId={person.equippedFrame} profileImageUrl={person.profileImageUrl} name={person.displayName ?? person.username ?? "Velocity member"} className="w-10" />
+      <ProfilePhoto frameId={person.equippedFrame} profileImageUrl={person.profileImageUrl} name={person.displayName ?? person.username ?? "Velocity member"} className="w-10" />
       {person.online && (
         <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-400" />
       )}
@@ -331,6 +341,7 @@ export default function Social() {
                       <p className="truncate font-bold">
                         {person.displayName ?? "Velocity member"}
                       </p>
+                      {titleLabel(person.equippedTitle) && <p className="truncate text-[10px] font-black uppercase text-primary">{titleLabel(person.equippedTitle)}</p>}
                       <p className="truncate text-xs text-muted-foreground">
                         {person.username
                           ? `@${person.username}`
@@ -379,6 +390,7 @@ export default function Social() {
                           <p className="truncate font-bold">
                             {friend.displayName ?? "Velocity member"}
                           </p>
+                          {titleLabel(friend.equippedTitle) && <p className="truncate text-[10px] font-black uppercase text-primary">{titleLabel(friend.equippedTitle)}</p>}
                           <p className="text-xs text-muted-foreground">
                             Level {friend.level} · {friend.streakDays} momentum days
                           </p>

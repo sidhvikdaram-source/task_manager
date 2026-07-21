@@ -4,11 +4,25 @@ import { db, directMessagesTable, friendshipsTable, userBlocksTable, userReports
 
 const router: IRouter = Router();
 
+router.use(async (req, res, next) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const [user] = await db.select({ socialEnabled: usersTable.socialEnabled }).from(usersTable).where(eq(usersTable.id, req.user.id));
+  if (!user?.socialEnabled) {
+    res.status(403).json({ error: "Turn on Social in Settings first." });
+    return;
+  }
+  next();
+});
+
 async function publicProfile(userId: string) {
-  const [user] = await db.select({ id: usersTable.id, displayName: usersTable.firstName, username: usersTable.username, profileImageUrl: usersTable.profileImageUrl, avatarStyle: usersTable.avatarStyle, equippedCosmetic: usersTable.equippedCosmetic, equippedFrame: usersTable.equippedFrame }).from(usersTable).where(eq(usersTable.id, userId));
-  if (!user) return null;
+  const [user] = await db.select({ id: usersTable.id, displayName: usersTable.firstName, username: usersTable.username, profileImageUrl: usersTable.profileImageUrl, equippedFrame: usersTable.equippedFrame, equippedTitle: usersTable.equippedTitle, socialEnabled: usersTable.socialEnabled }).from(usersTable).where(eq(usersTable.id, userId));
+  if (!user?.socialEnabled) return null;
   const [stats] = await db.select({ tier: userStatsTable.tier, streakDays: userStatsTable.streakDays }).from(userStatsTable).where(eq(userStatsTable.userId, user.id));
-  return { ...user, level: stats?.tier ?? 1, streakDays: stats?.streakDays ?? 0, online: false };
+  const { socialEnabled: _socialEnabled, ...profile } = user;
+  return { ...profile, level: stats?.tier ?? 1, streakDays: stats?.streakDays ?? 0, online: false };
 }
 
 async function relationship(userId: string, otherId: string) {

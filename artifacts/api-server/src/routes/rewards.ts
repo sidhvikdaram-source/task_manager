@@ -1,52 +1,166 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
-import { db, userCosmeticsTable, userStatsTable, usersTable } from "@workspace/db";
+import {
+  db,
+  tasksTable,
+  userCosmeticsTable,
+  userStatsTable,
+  usersTable,
+} from "@workspace/db";
 
 const router: IRouter = Router();
 
-const cosmetics = [
-  { id: "starter-bolt", name: "Sky Navigator", kind: "avatar", cost: 0, style: "navigator" },
+type RewardKind = "frame" | "pet" | "title";
+type RewardItem = {
+  id: string;
+  name: string;
+  kind: RewardKind;
+  cost: number;
+  style: string;
+  requirement?: string;
+  source?: "quest" | "achievement" | "tier";
+};
+
+const collectables: RewardItem[] = [
   { id: "orbit-frame", name: "Orbit Frame", kind: "frame", cost: 80, style: "orbit" },
   { id: "signal-ring", name: "Signal Ring", kind: "frame", cost: 150, style: "signal" },
-  { id: "ember-bolt", name: "Ember Graduate", kind: "avatar", cost: 220, style: "graduate" },
-  { id: "prism-core", name: "Prism Artist", kind: "avatar", cost: 360, style: "artist" },
-  { id: "mono-core", name: "Mono Coder", kind: "avatar", cost: 120, style: "coder" },
-  { id: "aurora-core", name: "Aurora Explorer", kind: "avatar", cost: 480, style: "explorer" },
-  { id: "atlas-reader", name: "Atlas Reader", kind: "avatar", cost: 90, style: "reader" },
-  { id: "nova-coder", name: "Nova Coder", kind: "avatar", cost: 180, style: "coder" },
-  { id: "sage-scholar", name: "Sage Scholar", kind: "avatar", cost: 240, style: "scholar" },
-  { id: "orbit-listener", name: "Orbit Listener", kind: "avatar", cost: 280, style: "listener" },
-  { id: "quill-writer", name: "Quill Writer", kind: "avatar", cost: 320, style: "writer" },
-  { id: "terra-explorer", name: "Terra Explorer", kind: "avatar", cost: 360, style: "explorer" },
-  { id: "tempo-maker", name: "Tempo Maker", kind: "avatar", cost: 400, style: "musician" },
-  { id: "pixel-planner", name: "Pixel Planner", kind: "avatar", cost: 440, style: "planner" },
-  { id: "lab-thinker", name: "Lab Thinker", kind: "avatar", cost: 500, style: "scientist" },
-  { id: "cafe-creator", name: "Cafe Creator", kind: "avatar", cost: 560, style: "creator" },
   { id: "precision-frame", name: "Precision Frame", kind: "frame", cost: 260, style: "precision" },
   { id: "nova-frame", name: "Nova Frame", kind: "frame", cost: 420, style: "nova" },
   { id: "studio-frame", name: "Studio Frame", kind: "frame", cost: 540, style: "studio" },
+  { id: "summit-frame", name: "Summit Frame", kind: "frame", cost: 620, style: "summit" },
+  { id: "terminal-frame", name: "Terminal Frame", kind: "frame", cost: 700, style: "terminal" },
+  { id: "honor-frame", name: "Honor Frame", kind: "frame", cost: 820, style: "honor" },
+  { id: "zen-frame", name: "Zen Frame", kind: "frame", cost: 940, style: "zen" },
+  { id: "velocity-frame", name: "Velocity Frame", kind: "frame", cost: 1100, style: "velocity" },
   { id: "pixel-spark", name: "Pixel Spark", kind: "pet", cost: 180, style: "spark" },
   { id: "cloud-bit", name: "Cloud Bit", kind: "pet", cost: 300, style: "cloud" },
   { id: "focus-cube", name: "Focus Cube", kind: "pet", cost: 520, style: "cube" },
   { id: "study-bot", name: "Study Bot", kind: "pet", cost: 420, style: "bot" },
   { id: "leafling", name: "Leafling", kind: "pet", cost: 250, style: "leaf" },
-] as const;
+  { id: "orbit-orb", name: "Orbit Orb", kind: "pet", cost: 380, style: "orb" },
+  { id: "book-bit", name: "Book Bit", kind: "pet", cost: 460, style: "book" },
+  { id: "tempo-dot", name: "Tempo Dot", kind: "pet", cost: 560, style: "tempo" },
+  { id: "comet", name: "Comet", kind: "pet", cost: 680, style: "comet" },
+  { id: "pebble", name: "Pebble", kind: "pet", cost: 760, style: "pebble" },
+];
 
-function findItem(itemId: string) { return cosmetics.find((item) => item.id === itemId); }
+type UnlockContext = {
+  tier: number;
+  earnedVp: number;
+  tasksCompleted: number;
+  focusMinutes: number;
+  momentum: number;
+  completed: Array<typeof tasksTable.$inferSelect>;
+  activeCount: number;
+};
+
+type TitleDefinition = RewardItem & { test: (context: UnlockContext) => boolean };
+const title = (
+  id: string,
+  name: string,
+  requirement: string,
+  source: NonNullable<RewardItem["source"]>,
+  test: TitleDefinition["test"],
+): TitleDefinition => ({ id, name, kind: "title", cost: 0, style: id, requirement, source, test });
+
+const hasCompleted = (context: UnlockContext, pattern: RegExp, count = 1) =>
+  context.completed.filter((task) => pattern.test(`${task.title} ${task.subject ?? ""}`)).length >= count;
+const lateTasks = (context: UnlockContext, start: number, end: number) =>
+  context.completed.filter((task) => {
+    const hour = task.completedAt?.getHours();
+    return hour !== undefined && (start <= end ? hour >= start && hour <= end : hour >= start || hour <= end);
+  }).length;
+
+const titles: TitleDefinition[] = [
+  title("getting-started", "Getting Started", "Complete your first task", "achievement", (c) => c.tasksCompleted >= 1),
+  title("on-a-roll", "On a Roll", "Build 3 Momentum days", "achievement", (c) => c.momentum >= 3),
+  title("consistent", "Consistent", "Build 7 Momentum days", "achievement", (c) => c.momentum >= 7),
+  title("daily-driver", "Daily Driver", "Build 14 Momentum days", "achievement", (c) => c.momentum >= 14),
+  title("unstoppable", "Unstoppable", "Build 30 Momentum days", "achievement", (c) => c.momentum >= 30),
+  title("night-grinder", "Night Grinder", "Complete a task after 10 PM", "quest", (c) => lateTasks(c, 22, 4) >= 1),
+  title("3-am-strategist", "3 AM Strategist", "Complete a task during the 3 AM hour", "quest", (c) => lateTasks(c, 3, 3) >= 1),
+  title("submitting-1159", "Submitting at 11:59 PM", "Finish a task between 11:55 PM and midnight", "quest", (c) => c.completed.some((task) => task.completedAt?.getHours() === 23 && (task.completedAt?.getMinutes() ?? 0) >= 55)),
+  title("driven-by-panic", "Driven By Panic", "Complete 5 overdue tasks", "achievement", (c) => c.completed.filter((task) => task.dueDate && task.completedAt && task.completedAt > new Date(`${task.dueDate}T23:59:59`)).length >= 5),
+  title("caffeine-fueled", "Caffeine Fueled", "Focus for 300 minutes", "achievement", (c) => c.focusMinutes >= 300),
+  title("dark-mode-main", "Dark Mode Main", "Reach Tier 5", "tier", (c) => c.tier >= 5),
+  title("midnight-coder", "Midnight Coder", "Finish coding work late at night", "quest", (c) => lateTasks({ ...c, completed: c.completed.filter((task) => /\b(code|coding|program|debug|api|frontend|backend)\b/i.test(task.title)) }, 22, 4) >= 1),
+  title("sleep-deprived", "Sleep Deprived", "Complete 5 late-night tasks", "achievement", (c) => lateTasks(c, 22, 4) >= 5),
+  title("academic-comeback", "Academic Comeback", "Complete 10 school tasks", "achievement", (c) => c.completed.filter((task) => Boolean(task.subject)).length >= 10),
+  title("procrastinator", "Procrastinator", "Complete 10 overdue tasks", "achievement", (c) => c.completed.filter((task) => task.dueDate && task.completedAt && task.completedAt > new Date(`${task.dueDate}T23:59:59`)).length >= 10),
+  title("surviving", "Surviving", "Complete 10 tasks", "achievement", (c) => c.tasksCompleted >= 10),
+  title("lock-in-era", "Lock In Era", "Focus for 120 minutes", "achievement", (c) => c.focusMinutes >= 120),
+  title("canvas-clear", "Canvas Clear", "Complete 20 Canvas tasks", "achievement", (c) => c.completed.filter((task) => task.externalSource === "canvas").length >= 20),
+  title("gg-wp", "GG WP", "Complete 25 tasks", "achievement", (c) => c.tasksCompleted >= 25),
+  title("trust-the-process", "Trust The Process", "Earn 500 lifetime VP", "tier", (c) => c.earnedVp >= 500),
+  title("clutch-player", "Clutch Player", "Complete 5 critical tasks", "quest", (c) => c.completed.filter((task) => task.priority === "critical").length >= 5),
+  title("locked-in", "Locked In", "Focus for 600 minutes", "achievement", (c) => c.focusMinutes >= 600),
+  title("in-the-zone", "In The Zone", "Focus for 1,200 minutes", "achievement", (c) => c.focusMinutes >= 1200),
+  title("dialed-in", "Dialed In", "Focus for 2,400 minutes", "achievement", (c) => c.focusMinutes >= 2400),
+  title("zero-backlog", "Zero Backlog", "Clear every active task after completing 10", "quest", (c) => c.tasksCompleted >= 10 && c.activeCount === 0),
+  title("top-tier", "Top Tier", "Reach Tier 10", "tier", (c) => c.tier >= 10),
+  title("unbothered", "Unbothered", "Earn 1,500 lifetime VP", "tier", (c) => c.earnedVp >= 1500),
+  title("built-different", "Built Different", "Complete 100 tasks", "achievement", (c) => c.tasksCompleted >= 100),
+  title("overachiever", "Overachiever", "Complete 150 tasks", "achievement", (c) => c.tasksCompleted >= 150),
+  title("backend-main", "Backend Main", "Complete 5 backend tasks", "quest", (c) => hasCompleted(c, /\b(backend|server|database|api)\b/i, 5)),
+  title("full-stack", "Full Stack", "Complete 8 frontend or backend tasks", "quest", (c) => hasCompleted(c, /\b(frontend|backend|full stack|database|api|react)\b/i, 8)),
+  title("bug-fixer", "Bug Fixer", "Complete 5 debugging tasks", "quest", (c) => hasCompleted(c, /\b(bug|debug|fix|repair)\b/i, 5)),
+  title("git-push", "Git Push", "Complete 3 Git or deployment tasks", "quest", (c) => hasCompleted(c, /\b(git|push|deploy|release)\b/i, 3)),
+  title("terminal-velocity", "Terminal Velocity", "Reach Tier 20", "tier", (c) => c.tier >= 20),
+  title("calc-ready", "Calc Ready", "Complete 10 math tasks", "achievement", (c) => hasCompleted(c, /\b(math|algebra|geometry|calculus|trig)\b/i, 10)),
+  title("4-0-grind", "4.0 Grind", "Complete 50 school tasks", "achievement", (c) => c.completed.filter((task) => Boolean(task.subject)).length >= 50),
+  title("mathletes", "Mathletes", "Complete 25 math tasks", "achievement", (c) => hasCompleted(c, /\b(math|algebra|geometry|calculus|trig|amc)\b/i, 25)),
+  title("proof-master", "Proof Master", "Complete 50 math tasks", "achievement", (c) => hasCompleted(c, /\b(math|algebra|geometry|calculus|proof|amc)\b/i, 50)),
+  title("honor-roll", "Honor Roll", "Reach Tier 8", "tier", (c) => c.tier >= 8),
+  title("a-star", "A Star", "Complete 75 tasks", "achievement", (c) => c.tasksCompleted >= 75),
+  title("class-rank-1", "Class Rank 1", "Reach Tier 15", "tier", (c) => c.tier >= 15),
+  title("inbox-zero", "Inbox Zero", "Clear your backlog after completing 20 tasks", "quest", (c) => c.tasksCompleted >= 20 && c.activeCount === 0),
+];
+
+function findItem(itemId: string) {
+  return collectables.find((item) => item.id === itemId) ?? titles.find((item) => item.id === itemId);
+}
 
 router.get("/rewards", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id));
-  const owned = await db.select({ itemId: userCosmeticsTable.itemId }).from(userCosmeticsTable).where(eq(userCosmeticsTable.userId, req.user.id));
-  const [user] = await db.select({ equippedCosmetic: usersTable.equippedCosmetic, equippedFrame: usersTable.equippedFrame, equippedPet: usersTable.equippedPet, avatarStyle: usersTable.avatarStyle }).from(usersTable).where(eq(usersTable.id, req.user.id));
-  res.json({ balance: stats?.totalVp ?? 0, owned: ["starter-bolt", ...owned.map((entry) => entry.itemId)], equipped: { avatar: user?.equippedCosmetic ?? "starter-bolt", frame: user?.equippedFrame ?? "none", pet: user?.equippedPet ?? "none" }, avatarStyle: user?.avatarStyle ?? "bolt", items: cosmetics });
+  const [stats, ownedRows, user, tasks] = await Promise.all([
+    db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id)).then((rows) => rows[0]),
+    db.select({ itemId: userCosmeticsTable.itemId }).from(userCosmeticsTable).where(eq(userCosmeticsTable.userId, req.user.id)),
+    db.select({ equippedFrame: usersTable.equippedFrame, equippedPet: usersTable.equippedPet, equippedTitle: usersTable.equippedTitle, profileImageUrl: usersTable.profileImageUrl }).from(usersTable).where(eq(usersTable.id, req.user.id)).then((rows) => rows[0]),
+    db.select().from(tasksTable).where(eq(tasksTable.userId, req.user.id)),
+  ]);
+  const completed = tasks.filter((task) => task.status === "completed");
+  const context: UnlockContext = {
+    tier: stats?.tier ?? 1,
+    earnedVp: stats?.lifetimeVp ?? 0,
+    tasksCompleted: stats?.tasksCompleted ?? completed.length,
+    focusMinutes: stats?.focusMinutes ?? 0,
+    momentum: stats?.streakDays ?? 0,
+    completed,
+    activeCount: tasks.filter((task) => task.status !== "completed" && !task.archived).length,
+  };
+  const unlockedTitles = titles.filter((item) => item.test(context));
+  const owned = new Set(ownedRows.map((entry) => entry.itemId));
+  const newlyUnlocked = unlockedTitles.filter((item) => !owned.has(item.id));
+  if (newlyUnlocked.length) {
+    await db.insert(userCosmeticsTable).values(newlyUnlocked.map((item) => ({ userId: req.user!.id, itemId: item.id }))).onConflictDoNothing();
+    newlyUnlocked.forEach((item) => owned.add(item.id));
+  }
+  res.json({
+    balance: stats?.totalVp ?? 0,
+    earnedVp: context.earnedVp,
+    owned: [...owned],
+    newlyUnlockedTitles: newlyUnlocked.map((item) => item.name),
+    equipped: { frame: user?.equippedFrame ?? "none", pet: user?.equippedPet ?? "none", title: user?.equippedTitle ?? "none" },
+    profileImageUrl: user?.profileImageUrl ?? null,
+    items: [...collectables, ...titles.map(({ test: _test, ...item }) => item)],
+  });
 });
 
 router.post("/rewards/:itemId/purchase", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const item = findItem(req.params.itemId);
   if (!item) { res.status(404).json({ error: "Unknown reward." }); return; }
-  if (item.cost === 0) { res.status(400).json({ error: "This reward is already available." }); return; }
+  if (item.kind === "title") { res.status(400).json({ error: "Titles are earned through achievements and tiers." }); return; }
   try {
     const response = await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(userCosmeticsTable).where(and(eq(userCosmeticsTable.userId, req.user.id), eq(userCosmeticsTable.itemId, item.id)));
@@ -69,20 +183,20 @@ router.post("/rewards/:itemId/equip", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const item = findItem(req.params.itemId);
   if (!item) { res.status(404).json({ error: "Unknown reward." }); return; }
-  const owned = item.cost === 0 || await db.select().from(userCosmeticsTable).where(and(eq(userCosmeticsTable.userId, req.user.id), eq(userCosmeticsTable.itemId, item.id))).then((rows) => rows.length > 0);
-  if (!owned) { res.status(403).json({ error: "Purchase this item before equipping it." }); return; }
-  const update = item.kind === "avatar" ? { equippedCosmetic: item.id, avatarStyle: item.style } : item.kind === "frame" ? { equippedFrame: item.id } : { equippedPet: item.id };
+  const owned = await db.select().from(userCosmeticsTable).where(and(eq(userCosmeticsTable.userId, req.user.id), eq(userCosmeticsTable.itemId, item.id))).then((rows) => rows.length > 0);
+  if (!owned) { res.status(403).json({ error: item.kind === "title" ? "Complete its requirement before equipping this title." : "Purchase this item before equipping it." }); return; }
+  const update = item.kind === "frame" ? { equippedFrame: item.id } : item.kind === "pet" ? { equippedPet: item.id } : { equippedTitle: item.id };
   await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
-  res.json({ equipped: item.id, avatarStyle: item.style });
+  res.json({ equipped: item.id });
 });
 
 router.delete("/rewards/equipped/:kind", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  if (req.params.kind !== "frame" && req.params.kind !== "pet") {
-    res.status(400).json({ error: "Only frames and companions can be removed." });
+  if (!(["frame", "pet", "title"] as const).includes(req.params.kind as "frame" | "pet" | "title")) {
+    res.status(400).json({ error: "Unknown reward type." });
     return;
   }
-  const update = req.params.kind === "frame" ? { equippedFrame: "none" } : { equippedPet: "none" };
+  const update = req.params.kind === "frame" ? { equippedFrame: "none" } : req.params.kind === "pet" ? { equippedPet: "none" } : { equippedTitle: "none" };
   await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
   res.json({ equipped: "none" });
 });

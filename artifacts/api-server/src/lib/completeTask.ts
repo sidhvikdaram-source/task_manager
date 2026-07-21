@@ -66,7 +66,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
     const newStreak = firstCompletionToday ? stats.streakDays + 1 : stats.streakDays;
     const newMultiplier = newStreak >= 14 ? 2 : newStreak >= 7 ? 1.5 : newStreak >= 3 ? 1.2 : 1;
 
-    await tx.update(userStatsTable).set({ totalVp: newTotal, tier: newTier, tierProgress: progress % 100,
+    await tx.update(userStatsTable).set({ totalVp: newTotal, lifetimeVp: stats.lifetimeVp + vpAwarded, tier: newTier, tierProgress: progress % 100,
       tasksCompleted: stats.tasksCompleted + 1, streakDays: newStreak, multiplier: newMultiplier,
       lastActivityDate: completedAt, updatedAt: completedAt }).where(eq(userStatsTable.id, stats.id));
 

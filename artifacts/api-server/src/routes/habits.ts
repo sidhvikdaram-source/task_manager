@@ -56,8 +56,10 @@ router.post("/daily-habits/:habitId/toggle", async (req, res): Promise<void> => 
 
 async function awardVp(userId: string, amount: number) {
   const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
-  if (stats) await db.update(userStatsTable).set({ totalVp: stats.totalVp + amount, tierProgress: (stats.tierProgress + amount) % 100, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
-  else await db.insert(userStatsTable).values({ userId, totalVp: amount, tierProgress: amount % 100 });
+  if (stats) {
+    const progress = stats.tierProgress + amount;
+    await db.update(userStatsTable).set({ totalVp: stats.totalVp + amount, lifetimeVp: stats.lifetimeVp + amount, tier: stats.tier + Math.floor(progress / 100), tierProgress: progress % 100, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
+  } else await db.insert(userStatsTable).values({ userId, totalVp: amount, lifetimeVp: amount, tier: 1 + Math.floor(amount / 100), tierProgress: amount % 100 });
 }
 
 router.delete("/daily-habits/:habitId", async (req, res): Promise<void> => {

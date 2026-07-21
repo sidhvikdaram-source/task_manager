@@ -78,6 +78,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
           queryClient.invalidateQueries({
             queryKey: getGetUserStatsQueryKey(),
           });
+          queryClient.invalidateQueries({ queryKey: ["rewards"] });
         },
       },
     );

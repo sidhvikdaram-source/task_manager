@@ -110,6 +110,7 @@ router.patch("/checklist/:itemId", async (req, res): Promise<void> => {
       const tierUps = Math.floor(newTierProgress / 100);
       await db.update(userStatsTable).set({
         totalVp: newTotal,
+        lifetimeVp: stats.lifetimeVp + vpAwarded,
         tier: stats.tier + tierUps,
         tierProgress: newTierProgress % 100,
         updatedAt: new Date(),

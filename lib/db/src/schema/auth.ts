@@ -37,12 +37,14 @@ export const usersTable = pgTable("users", {
     .default("starter-bolt"),
   equippedFrame: varchar("equipped_frame").notNull().default("none"),
   equippedPet: varchar("equipped_pet").notNull().default("none"),
+  equippedTitle: varchar("equipped_title").notNull().default("none"),
   mainGoal: varchar("main_goal"),
   onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
   advancedFeaturesEnabled: boolean("advanced_features_enabled")
     .notNull()
     .default(false),
   tutorialCompleted: boolean("tutorial_completed").notNull().default(false),
+  socialEnabled: boolean("social_enabled").notNull().default(false),
   timezone: varchar("timezone").notNull().default("UTC"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

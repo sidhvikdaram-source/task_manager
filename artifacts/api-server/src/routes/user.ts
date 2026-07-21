@@ -44,6 +44,7 @@ router.get("/user/preferences", async (req, res): Promise<void> => {
       onboardingCompleted: usersTable.onboardingCompleted,
       advancedFeaturesEnabled: usersTable.advancedFeaturesEnabled,
       tutorialCompleted: usersTable.tutorialCompleted,
+      socialEnabled: usersTable.socialEnabled,
       timezone: usersTable.timezone,
     })
     .from(usersTable)
@@ -69,6 +70,8 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
     update.advancedFeaturesEnabled = req.body.advancedFeaturesEnabled;
   if (typeof req.body?.tutorialCompleted === "boolean")
     update.tutorialCompleted = req.body.tutorialCompleted;
+  if (typeof req.body?.socialEnabled === "boolean")
+    update.socialEnabled = req.body.socialEnabled;
   if (typeof req.body?.timezone === "string") {
     try {
       Intl.DateTimeFormat("en-US", { timeZone: req.body.timezone }).format();
@@ -91,8 +94,32 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
       onboardingCompleted: usersTable.onboardingCompleted,
       advancedFeaturesEnabled: usersTable.advancedFeaturesEnabled,
       tutorialCompleted: usersTable.tutorialCompleted,
+      socialEnabled: usersTable.socialEnabled,
       timezone: usersTable.timezone,
     });
+  res.json(user);
+});
+
+router.patch("/user/profile", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const profileImageUrl = req.body?.profileImageUrl;
+  if (
+    profileImageUrl !== null &&
+    (typeof profileImageUrl !== "string" ||
+      !/^data:image\/(png|jpeg|webp);base64,/i.test(profileImageUrl) ||
+      profileImageUrl.length > 700_000)
+  ) {
+    res.status(400).json({ error: "Use a PNG, JPEG, or WebP image under 500 KB." });
+    return;
+  }
+  const [user] = await db
+    .update(usersTable)
+    .set({ profileImageUrl, updatedAt: new Date() })
+    .where(eq(usersTable.id, req.user.id))
+    .returning({ profileImageUrl: usersTable.profileImageUrl });
   res.json(user);
 });
 

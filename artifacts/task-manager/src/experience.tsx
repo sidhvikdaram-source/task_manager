@@ -14,6 +14,7 @@ export type ExperiencePreferences = {
   onboardingCompleted: boolean;
   advancedFeaturesEnabled: boolean;
   tutorialCompleted: boolean;
+  socialEnabled: boolean;
   timezone: string;
 };
 
@@ -22,6 +23,7 @@ const defaults: ExperiencePreferences = {
   onboardingCompleted: false,
   advancedFeaturesEnabled: false,
   tutorialCompleted: false,
+  socialEnabled: false,
   timezone: "UTC",
 };
 

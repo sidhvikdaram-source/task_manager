@@ -6,6 +6,7 @@ export const userStatsTable = pgTable("user_stats", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id"),
   totalVp: integer("total_vp").notNull().default(0),
+  lifetimeVp: integer("lifetime_vp").notNull().default(0),
   tier: integer("tier").notNull().default(1),
   tierProgress: integer("tier_progress").notNull().default(0),
   streakDays: integer("streak_days").notNull().default(0),

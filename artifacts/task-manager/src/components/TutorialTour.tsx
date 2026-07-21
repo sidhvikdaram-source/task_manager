@@ -4,6 +4,12 @@ import { useExperience } from "@/experience";
 
 const steps = [
   {
+    target: "[data-tour='settings-access']",
+    title: "Start simple, add more later",
+    detail:
+      "Open your account menu to reach Settings. Social stays private and off until you choose to enable it there.",
+  },
+  {
     target: "[data-tour='quick-capture']",
     title: "Capture naturally",
     detail:
@@ -44,7 +50,7 @@ export function TutorialTour() {
   }
 
   return (
-    <aside className="fixed bottom-4 right-4 z-[80] w-[calc(100%-2rem)] max-w-sm rounded-lg border bg-popover p-4 shadow-2xl">
+    <aside className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-[80] w-[calc(100%-2rem)] max-w-sm rounded-lg border bg-popover p-4 shadow-2xl md:bottom-4">
       <div className="flex items-start gap-3">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-black text-primary-foreground">
           {step + 1}

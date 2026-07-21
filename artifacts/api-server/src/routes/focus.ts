@@ -78,6 +78,7 @@ router.post("/focus-sessions/:id/complete", async (req, res): Promise<void> => {
 
   await db.update(userStatsTable).set({
     totalVp: newTotal,
+    lifetimeVp: stats.lifetimeVp + vpAwarded,
     tier: stats.tier + tierUps,
     tierProgress: newTierProgress % 100,
     focusMinutes: stats.focusMinutes + existing.durationMinutes,

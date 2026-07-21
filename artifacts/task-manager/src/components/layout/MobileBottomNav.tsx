@@ -32,6 +32,7 @@ const moreLinks = [
   { href: "/social", label: "Social", icon: Users },
   { href: "/analytics", label: "Insights", icon: BarChart3 },
   { href: "/profile", label: "Profile", icon: UserRound },
+  { href: "/settings", label: "Settings", icon: Settings2 },
 ] as const;
 
 export function MobileBottomNav() {
@@ -121,8 +122,11 @@ export function MobileBottomNav() {
                 {moreLinks.map((item) => {
                   const Icon = item.icon;
                   const locked =
-                    item.href !== "/profile" &&
+                    item.href !== "/profile" && item.href !== "/settings" &&
                     !preferences.advancedFeaturesEnabled;
+                  if (item.href === "/social" && !preferences.socialEnabled) {
+                    return <Link key={item.href} href="/settings"><button type="button" onClick={() => setMoreOpen(false)} className="flex min-h-14 w-full items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted"><Users className="h-4 w-4 text-muted-foreground" /><span><span className="block text-sm font-bold">Social</span><span className="block text-[10px] text-muted-foreground">Turn on in Settings</span></span></button></Link>;
+                  }
                   return locked ? (
                     <button
                       key={item.href}

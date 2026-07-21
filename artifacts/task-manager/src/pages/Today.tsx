@@ -162,6 +162,7 @@ export default function Today() {
         queryKey: getGetDashboardOverviewQueryKey(),
       }),
       queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: ["rewards"] }),
     ]);
   }
 
@@ -587,13 +588,15 @@ export default function Today() {
               onClick={(event) => event.stopPropagation()}
               className="w-full max-w-sm rounded-xl border border-secondary/40 bg-card p-7 text-center shadow-2xl"
             >
-              <motion.div
-                animate={{ scale: [1, 1.18, 1], rotate: [0, -5, 5, 0] }}
-                transition={{ duration: 0.9 }}
-                className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-secondary/15 text-secondary"
-              >
-                <MomentumIcon className="h-9 w-9" />
-              </motion.div>
+              <div className="relative mx-auto flex h-28 w-28 items-center justify-center" aria-hidden="true">
+                <motion.span className="absolute inset-1 rounded-full border border-primary/25" initial={{ scale: 0.45, opacity: 0 }} animate={{ scale: [0.45, 1.08, 1], opacity: [0, 0.9, 0.3] }} transition={{ duration: 1.1 }} />
+                <motion.span className="absolute inset-3 rounded-full border-2 border-dashed border-secondary/45" animate={{ rotate: 360 }} transition={{ duration: 5, repeat: Infinity, ease: "linear" }} />
+                {[0, 1, 2, 3, 4, 5].map((particle) => <motion.span key={particle} className="absolute h-2 w-2 rounded-full bg-primary" initial={{ x: 0, y: 0, opacity: 0 }} animate={{ x: Math.cos((particle / 6) * Math.PI * 2) * 50, y: Math.sin((particle / 6) * Math.PI * 2) * 50, opacity: [0, 1, 0], scale: [0.4, 1, 0.4] }} transition={{ duration: 1.25, delay: particle * 0.06 }} />)}
+                <motion.div animate={{ y: [0, -5, 0], scale: [1, 1.12, 1] }} transition={{ duration: 1.1 }} className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-[0_0_28px_hsl(var(--secondary)/.35)]">
+                  <MomentumIcon className="h-9 w-9" />
+                </motion.div>
+                <div className="absolute bottom-1 flex h-5 items-end gap-1">{[9, 16, 12, 20, 14].map((height, index) => <motion.span key={index} className="w-1 rounded-full bg-primary" initial={{ height: 2 }} animate={{ height: [2, height, 4] }} transition={{ duration: 0.8, delay: 0.35 + index * 0.06 }} />)}</div>
+              </div>
               <p className="mt-4 text-xs font-black uppercase text-secondary">
                 Momentum kept
               </p>

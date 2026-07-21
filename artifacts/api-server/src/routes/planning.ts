@@ -126,8 +126,10 @@ router.post("/weekly-review/complete", async (req, res): Promise<void> => {
     const [receipt] = await tx.insert(weeklyReviewsTable).values({ userId: req.user.id, weekStart, topPriorities: priorities, focusGoalMinutes, vpAwarded: award }).onConflictDoNothing().returning();
     if (!receipt) return { awarded: 0, alreadyCompleted: true };
     const [stats] = await tx.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id));
-    if (stats) await tx.update(userStatsTable).set({ totalVp: sql`${userStatsTable.totalVp} + ${award}`, tierProgress: (stats.tierProgress + award) % 100, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
-    else await tx.insert(userStatsTable).values({ userId: req.user.id, totalVp: award, tierProgress: award });
+    if (stats) {
+      const progress = stats.tierProgress + award;
+      await tx.update(userStatsTable).set({ totalVp: sql`${userStatsTable.totalVp} + ${award}`, lifetimeVp: stats.lifetimeVp + award, tier: stats.tier + Math.floor(progress / 100), tierProgress: progress % 100, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
+    } else await tx.insert(userStatsTable).values({ userId: req.user.id, totalVp: award, lifetimeVp: award, tierProgress: award });
     return { awarded: award, alreadyCompleted: false };
   });
   res.json(result);
