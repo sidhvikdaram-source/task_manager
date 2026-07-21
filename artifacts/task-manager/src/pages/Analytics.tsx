@@ -15,7 +15,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
-  Flame,
   Trophy,
   Zap,
   Clock,
@@ -25,6 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, parseISO } from "date-fns";
 import WeeklyReview from "@/pages/WeeklyReview";
+import { MomentumIcon } from "@/components/MomentumIcon";
 
 export default function Analytics() {
   const [view, setView] = useState<"analytics" | "review">("analytics");
@@ -101,12 +101,12 @@ export default function Analytics() {
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-orange-500/10 to-rose-500/10 border-orange-500/20 border p-4 rounded-xl shadow-sm flex flex-col justify-center items-center text-center">
-          <Flame className="w-8 h-8 text-orange-500 mb-2" />
+          <MomentumIcon className="mb-2 h-8 w-8 text-primary" />
           <div className="text-3xl font-black text-orange-600">
             {summary.streakDays}
           </div>
           <div className="text-xs font-semibold text-orange-600/80 uppercase tracking-wider mt-1">
-            Day Streak
+            Momentum Days
           </div>
         </div>
 

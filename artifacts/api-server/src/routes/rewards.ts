@@ -5,18 +5,31 @@ import { db, userCosmeticsTable, userStatsTable, usersTable } from "@workspace/d
 const router: IRouter = Router();
 
 const cosmetics = [
-  { id: "starter-bolt", name: "Core Bolt", kind: "avatar", cost: 0, style: "bolt" },
+  { id: "starter-bolt", name: "Sky Navigator", kind: "avatar", cost: 0, style: "navigator" },
   { id: "orbit-frame", name: "Orbit Frame", kind: "frame", cost: 80, style: "orbit" },
   { id: "signal-ring", name: "Signal Ring", kind: "frame", cost: 150, style: "signal" },
-  { id: "ember-bolt", name: "Ember Bolt", kind: "avatar", cost: 220, style: "ember" },
-  { id: "prism-core", name: "Prism Core", kind: "avatar", cost: 360, style: "prism" },
-  { id: "mono-core", name: "Mono Core", kind: "avatar", cost: 120, style: "mono" },
-  { id: "aurora-core", name: "Aurora Core", kind: "avatar", cost: 480, style: "aurora" },
+  { id: "ember-bolt", name: "Ember Graduate", kind: "avatar", cost: 220, style: "graduate" },
+  { id: "prism-core", name: "Prism Artist", kind: "avatar", cost: 360, style: "artist" },
+  { id: "mono-core", name: "Mono Coder", kind: "avatar", cost: 120, style: "coder" },
+  { id: "aurora-core", name: "Aurora Explorer", kind: "avatar", cost: 480, style: "explorer" },
+  { id: "atlas-reader", name: "Atlas Reader", kind: "avatar", cost: 90, style: "reader" },
+  { id: "nova-coder", name: "Nova Coder", kind: "avatar", cost: 180, style: "coder" },
+  { id: "sage-scholar", name: "Sage Scholar", kind: "avatar", cost: 240, style: "scholar" },
+  { id: "orbit-listener", name: "Orbit Listener", kind: "avatar", cost: 280, style: "listener" },
+  { id: "quill-writer", name: "Quill Writer", kind: "avatar", cost: 320, style: "writer" },
+  { id: "terra-explorer", name: "Terra Explorer", kind: "avatar", cost: 360, style: "explorer" },
+  { id: "tempo-maker", name: "Tempo Maker", kind: "avatar", cost: 400, style: "musician" },
+  { id: "pixel-planner", name: "Pixel Planner", kind: "avatar", cost: 440, style: "planner" },
+  { id: "lab-thinker", name: "Lab Thinker", kind: "avatar", cost: 500, style: "scientist" },
+  { id: "cafe-creator", name: "Cafe Creator", kind: "avatar", cost: 560, style: "creator" },
   { id: "precision-frame", name: "Precision Frame", kind: "frame", cost: 260, style: "precision" },
   { id: "nova-frame", name: "Nova Frame", kind: "frame", cost: 420, style: "nova" },
+  { id: "studio-frame", name: "Studio Frame", kind: "frame", cost: 540, style: "studio" },
   { id: "pixel-spark", name: "Pixel Spark", kind: "pet", cost: 180, style: "spark" },
   { id: "cloud-bit", name: "Cloud Bit", kind: "pet", cost: 300, style: "cloud" },
   { id: "focus-cube", name: "Focus Cube", kind: "pet", cost: 520, style: "cube" },
+  { id: "study-bot", name: "Study Bot", kind: "pet", cost: 420, style: "bot" },
+  { id: "leafling", name: "Leafling", kind: "pet", cost: 250, style: "leaf" },
 ] as const;
 
 function findItem(itemId: string) { return cosmetics.find((item) => item.id === itemId); }
@@ -61,6 +74,17 @@ router.post("/rewards/:itemId/equip", async (req, res): Promise<void> => {
   const update = item.kind === "avatar" ? { equippedCosmetic: item.id, avatarStyle: item.style } : item.kind === "frame" ? { equippedFrame: item.id } : { equippedPet: item.id };
   await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
   res.json({ equipped: item.id, avatarStyle: item.style });
+});
+
+router.delete("/rewards/equipped/:kind", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (req.params.kind !== "frame" && req.params.kind !== "pet") {
+    res.status(400).json({ error: "Only frames and companions can be removed." });
+    return;
+  }
+  const update = req.params.kind === "frame" ? { equippedFrame: "none" } : { equippedPet: "none" };
+  await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
+  res.json({ equipped: "none" });
 });
 
 export default router;

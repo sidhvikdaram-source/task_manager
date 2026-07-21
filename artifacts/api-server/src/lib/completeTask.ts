@@ -1,7 +1,24 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { db, milestonesTable, tasksTable, userStatsTable } from "@workspace/db";
+import {
+  db,
+  milestonesTable,
+  tasksTable,
+  usersTable,
+  userStatsTable,
+} from "@workspace/db";
 
 export class TaskNotFoundError extends Error {}
+
+function localDateKey(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
 
 export async function completeTaskAndAward(userId: string, taskId: number) {
   return db.transaction(async (tx) => {
@@ -29,14 +46,21 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
 
     let [stats] = await tx.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
     if (!stats) [stats] = await tx.insert(userStatsTable).values({ userId }).returning();
+    const [user] = await tx
+      .select({ timezone: usersTable.timezone })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
     const multiplier = stats.multiplier ?? 1;
     const vpAwarded = Math.round((task.vpValue ?? 10) * multiplier);
     const newTotal = stats.totalVp + vpAwarded;
     const progress = stats.tierProgress + vpAwarded;
     const tierUps = Math.floor(progress / 100);
     const newTier = stats.tier + tierUps;
-    const today = completedAt.toDateString();
-    const lastActivity = stats.lastActivityDate?.toDateString();
+    const timezone = user?.timezone ?? "UTC";
+    const today = localDateKey(completedAt, timezone);
+    const lastActivity = stats.lastActivityDate
+      ? localDateKey(stats.lastActivityDate, timezone)
+      : null;
     const firstCompletionToday = lastActivity !== today;
     // Momentum counts active days. Missing a day never erases progress.
     const newStreak = firstCompletionToday ? stats.streakDays + 1 : stats.streakDays;

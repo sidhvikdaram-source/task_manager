@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
+import { MomentumIcon } from "@/components/MomentumIcon";
 
 type Task = {
   id: number;
@@ -157,7 +158,7 @@ export default function WeeklyReview() {
         />
         <Metric icon={Clock3} label="Focus" value={`${data.focusMinutes}m`} />
         <Metric icon={Zap} label="VP earned" value={data.vpEarned} />
-        <Metric icon={Trophy} label="Streak" value={`${data.streakDays}d`} />
+        <Metric icon={MomentumIcon} label="Momentum" value={`${data.streakDays}d`} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">

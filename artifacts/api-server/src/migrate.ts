@@ -31,7 +31,8 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "main_goal" varchar,
       ADD COLUMN IF NOT EXISTS "onboarding_completed" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "advanced_features_enabled" boolean DEFAULT false NOT NULL,
-      ADD COLUMN IF NOT EXISTS "tutorial_completed" boolean DEFAULT false NOT NULL;
+      ADD COLUMN IF NOT EXISTS "tutorial_completed" boolean DEFAULT false NOT NULL,
+      ADD COLUMN IF NOT EXISTS "timezone" varchar DEFAULT 'UTC' NOT NULL;
   `);
   await db.execute(
     sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_username_unique" ON "users" ("username") WHERE "username" IS NOT NULL;`,

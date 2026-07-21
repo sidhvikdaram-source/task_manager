@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@workspace/replit-auth-web";
+import { ProfileAvatar } from "@/components/ProfileCosmetics";
 
 type Profile = {
   id: string;
@@ -25,6 +26,8 @@ type Profile = {
   username: string | null;
   profileImageUrl: string | null;
   avatarStyle: string;
+  equippedCosmetic: string;
+  equippedFrame: string;
   level: number;
   streakDays: number;
   online: boolean;
@@ -65,19 +68,8 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
 
 function ProfileMark({ person }: { person: Profile }) {
   return (
-    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary font-black text-primary-foreground">
-      {person.profileImageUrl ? (
-        <img
-          src={person.profileImageUrl}
-          alt=""
-          width="40"
-          height="40"
-          loading="lazy"
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        (person.displayName?.[0]?.toUpperCase() ?? "?")
-      )}
+    <div className="relative h-10 w-10 shrink-0">
+      <ProfileAvatar avatarId={person.equippedCosmetic} frameId={person.equippedFrame} profileImageUrl={person.profileImageUrl} name={person.displayName ?? person.username ?? "Velocity member"} className="w-10" />
       {person.online && (
         <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-400" />
       )}
@@ -343,7 +335,7 @@ export default function Social() {
                         {person.username
                           ? `@${person.username}`
                           : "Velocity member"}{" "}
-                        · Level {person.level} · {person.streakDays} day streak
+                        · Level {person.level} · {person.streakDays} momentum days
                       </p>
                     </div>
                     {person.friendshipStatus === "none" ? (
@@ -388,8 +380,7 @@ export default function Social() {
                             {friend.displayName ?? "Velocity member"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Level {friend.level} · {friend.streakDays} day
-                            streak
+                            Level {friend.level} · {friend.streakDays} momentum days
                           </p>
                         </div>
                         <button
@@ -662,10 +653,10 @@ export default function Social() {
             <div className="rounded-xl border p-5">
               <div className="flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-secondary" />
-                <h2 className="font-black">Streak comparison</h2>
+                <h2 className="font-black">Momentum comparison</h2>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Based only on stored streak and level data.
+                Based only on stored active-day and level data.
               </p>
               <div className="mt-4 space-y-2">
                 {streakLeaders.map((friend, index) => (

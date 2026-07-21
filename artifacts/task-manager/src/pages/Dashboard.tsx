@@ -23,7 +23,6 @@ import { toast } from "sonner";
 import { useAuth } from "@workspace/replit-auth-web";
 import {
   Zap,
-  Flame,
   Target,
   ChevronRight,
   CheckCircle2,
@@ -32,6 +31,7 @@ import {
   Trophy,
   Plus,
 } from "lucide-react";
+import { MomentumIcon } from "@/components/MomentumIcon";
 
 const CreateTaskModal = lazy(() =>
   import("@/components/CreateTaskModal").then((module) => ({
@@ -357,10 +357,10 @@ export default function Dashboard() {
       countUp: true,
     },
     {
-      label: "Current streak",
+      label: "Momentum days",
       rawValue: stats.streakDays,
       displayValue: `${stats.streakDays} day${stats.streakDays !== 1 ? "s" : ""}`,
-      icon: <Flame className="w-4 h-4 text-amber-500" />,
+      icon: <MomentumIcon className="h-4 w-4 text-primary" />,
       color: "text-amber-600",
     },
   ];
@@ -764,12 +764,12 @@ export default function Dashboard() {
                     className="flex items-center gap-3 p-2.5 bg-muted/50 rounded-lg border"
                   >
                     <div className="w-7 h-7 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-                      <Flame className="w-3.5 h-3.5 text-rose-600" />
+                      <MomentumIcon className="h-3.5 w-3.5 text-primary" />
                     </div>
                     <div>
-                      <div className="text-xs font-semibold">On a Streak</div>
+                      <div className="text-xs font-semibold">Momentum building</div>
                       <div className="text-[10px] text-muted-foreground">
-                        {stats.streakDays} consecutive days
+                        {stats.streakDays} active days total
                       </div>
                     </div>
                   </motion.div>

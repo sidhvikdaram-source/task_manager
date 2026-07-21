@@ -173,10 +173,77 @@ async function upsertAssignment(
 ) {
   const externalId = String(assignment.id);
   if (ignored.has(`assignment:${externalId}`)) return;
-  const subject = await ensureSubject(integration.userId, course);
   const now = new Date();
   const dueAt = assignment.due_at ? new Date(assignment.due_at) : null;
   const dueDate = assignment.due_at?.slice(0, 10) ?? null;
+  const calendarEventId = `assignment:${externalId}`;
+  if (!shouldCreateCanvasTask(assignment.name, "assignment")) {
+    await db
+      .update(tasksTable)
+      .set({ archived: true, externalLastSeenAt: now })
+      .where(
+        and(
+          eq(tasksTable.userId, integration.userId),
+          eq(tasksTable.externalSource, "canvas"),
+          eq(tasksTable.externalId, externalId),
+        ),
+      );
+    if (dueAt) {
+      const eventHash = hash({
+        name: assignment.name,
+        due: assignment.due_at,
+        url: assignment.html_url,
+      });
+      await db
+        .insert(externalCalendarEventsTable)
+        .values({
+          userId: integration.userId,
+          integrationId: integration.id,
+          externalEventId: calendarEventId,
+          externalCourseId: course.externalCourseId,
+          title: assignment.name.trim().slice(0, 300),
+          description: assignment.description ?? null,
+          category: "Class Event",
+          startsAt: dueAt,
+          endsAt: dueAt,
+          allDay: !assignment.due_at?.includes("T"),
+          externalUrl: assignment.html_url ?? null,
+          sourceHash: eventHash,
+          lastSeenAt: now,
+          archived: false,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            externalCalendarEventsTable.integrationId,
+            externalCalendarEventsTable.externalEventId,
+          ],
+          set: {
+            title: assignment.name.trim().slice(0, 300),
+            description: assignment.description ?? null,
+            startsAt: dueAt,
+            endsAt: dueAt,
+            externalUrl: assignment.html_url ?? null,
+            sourceHash: eventHash,
+            lastSeenAt: now,
+            archived: false,
+            updatedAt: now,
+          },
+        });
+      summary.calendarEvents += 1;
+    }
+    return;
+  }
+  await db
+    .update(externalCalendarEventsTable)
+    .set({ archived: true, updatedAt: now })
+    .where(
+      and(
+        eq(externalCalendarEventsTable.integrationId, integration.id),
+        eq(externalCalendarEventsTable.externalEventId, calendarEventId),
+      ),
+    );
+  const subject = await ensureSubject(integration.userId, course);
   const category =
     assignment.is_quiz_assignment || assignment.quiz_id
       ? "Quiz/Test"
@@ -657,7 +724,7 @@ async function syncOAuth(integration: Integration, summary: SyncSummary) {
       });
     const externalCourseId =
       event.context_code?.replace(/^course_/, "") ?? null;
-    if (event.start_at && shouldCreateCanvasTask(event.title)) {
+    if (event.start_at && shouldCreateCanvasTask(event.title, "event")) {
       seenTaskEvents.add(externalId);
       await upsertCalendarTask({
         integration,
@@ -826,7 +893,7 @@ async function syncFeed(integration: Integration, summary: SyncSummary) {
             updatedAt: now,
           },
         });
-      if (shouldCreateCanvasTask(title)) {
+      if (shouldCreateCanvasTask(title, "event")) {
         seenTasks.add(externalId);
         await upsertCalendarTask({
           integration,

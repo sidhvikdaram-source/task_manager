@@ -14,6 +14,7 @@ export type ExperiencePreferences = {
   onboardingCompleted: boolean;
   advancedFeaturesEnabled: boolean;
   tutorialCompleted: boolean;
+  timezone: string;
 };
 
 const defaults: ExperiencePreferences = {
@@ -21,6 +22,7 @@ const defaults: ExperiencePreferences = {
   onboardingCompleted: false,
   advancedFeaturesEnabled: false,
   tutorialCompleted: false,
+  timezone: "UTC",
 };
 
 type ExperienceContextValue = {
@@ -48,7 +50,21 @@ export function ExperienceProvider({
         if (!response.ok) throw new Error("Preferences could not be loaded");
         return (await response.json()) as ExperiencePreferences;
       })
-      .then((value) => active && setPreferences(value))
+      .then((value) => {
+        if (!active) return;
+        setPreferences(value);
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (timezone && timezone !== value.timezone) {
+          void fetch("/api/user/preferences", {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ timezone }),
+          }).then(async (response) => {
+            if (response.ok && active) setPreferences(await response.json() as ExperiencePreferences);
+          });
+        }
+      })
       .catch(() => undefined)
       .finally(() => active && setLoading(false));
     return () => {

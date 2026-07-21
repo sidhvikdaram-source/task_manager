@@ -317,7 +317,7 @@ export function VelocityAssistantCard() {
           exit={{ opacity: 0, y: 12, scale: 0.97 }}
           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           className={cn(
-            'bento-card fixed bottom-3 left-3 right-3 z-50 flex h-[min(38rem,calc(100dvh-6rem))] flex-col overflow-hidden p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:w-[28rem] sm:p-5',
+            'bento-card fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-2 right-2 z-[70] flex h-[min(42rem,calc(100dvh-6rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:w-[28rem] sm:p-5',
             isFocused && 'ring-2 ring-primary/35 shadow-[0_0_42px_hsl(var(--primary)/0.18)]',
           )}
           aria-label="Velocity Assistant"
@@ -375,7 +375,7 @@ export function VelocityAssistantCard() {
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.94 }}
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-white/15 bg-[#141414] text-white shadow-[0_12px_34px_rgba(0,0,0,0.34)]"
+          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-50 flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full border border-white/15 bg-[#141414] text-white shadow-[0_12px_34px_rgba(0,0,0,0.34)] sm:bottom-5 sm:right-5 sm:h-14 sm:w-14"
           aria-label="Open Velocity Assistant"
           title="Velocity Assistant"
         >

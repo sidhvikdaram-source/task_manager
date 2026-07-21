@@ -43,6 +43,7 @@ export const usersTable = pgTable("users", {
     .notNull()
     .default(false),
   tutorialCompleted: boolean("tutorial_completed").notNull().default(false),
+  timezone: varchar("timezone").notNull().default("UTC"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -27,6 +27,9 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { themes, useTheme, type ThemeId } from "@/theme";
 import { useExperience } from "@/experience";
+import { useQuery } from "@tanstack/react-query";
+import { ProfileAvatar } from "@/components/ProfileCosmetics";
+import type { RewardsResponse } from "@/pages/Profile";
 
 const CreateTaskModal = lazy(() =>
   import("@/components/CreateTaskModal").then((module) => ({
@@ -60,6 +63,16 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const { user, logout, login, isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
   const { preferences, updatePreferences } = useExperience();
+  const { data: rewards } = useQuery({
+    queryKey: ["rewards"],
+    queryFn: async () => {
+      const response = await fetch("/api/rewards", { credentials: "include" });
+      if (!response.ok) return null;
+      return response.json() as Promise<RewardsResponse>;
+    },
+    enabled: isAuthenticated,
+    staleTime: 60_000,
+  });
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -111,7 +124,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
             onClick={onOpenSidebar}
             data-tour="mobile-navigation"
             aria-label="Open navigation"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="hidden h-9 w-9 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground md:flex"
           >
             <Menu className="h-4 w-4" />
           </button>
@@ -249,20 +262,16 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
               onClick={() => setAccountOpen((o) => !o)}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.94 }}
-              className="w-9 h-9 rounded-xl ring-2 ring-transparent hover:ring-primary/40 transition-all overflow-hidden flex items-center justify-center bg-muted text-xs font-bold text-muted-foreground border border-border/70"
+              className="h-9 w-9 rounded-xl ring-2 ring-transparent transition-all hover:ring-primary/40"
               title="Account"
             >
-              {user?.profileImageUrl ? (
-                <img
-                  src={user.profileImageUrl}
-                  alt=""
-                  width="36"
-                  height="36"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span>{user?.firstName?.[0] ?? user?.email?.[0] ?? "?"}</span>
-              )}
+              <ProfileAvatar
+                avatarId={rewards?.equipped.avatar}
+                frameId={rewards?.equipped.frame}
+                profileImageUrl={user?.profileImageUrl}
+                name={user?.firstName ?? user?.email ?? "Account"}
+                className="w-9"
+              />
             </motion.button>
 
             <AnimatePresence>

@@ -340,7 +340,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       </aside>
 
       {open && (
-        <div className="fixed inset-0 z-[70] lg:hidden">
+        <div className="fixed inset-0 z-[70] hidden md:block lg:hidden">
           <button
             type="button"
             aria-label="Close navigation"

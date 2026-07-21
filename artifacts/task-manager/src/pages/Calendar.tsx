@@ -336,6 +336,7 @@ export default function Calendar() {
               onClick={() => setView(item.id)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold",
+                (item.id === "week" || item.id === "day") && "hidden sm:inline-flex",
                 view === item.id
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground",
@@ -383,15 +384,15 @@ export default function Calendar() {
       <div className={cn("grid grid-cols-1 gap-5", view !== "agenda" && "xl:grid-cols-[minmax(0,1fr)_280px]")}>
         <section className="bento-card overflow-hidden">
           {view === "month" && (
-            <div className="overflow-x-auto">
-              <div className="min-w-[760px]">
+            <div>
+              <div className="sm:min-w-[760px]">
                 <div className="grid grid-cols-7 border-b neon-rule bg-white/[0.03]">
                   {weekDays.map((day) => (
                     <div
                       key={day}
                       className="px-2 py-3 text-center text-[11px] font-black uppercase text-muted-foreground"
                     >
-                      {day}
+                      <span className="sm:hidden">{day[0]}</span><span className="hidden sm:inline">{day}</span>
                     </div>
                   ))}
                 </div>
@@ -430,17 +431,17 @@ export default function Calendar() {
                             void scheduleTask(taskId, day);
                         }}
                         className={cn(
-                          "group min-h-[112px] border-r border-b border-border/70 p-2 text-left transition-all hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                          "group min-h-16 border-r border-b border-border/70 p-1 text-left transition-all hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:min-h-[112px] sm:p-2",
                           !isCurrentMonth &&
                             "bg-black/20 text-muted-foreground/55",
                           selected && "bg-primary/10",
                           urgencyClass(dayTasks),
                         )}
                       >
-                        <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="mb-1 flex items-center justify-between gap-1 sm:mb-2 sm:gap-2">
                           <span
                             className={cn(
-                              "flex h-7 w-7 items-center justify-center rounded-xl text-xs font-black",
+                              "flex h-6 w-6 items-center justify-center rounded-lg text-[11px] font-black sm:h-7 sm:w-7 sm:rounded-xl sm:text-xs",
                               isToday(day) &&
                                 "bg-primary text-primary-foreground shadow-[0_0_18px_rgba(0,213,255,0.35)]",
                               selected &&
@@ -450,12 +451,17 @@ export default function Calendar() {
                           >
                             {format(day, "d")}
                           </span>
-                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-secondary text-secondary-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                          <span className="hidden h-6 w-6 items-center justify-center rounded-lg bg-secondary text-secondary-foreground opacity-0 transition-opacity group-hover:opacity-100 sm:flex">
                             <Plus className="h-3.5 w-3.5" />
                           </span>
                         </div>
 
-                        <div className="space-y-1.5">
+                        <div className="flex flex-wrap gap-1 sm:hidden">
+                          {dayTasks.slice(0, 3).map((task) => <span key={task.id} className={cn("h-1.5 w-1.5 rounded-full", task.priority === "critical" ? "bg-destructive" : task.priority === "high" ? "bg-secondary" : "bg-primary")} />)}
+                          {dayEvents.slice(0, 2).map((event) => <span key={event.id} className="h-1.5 w-1.5 rounded-full bg-[#0f6cbf]" />)}
+                          {dayTasks.length + dayEvents.length > 5 && <span className="text-[8px] font-black text-muted-foreground">+{dayTasks.length + dayEvents.length - 5}</span>}
+                        </div>
+                        <div className="hidden space-y-1.5 sm:block">
                           {dayTasks.slice(0, 2).map((task) => (
                             <span
                               key={task.id}
@@ -581,7 +587,7 @@ export default function Calendar() {
                   type="button"
                   disabled={item.taskId === null}
                   onClick={() => item.taskId && setSelectedTaskId(item.taskId)}
-                  className="grid w-full grid-cols-[90px_minmax(0,1fr)_100px] items-center gap-3 p-4 text-left hover:bg-muted/40 disabled:cursor-default"
+                  className="grid w-full grid-cols-[58px_minmax(0,1fr)] items-center gap-2 p-3 text-left hover:bg-muted/40 disabled:cursor-default sm:grid-cols-[90px_minmax(0,1fr)_100px] sm:gap-3 sm:p-4"
                 >
                   <span className="text-xs font-black text-primary">
                     {format(
@@ -594,7 +600,7 @@ export default function Calendar() {
                   <span className="break-words text-sm font-bold">
                     {item.title}
                   </span>
-                  <span className="text-right text-[10px] font-black uppercase text-muted-foreground">
+                  <span className="hidden text-right text-[10px] font-black uppercase text-muted-foreground sm:block">
                     {item.kind}
                   </span>
                 </button>

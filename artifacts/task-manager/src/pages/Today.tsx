@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Circle,
   Clock3,
-  Flame,
   ListChecks,
   Loader2,
   Plus,
@@ -33,6 +32,7 @@ import {
   playCompletionSound,
   primeCompletionSound,
 } from "@/lib/completionSound";
+import { MomentumIcon } from "@/components/MomentumIcon";
 
 const TaskDetailsModal = lazy(() =>
   import("@/components/TaskDetailsModal").then((module) => ({
@@ -261,8 +261,8 @@ export default function Today() {
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs font-black uppercase text-primary">My Day</p>
           <span className="inline-flex items-center gap-1 rounded-full bg-secondary/10 px-2 py-1 text-[11px] font-black text-secondary">
-            <Flame className="h-3.5 w-3.5 fill-secondary" />
-            {stats?.streakDays ?? 0} day streak
+            <MomentumIcon className="h-3.5 w-3.5" />
+            {stats?.streakDays ?? 0} momentum days
           </span>
         </div>
         <h1 className="mt-1 text-2xl font-black sm:text-3xl">
@@ -303,7 +303,7 @@ export default function Today() {
         <section data-tour="today-list" className="bento-card overflow-hidden">
           <header className="border-b px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex w-full items-center gap-2 sm:w-auto">
                 <ListChecks className="h-4 w-4 text-primary" />
                 <h2 className="font-black">Tasks</h2>
                 <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">
@@ -316,7 +316,7 @@ export default function Today() {
                   size="sm"
                   onClick={() => void recommendNext()}
                   disabled={recommendationLoading}
-                  className="h-8 gap-1.5"
+                  className="h-8 flex-1 gap-1.5 sm:flex-none"
                 >
                   {recommendationLoading ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -592,13 +592,13 @@ export default function Today() {
                 transition={{ duration: 0.9 }}
                 className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-secondary/15 text-secondary"
               >
-                <Flame className="h-9 w-9 fill-secondary" />
+                <MomentumIcon className="h-9 w-9" />
               </motion.div>
               <p className="mt-4 text-xs font-black uppercase text-secondary">
                 Momentum kept
               </p>
               <p className="mt-1 text-3xl font-black">
-                {streakCelebration} day streak
+                {streakCelebration} momentum days
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
                 Every active day counts. Missing a day never erases your

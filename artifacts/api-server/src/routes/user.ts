@@ -44,6 +44,7 @@ router.get("/user/preferences", async (req, res): Promise<void> => {
       onboardingCompleted: usersTable.onboardingCompleted,
       advancedFeaturesEnabled: usersTable.advancedFeaturesEnabled,
       tutorialCompleted: usersTable.tutorialCompleted,
+      timezone: usersTable.timezone,
     })
     .from(usersTable)
     .where(eq(usersTable.id, req.user.id));
@@ -68,6 +69,15 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
     update.advancedFeaturesEnabled = req.body.advancedFeaturesEnabled;
   if (typeof req.body?.tutorialCompleted === "boolean")
     update.tutorialCompleted = req.body.tutorialCompleted;
+  if (typeof req.body?.timezone === "string") {
+    try {
+      Intl.DateTimeFormat("en-US", { timeZone: req.body.timezone }).format();
+      update.timezone = req.body.timezone;
+    } catch {
+      res.status(400).json({ error: "Invalid timezone" });
+      return;
+    }
+  }
   if (!Object.keys(update).length) {
     res.status(400).json({ error: "No supported preferences were provided" });
     return;
@@ -81,6 +91,7 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
       onboardingCompleted: usersTable.onboardingCompleted,
       advancedFeaturesEnabled: usersTable.advancedFeaturesEnabled,
       tutorialCompleted: usersTable.tutorialCompleted,
+      timezone: usersTable.timezone,
     });
   res.json(user);
 });

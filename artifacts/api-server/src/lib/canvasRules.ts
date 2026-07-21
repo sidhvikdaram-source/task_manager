@@ -58,15 +58,23 @@ const calendarOnlyPatterns = [
   /\b(memorial day|labor day|thanksgiving day|independence day|martin luther king(?: jr\.? day)?|mlk day)\b/i,
 ];
 
-export function shouldCreateCanvasTask(title: string) {
+const actionablePatterns = [
+  /\b(quiz|test|exam|assessment|midterm|final)\b/i,
+  /\b(due|deadline|submit|submission|assignment|homework|worksheet|essay|paper|project|presentation|lab report)\b/i,
+  /\b(meeting|conference|office hours|appointment|check-in|rehearsal|practice)\b/i,
+  /^(complete|finish|read|write|study|review|prepare|practice|solve|watch|upload|turn in|bring|create|build|record|respond|reply|attend)\b/i,
+];
+
+export function shouldCreateCanvasTask(
+  title: string,
+  sourceType: "assignment" | "event" = "event",
+) {
   const normalized = title
     .replace(/[_–—]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return (
-    normalized.length > 0 &&
-    !calendarOnlyPatterns.some((pattern) => pattern.test(normalized))
-  );
+  if (!normalized || calendarOnlyPatterns.some((pattern) => pattern.test(normalized))) return false;
+  return sourceType === "assignment" || actionablePatterns.some((pattern) => pattern.test(normalized));
 }
 
 export function shouldRestoreCanvasTask(
@@ -74,8 +82,8 @@ export function shouldRestoreCanvasTask(
   title: string,
 ) {
   return (
-    externalSource === "canvas" ||
-    (externalSource === "canvas_event" && shouldCreateCanvasTask(title))
+    (externalSource === "canvas" && shouldCreateCanvasTask(title, "assignment")) ||
+    (externalSource === "canvas_event" && shouldCreateCanvasTask(title, "event"))
   );
 }
 

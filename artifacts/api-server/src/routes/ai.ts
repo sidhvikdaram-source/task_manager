@@ -10,7 +10,7 @@ const systemPrompt = [
   "You are Velocity Assistant.",
   "You are exclusively a productivity and workspace assistant for Velocity. Do not solve math, write essays, generate code, or act as a general-purpose chatbot.",
   "Help users capture, organize, prioritize, schedule, sort, and review tasks, projects, subjects, checklists, habits, and focus work.",
-  "You may help send a concise message only to an accepted friend, and may summarize only friend names, levels, streaks, or activity explicitly supplied by Velocity. Never infer private activity or claim access to unavailable data.",
+  "You may help send a concise message only to an accepted friend, and may summarize only friend names, levels, Momentum active-day counts, or activity explicitly supplied by Velocity. Never infer private activity or claim access to unavailable data.",
   "Time is strictly optional; never force a deadline or invent one when the user did not ask for it.",
   "If a user sets a time without a task name, such as remind me at 4, generate a smart title like Afternoon Focus Block instead of Task at 4.",
   "Handle relative dates like tomorrow, next Monday, Friday afternoon, in two hours, and in three days accurately.",
@@ -1169,7 +1169,7 @@ async function generateWorkspaceActionPlan(userId: string, message: string, hist
     "When an update refers to an existing item, resolve it from the supplied workspace by meaning and use its exact ID. If the reference is genuinely ambiguous, choose general and explain the ambiguity in summary instead of guessing.",
     "Task statuses may be todo, backlog, or in_progress. Project statuses may be active, planning, waiting, or completed. Task completion must use the normal task UI because it awards VP.",
     "A request to message someone may use send_message only when that person is uniquely matched in Current workspace friends. Use the exact friend id as recipientId and include the intended text as body. Messages always require preview confirmation.",
-    "For friend activity questions, use only the level and streak values supplied in Current workspace friends. Say when other activity is unavailable; never invent it.",
+    "For friend activity questions, use only the level and Momentum active-day values supplied in Current workspace friends. Say when other activity is unavailable; never invent it.",
     `Today is ${formatDate(new Date())}. Current workspace: ${JSON.stringify(context)}. Current user request: ${JSON.stringify(message)}`,
   ].join(" ");
 
@@ -1275,7 +1275,7 @@ function formatAiError(err: unknown) {
 function isVelocityProductivityRequest(message: string, history: ChatHistoryMessage[]) {
   if ((looksLikeMathRequest(message) || looksLikeGeneralCreationRequest(message)) && !hasExplicitTaskCue(message)) return false;
   const recentContext = history.slice(-4).map((item) => item.content).join(" ");
-  return /\b(task|tasks|todo|project|projects|deadline|due|schedule|calendar|study|homework|priority|prioritize|focus|habit|canvas|subject|assignment|quiz|exam|friend|message|streak|challenge|organize|remind|checklist|workload|inbox)\b/i.test(`${recentContext} ${message}`);
+  return /\b(task|tasks|todo|project|projects|deadline|due|schedule|calendar|study|homework|priority|prioritize|focus|habit|canvas|subject|assignment|quiz|exam|friend|message|streak|momentum|challenge|organize|remind|checklist|workload|inbox)\b/i.test(`${recentContext} ${message}`);
 }
 
 router.post("/ai/chat", async (req, res): Promise<void> => {

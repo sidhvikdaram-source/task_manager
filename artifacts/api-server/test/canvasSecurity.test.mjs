@@ -67,6 +67,10 @@ test("calendar rules provide stable occurrence IDs and limited categories", () =
   assert.equal(shouldCreateCanvasTask("No School"), false);
   assert.equal(shouldCreateCanvasTask("End of Second Nine Weeks"), false);
   assert.equal(shouldCreateCanvasTask("Bad Weather Make-Up Day"), false);
+  assert.equal(shouldCreateCanvasTask("Welcome picnic", "event"), false);
+  assert.equal(shouldCreateCanvasTask("Complete permission form", "event"), true);
+  assert.equal(shouldCreateCanvasTask("Chapter 3 Problems", "assignment"), true);
+  assert.equal(shouldCreateCanvasTask("Start of 1st Nine Weeks", "assignment"), false);
   assert.equal(shouldRestoreCanvasTask("canvas", "Math assignment"), true);
   assert.equal(
     shouldRestoreCanvasTask("canvas_event", "Bad Weather Make-Up Day"),

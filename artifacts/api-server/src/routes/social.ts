@@ -5,7 +5,7 @@ import { db, directMessagesTable, friendshipsTable, userBlocksTable, userReports
 const router: IRouter = Router();
 
 async function publicProfile(userId: string) {
-  const [user] = await db.select({ id: usersTable.id, displayName: usersTable.firstName, username: usersTable.username, profileImageUrl: usersTable.profileImageUrl, avatarStyle: usersTable.avatarStyle }).from(usersTable).where(eq(usersTable.id, userId));
+  const [user] = await db.select({ id: usersTable.id, displayName: usersTable.firstName, username: usersTable.username, profileImageUrl: usersTable.profileImageUrl, avatarStyle: usersTable.avatarStyle, equippedCosmetic: usersTable.equippedCosmetic, equippedFrame: usersTable.equippedFrame }).from(usersTable).where(eq(usersTable.id, userId));
   if (!user) return null;
   const [stats] = await db.select({ tier: userStatsTable.tier, streakDays: userStatsTable.streakDays }).from(userStatsTable).where(eq(userStatsTable.userId, user.id));
   return { ...user, level: stats?.tier ?? 1, streakDays: stats?.streakDays ?? 0, online: false };

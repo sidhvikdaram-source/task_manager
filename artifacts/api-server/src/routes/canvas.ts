@@ -659,7 +659,7 @@ router.post("/canvas/ignored/:id/restore", async (req, res): Promise<void> => {
   if (item.externalType === "assignment")
     await db
       .update(tasksTable)
-      .set({ archived: false })
+      .set({ archived: !shouldCreateCanvasTask(item.title ?? "", "assignment") })
       .where(
         and(
           eq(tasksTable.userId, userId),
@@ -680,7 +680,7 @@ router.post("/canvas/ignored/:id/restore", async (req, res): Promise<void> => {
       );
     await db
       .update(tasksTable)
-      .set({ archived: !shouldCreateCanvasTask(item.title ?? "") })
+      .set({ archived: !shouldCreateCanvasTask(item.title ?? "", "event") })
       .where(
         and(
           eq(tasksTable.userId, userId),
