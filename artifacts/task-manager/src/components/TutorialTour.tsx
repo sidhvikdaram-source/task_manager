@@ -16,10 +16,10 @@ const steps = [
       "Your due, overdue, and unscheduled tasks stay together in one calm list.",
   },
   {
-    target: "[data-tour='primary-navigation']",
-    title: "Three places to start",
+    target: "[data-tour='primary-navigation'], [data-tour='mobile-navigation']",
+    title: "Your workspace lives here",
     detail:
-      "Use Today for tasks, Academics for Canvas and classes, and Focus for deep work.",
+      "Use the sidebar for My Day, Academics, and Focus. The Need more panel turns on advanced tools whenever you are ready.",
   },
 ];
 
@@ -29,7 +29,9 @@ export function TutorialTour() {
 
   useEffect(() => {
     if (preferences.tutorialCompleted) return;
-    const target = document.querySelector<HTMLElement>(steps[step].target);
+    const target = Array.from(
+      document.querySelectorAll<HTMLElement>(steps[step].target),
+    ).find((element) => element.offsetParent !== null);
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
     target?.classList.add("velocity-tour-target");
     return () => target?.classList.remove("velocity-tour-target");

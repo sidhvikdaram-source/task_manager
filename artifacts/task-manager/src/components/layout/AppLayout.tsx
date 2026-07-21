@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useExperience } from "@/experience";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { TutorialTour } from "@/components/TutorialTour";
+import { Sidebar } from "./Sidebar";
 
 const VelocityAssistantCard = lazy(() =>
   import("@/components/VelocityAssistantCard").then((module) => ({
@@ -14,6 +15,7 @@ const VelocityAssistantCard = lazy(() =>
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { preferences, loading } = useExperience();
   const [assistantReady, setAssistantReady] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   useEffect(() => {
     const requestIdle =
       window.requestIdleCallback ??
@@ -29,13 +31,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   return (
-    <div className="tech-shell flex flex-col h-[100dvh] w-full overflow-hidden bg-background">
-      <TopNav />
-      <main className="flex-1 overflow-y-auto">
-        <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-7xl">
-          {children}
-        </div>
-      </main>
+    <div className="tech-shell flex h-[100dvh] w-full overflow-hidden bg-background">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopNav onOpenSidebar={() => setSidebarOpen(true)} />
+        <main className="flex-1 overflow-y-auto">
+          <div className="container mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+            {children}
+          </div>
+        </main>
+      </div>
       {assistantReady && preferences.onboardingCompleted && (
         <Suspense fallback={null}>
           <VelocityAssistantCard />

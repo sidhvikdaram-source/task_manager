@@ -221,8 +221,9 @@ export function OnboardingFlow() {
                 </div>
                 <h1 className="mt-5 text-2xl font-black">Your day is ready</h1>
                 <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                  You will start with Today, Academics, and Focus. A short
-                  guided tour will point out the essentials.
+                  You will start with My Day, Academics, and Focus. If you ever
+                  want more, the sidebar shows exactly where to enable advanced
+                  tools.
                 </p>
                 {canvasLater && (
                   <p className="mt-4 rounded-lg bg-muted px-3 py-2 text-xs font-semibold">

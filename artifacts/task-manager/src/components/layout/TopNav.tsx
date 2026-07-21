@@ -1,9 +1,7 @@
 import React, { lazy, Suspense } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CalendarDays,
-  Timer,
   LineChart,
   Zap,
   Bell,
@@ -14,11 +12,10 @@ import {
   AlertTriangle,
   Users,
   UserRound,
-  Library,
-  ListChecks,
   Check,
   FolderKanban,
   Settings2,
+  Menu,
 } from "lucide-react";
 import {
   getListTasksQueryKey,
@@ -54,8 +51,7 @@ function notificationLabel(task: Task) {
   return "Upcoming task";
 }
 
-export function TopNav() {
-  const [location] = useLocation();
+export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const { data: stats } = useGetUserStats();
   const { data: tasks } = useListTasks(
     { sortBy: "dueDate" },
@@ -94,15 +90,6 @@ export function TopNav() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const links = [
-    { href: "/", label: "My Day", icon: ListChecks },
-    { href: "/school", label: "Academics", icon: Library },
-    ...(preferences.advancedFeaturesEnabled
-      ? [{ href: "/calendar", label: "Schedule", icon: CalendarDays }]
-      : []),
-    { href: "/focus", label: "Focus", icon: Timer },
-  ];
-
   const upcomingNotifications = (tasks ?? [])
     .filter((task) => task.status !== "completed")
     .map((task) => ({
@@ -117,65 +104,28 @@ export function TopNav() {
 
   return (
     <>
-      <header
-        data-tour="primary-navigation"
-        className="h-14 border-b neon-rule bg-background/78 backdrop-blur-xl flex items-center px-3 sm:px-4 gap-3 shrink-0 sticky top-0 z-40 shadow-[0_12px_40px_rgba(0,0,0,0.32)]"
-      >
-        <Link href="/">
-          <motion.div
-            className="flex shrink-0 items-center gap-2 cursor-pointer"
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+      <header className="neon-rule sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-background/78 px-3 shadow-[0_12px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:px-4 lg:justify-end">
+        <div className="flex items-center gap-2 lg:hidden">
+          <button
+            type="button"
+            onClick={onOpenSidebar}
+            data-tour="mobile-navigation"
+            aria-label="Open navigation"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-[0.78rem] bg-[#141414] text-white shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <Zap className="h-4 w-4 fill-white text-white" />
+            <Menu className="h-4 w-4" />
+          </button>
+          <Link href="/">
+            <div className="flex cursor-pointer items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-[0.78rem] bg-[#141414] text-white">
+                <Zap className="h-4 w-4 fill-white text-white" />
+              </div>
+              <span className="text-lg font-black tracking-tight text-foreground">
+                Velocity
+              </span>
             </div>
-            <span className="text-lg font-black tracking-tight text-foreground">
-              Velocity
-            </span>
-          </motion.div>
-        </Link>
-
-        <nav className="mx-auto hidden min-w-0 max-w-2xl flex-1 items-center justify-center gap-2 lg:flex">
-          {links.map((link) => {
-            const isActive = location === link.href;
-            return (
-              <Link key={link.href} href={link.href}>
-                <motion.div
-                  data-testid={`nav-link-${link.label.toLowerCase().replace(" ", "-")}`}
-                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                    isActive
-                      ? "text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  whileTap={{ scale: 0.96 }}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="nav-active-pill"
-                      className="absolute inset-0 bg-primary rounded-xl shadow-[0_0_28px_rgba(0,213,255,0.28)]"
-                      transition={{
-                        type: "spring",
-                        stiffness: 420,
-                        damping: 32,
-                      }}
-                    />
-                  )}
-                  {!isActive && (
-                    <motion.div
-                      className="absolute inset-0 rounded-xl bg-muted opacity-0"
-                      whileHover={{ opacity: 1 }}
-                      transition={{ duration: 0.15 }}
-                    />
-                  )}
-                  <link.icon className="w-3.5 h-3.5 relative z-10" />
-                  <span className="relative z-10">{link.label}</span>
-                </motion.div>
-              </Link>
-            );
-          })}
-        </nav>
+          </Link>
+        </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
           <div className="relative hidden lg:block" ref={themesRef}>
@@ -453,52 +403,6 @@ export function TopNav() {
             </AnimatePresence>
           </div>
 
-          <AnimatePresence>
-            {stats !== undefined && (
-              <motion.div
-                role="button"
-                tabIndex={0}
-                aria-label="Open tier progress"
-                onClick={() => setAccountOpen(true)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ")
-                    setAccountOpen(true);
-                }}
-                initial={{ opacity: 0, scale: 0.85, x: 8 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                transition={{ type: "spring", stiffness: 380, damping: 24 }}
-                className="hidden cursor-pointer sm:flex items-center gap-1.5 bg-primary/10 border border-primary/30 rounded-lg px-2.5 py-1.5"
-              >
-                {stats.multiplier > 1.0 && (
-                  <motion.div
-                    animate={{ scale: [1, 1.2, 1], rotate: [0, 8, -8, 0] }}
-                    transition={{
-                      duration: 2.2,
-                      repeat: Infinity,
-                      repeatDelay: 1,
-                    }}
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                  </motion.div>
-                )}
-                <motion.span
-                  key={stats.totalVp}
-                  initial={{ y: -8, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 22 }}
-                  className="text-sm font-bold text-primary"
-                >
-                  Tier {stats.tier} · {stats.tierProgress}/100 VP
-                </motion.span>
-                {stats.multiplier > 1.0 && (
-                  <span className="text-xs text-amber-600 font-semibold">
-                    {stats.multiplier}×
-                  </span>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           <motion.button
             onClick={() => setIsCreateModalOpen(true)}
             data-testid="button-new-task-nav"
@@ -513,22 +417,6 @@ export function TopNav() {
           </motion.button>
         </div>
       </header>
-
-      <nav className="flex shrink-0 justify-center gap-1 overflow-x-auto border-b border-border/70 bg-background/90 px-3 py-2 lg:hidden">
-        {links.map((link) => {
-          const active = location === link.href;
-          return (
-            <Link key={link.href} href={link.href}>
-              <div
-                className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
-              >
-                <link.icon className="h-3.5 w-3.5" />
-                {link.label}
-              </div>
-            </Link>
-          );
-        })}
-      </nav>
 
       {isCreateModalOpen && (
         <Suspense fallback={null}>
