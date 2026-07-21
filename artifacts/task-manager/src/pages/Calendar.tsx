@@ -22,12 +22,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Flame,
   GripVertical,
   List,
+  ListFilter,
   Plus,
   Target,
-  Zap,
 } from "lucide-react";
 import {
   getListTasksQueryKey,
@@ -117,7 +116,8 @@ export default function Calendar() {
   const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [view, setView] = useState<CalendarView>("month");
+  const [view, setView] = useState<CalendarView>("agenda");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [createDate, setCreateDate] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [eventCategories, setEventCategories] = useState<Set<string>>(
@@ -198,10 +198,6 @@ export default function Calendar() {
   const selectedTasks = activeTasks.filter((task) =>
     matchesDate(task, selectedDate),
   );
-  const monthTasks = activeTasks.filter((task) => {
-    const value = taskDate(task);
-    return value ? isSameMonth(parseISO(value), currentMonth) : false;
-  });
   const unscheduledTasks = activeTasks.filter((task) => !taskDate(task));
   const focusedDays =
     view === "day"
@@ -280,60 +276,39 @@ export default function Calendar() {
 
   return (
     <div className="space-y-5">
-      <section className="bento-card p-5 sm:p-6 overflow-hidden relative">
-        <div className="absolute right-8 top-0 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5 relative">
+      <section className="border-b border-border/70 pb-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-primary text-xs font-black uppercase">
-              <Zap className="h-3.5 w-3.5 fill-primary" />
-              Temporal Command
-            </div>
-            <h1 className="tech-title mt-2 text-3xl sm:text-5xl text-foreground">
-              Calendar
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground max-w-2xl">
-              Scheduled tasks, due dates, and focus windows in one bento control
-              surface.
+            <p className="text-xs font-black uppercase text-primary">Your time</p>
+            <h1 className="mt-1 text-2xl font-black sm:text-3xl">Calendar</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tasks and school events, ordered by when they happen.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <CanvasSyncButton />
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Previous calendar period"
-              onClick={() => movePeriod(-1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="min-w-44 rounded-xl border border-primary/25 bg-primary/10 px-4 py-2 text-center">
-              <div className="tech-title text-sm text-primary">
-                {view === "month"
-                  ? format(currentMonth, "MMMM")
-                  : view === "week"
-                    ? `${format(focusedDays[0], "MMM d")} – ${format(focusedDays[focusedDays.length - 1], "MMM d")}`
-                    : view === "day"
-                      ? format(selectedDate, "MMM d")
-                      : "Upcoming"}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {view === "month"
-                  ? format(currentMonth, "yyyy")
-                  : `${view[0].toUpperCase()}${view.slice(1)} view`}
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Next calendar period"
-              onClick={() => movePeriod(1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            {view !== "agenda" && (
+              <>
+                <Button variant="outline" size="icon" aria-label="Previous calendar period" onClick={() => movePeriod(-1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="min-w-36 rounded-lg border bg-muted/40 px-3 py-1.5 text-center">
+                  <div className="text-sm font-black text-foreground">
+                    {view === "month" ? format(currentMonth, "MMMM") : view === "week" ? `${format(focusedDays[0], "MMM d")} - ${format(focusedDays[focusedDays.length - 1], "MMM d")}` : format(selectedDate, "MMM d")}
+                  </div>
+                  <div className="text-[10px] font-semibold text-muted-foreground">
+                    {view === "month" ? format(currentMonth, "yyyy") : `${view[0].toUpperCase()}${view.slice(1)} view`}
+                  </div>
+                </div>
+                <Button variant="outline" size="icon" aria-label="Next calendar period" onClick={() => movePeriod(1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </>
+            )}
             <Button
               onClick={() => openCreate(selectedDate)}
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
+              size="sm"
             >
               <CalendarPlus className="mr-2 h-4 w-4" />
               Add
@@ -370,14 +345,14 @@ export default function Calendar() {
             </button>
           ))}
         </div>
-        <p className="text-xs font-semibold text-muted-foreground">
-          Drag an unscheduled task onto a day to schedule it.
-        </p>
+        <Button type="button" variant="outline" size="sm" onClick={() => setFiltersOpen((open) => !open)} aria-expanded={filtersOpen} className="gap-1.5">
+          <ListFilter className="h-3.5 w-3.5" /> Filters
+        </Button>
       </div>
 
-      {(canvasEvents.length > 0 ||
+      {filtersOpen && (canvasEvents.length > 0 ||
         tasks.some((task) => task.externalSource?.startsWith("canvas"))) && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/25 p-3">
           <span className="text-xs font-bold text-muted-foreground">
             Canvas categories
           </span>
@@ -405,7 +380,7 @@ export default function Calendar() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-5">
+      <div className={cn("grid grid-cols-1 gap-5", view !== "agenda" && "xl:grid-cols-[minmax(0,1fr)_280px]")}>
         <section className="bento-card overflow-hidden">
           {view === "month" && (
             <div className="overflow-x-auto">
@@ -455,7 +430,7 @@ export default function Calendar() {
                             void scheduleTask(taskId, day);
                         }}
                         className={cn(
-                          "group min-h-[148px] border-r border-b border-border/70 p-2 text-left transition-all hover:bg-white/[0.055] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                          "group min-h-[112px] border-r border-b border-border/70 p-2 text-left transition-all hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                           !isCurrentMonth &&
                             "bg-black/20 text-muted-foreground/55",
                           selected && "bg-primary/10",
@@ -481,7 +456,7 @@ export default function Calendar() {
                         </div>
 
                         <div className="space-y-1.5">
-                          {dayTasks.slice(0, 3).map((task) => (
+                          {dayTasks.slice(0, 2).map((task) => (
                             <span
                               key={task.id}
                               title={task.title}
@@ -497,15 +472,15 @@ export default function Calendar() {
                               {task.title}
                             </span>
                           ))}
-                          {dayTasks.length > 3 && (
+                          {dayTasks.length > 2 && (
                             <span className="block rounded-lg bg-white/8 px-2 py-1 text-center text-[10px] font-bold text-muted-foreground">
-                              +{dayTasks.length - 3} more
+                              +{dayTasks.length - 2} more
                             </span>
                           )}
                           {dayEvents
                             .slice(
                               0,
-                              Math.max(0, 3 - Math.min(dayTasks.length, 3)),
+                              Math.max(0, 2 - Math.min(dayTasks.length, 2)),
                             )
                             .map((event) => (
                               <span
@@ -633,11 +608,12 @@ export default function Calendar() {
           )}
         </section>
 
-        <aside className="bento-card p-5 xl:sticky xl:top-24 self-start">
+        {view !== "agenda" && (
+        <aside className="bento-card self-start p-4 xl:sticky xl:top-16">
           <div className="flex items-center justify-between border-b neon-rule pb-4">
             <div>
               <p className="text-xs font-black uppercase text-muted-foreground">
-                Selected Vector
+                Selected day
               </p>
               <h2 className="tech-title mt-1 text-xl">
                 {format(selectedDate, "MMM d")}
@@ -653,30 +629,9 @@ export default function Calendar() {
             </Button>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-primary/25 bg-primary/10 p-3">
-              <Target className="h-4 w-4 text-primary" />
-              <div className="mt-2 text-2xl font-black">
-                {selectedTasks.length}
-              </div>
-              <div className="text-[11px] uppercase text-muted-foreground">
-                Tasks
-              </div>
-            </div>
-            <div className="rounded-2xl border border-secondary/25 bg-secondary/10 p-3">
-              <Flame className="h-4 w-4 text-secondary" />
-              <div className="mt-2 text-2xl font-black">
-                {monthTasks.length}
-              </div>
-              <div className="text-[11px] uppercase text-muted-foreground">
-                This Month
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-2">
+          <div className="mt-4 space-y-2">
             {selectedTasks.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed border-border p-5 text-center text-sm text-muted-foreground">
                 No tasks scheduled here.
               </div>
             ) : (
@@ -685,7 +640,7 @@ export default function Calendar() {
                   key={task.id}
                   type="button"
                   onClick={() => setSelectedTaskId(task.id)}
-                  className="w-full rounded-2xl border border-border/80 bg-white/[0.035] p-3 text-left transition-colors hover:border-primary/45 hover:bg-primary/8"
+                  className="w-full rounded-lg border border-border/80 bg-muted/20 p-3 text-left transition-colors hover:border-primary/45 hover:bg-primary/8"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-bold leading-tight">
@@ -799,6 +754,7 @@ export default function Calendar() {
             </div>
           )}
         </aside>
+        )}
       </div>
 
       <CreateTaskModal

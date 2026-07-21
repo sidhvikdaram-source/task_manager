@@ -14,7 +14,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         await tx.update(tasksTable).set({ completionAwardedAt: existing.completedAt ?? new Date() })
           .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId), isNull(tasksTable.completionAwardedAt)));
       }
-      return { task: existing, vpAwarded: 0, multiplier: 1, newTotal: null, tierUp: false, newTier: null };
+      return { task: existing, vpAwarded: 0, multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
     }
 
     const completedAt = new Date();
@@ -24,7 +24,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
       .returning();
     if (!task) {
       const [current] = await tx.select().from(tasksTable).where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)));
-      return { task: current ?? existing, vpAwarded: 0, multiplier: 1, newTotal: null, tierUp: false, newTier: null };
+      return { task: current ?? existing, vpAwarded: 0, multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
     }
 
     let [stats] = await tx.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
@@ -36,9 +36,10 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
     const tierUps = Math.floor(progress / 100);
     const newTier = stats.tier + tierUps;
     const today = completedAt.toDateString();
-    const yesterday = new Date(completedAt.getTime() - 86_400_000).toDateString();
     const lastActivity = stats.lastActivityDate?.toDateString();
-    const newStreak = lastActivity === today ? stats.streakDays : lastActivity === yesterday ? stats.streakDays + 1 : 1;
+    const firstCompletionToday = lastActivity !== today;
+    // Momentum counts active days. Missing a day never erases progress.
+    const newStreak = firstCompletionToday ? stats.streakDays + 1 : stats.streakDays;
     const newMultiplier = newStreak >= 14 ? 2 : newStreak >= 7 ? 1.5 : newStreak >= 3 ? 1.2 : 1;
 
     await tx.update(userStatsTable).set({ totalVp: newTotal, tier: newTier, tierProgress: progress % 100,
@@ -57,6 +58,6 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         await tx.insert(milestonesTable).values({ userId, title, description, vpThreshold: threshold, achievedAt: completedAt });
       }
     }
-    return { task, vpAwarded, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null };
+    return { task, vpAwarded, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null, firstCompletionToday, streakDays: newStreak };
   });
 }

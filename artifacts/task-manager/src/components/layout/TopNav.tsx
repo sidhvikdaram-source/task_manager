@@ -104,7 +104,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
 
   return (
     <>
-      <header className="neon-rule sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-background/78 px-3 shadow-[0_12px_40px_rgba(0,0,0,0.2)] backdrop-blur-xl sm:px-4 lg:justify-end">
+      <header className="sticky top-0 z-40 flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background/92 px-3 backdrop-blur-xl sm:px-4 lg:justify-end">
         <div className="flex items-center gap-2 lg:hidden">
           <button
             type="button"
@@ -319,7 +319,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                           Advanced workspace
                         </span>
                         <span className="block text-[11px] text-muted-foreground">
-                          Schedule and planning tools
+                          Calendar and planning tools
                         </span>
                       </span>
                       <span

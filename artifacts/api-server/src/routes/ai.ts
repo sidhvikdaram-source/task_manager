@@ -1,25 +1,26 @@
 import { GoogleGenAI } from "@google/genai";
 import Groq from "groq-sdk";
 import { Router, type IRouter } from "express";
-import { checklistItemsTable, db, projectsTable, subjectsTable, tasksTable } from "@workspace/db";
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { checklistItemsTable, db, directMessagesTable, friendshipsTable, projectsTable, subjectsTable, tasksTable, usersTable, userStatsTable } from "@workspace/db";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 
 const router: IRouter = Router();
 
 const systemPrompt = [
   "You are Velocity Assistant.",
-  "Track 1: General Utility - Solve math, code, planning, writing, and everyday tasks cleanly with Markdown.",
-  "Track 2: Tasks - Time is strictly optional; never force a deadline or invent one when the user did not ask for it.",
+  "You are exclusively a productivity and workspace assistant for Velocity. Do not solve math, write essays, generate code, or act as a general-purpose chatbot.",
+  "Help users capture, organize, prioritize, schedule, sort, and review tasks, projects, subjects, checklists, habits, and focus work.",
+  "You may help send a concise message only to an accepted friend, and may summarize only friend names, levels, streaks, or activity explicitly supplied by Velocity. Never infer private activity or claim access to unavailable data.",
+  "Time is strictly optional; never force a deadline or invent one when the user did not ask for it.",
   "If a user sets a time without a task name, such as remind me at 4, generate a smart title like Afternoon Focus Block instead of Task at 4.",
   "Handle relative dates like tomorrow, next Monday, Friday afternoon, in two hours, and in three days accurately.",
   "Infer intent from short user phrases, but do not pretend to complete actions that the backend did not report as completed.",
   "When the backend created a task, confirm the title and schedule reference first.",
   "When the backend created multiple tasks from a previous agenda or plan, briefly list the tasks that were added.",
-  "When no task was created, answer the user normally and do not mention backend internals.",
+  "When a request is outside Velocity productivity, briefly state your scope and suggest a task-oriented alternative.",
   "Keep responses brief, professional, and free of filler.",
   "Use structured Markdown only: short paragraphs, bullets, bold labels, and code fences when useful.",
-  "For math, use clean readable Markdown with plain-text equations. Do not use raw LaTeX delimiters, backslash commands, or dollar signs. Prefer forms like x = (-4 +/- sqrt(-104)) / 10 and bullet each step clearly.",
-  "Never create a task for a math expression, equation, solve request, essay request, explanation request, or general homework help unless the user explicitly says to remind, schedule, add a task, create a todo, or set a deadline.",
+  "Never turn a math expression, essay request, explanation request, or general homework question into a task unless the user explicitly asks Velocity to track or schedule work related to it.",
   "Do not include malformed tables, decorative characters, fake JSON, or hidden chain-of-thought.",
 ].join(" ");
 
@@ -130,7 +131,16 @@ type WorkspaceOperation =
   | { type: "create_task"; label: string; title: string; subject: string | null; projectName: string | null; priority: Priority; dueDate: string | null; estimatedMinutes: number | null; difficulty: number; status: string; blocked: boolean }
   | { type: "update_task"; label: string; targetId: number; title?: string; subject?: string | null; projectName?: string | null; priority?: Priority; dueDate?: string | null; estimatedMinutes?: number | null; difficulty?: number; status?: string; blocked?: boolean }
   | { type: "delete_task"; label: string; targetId: number }
-  | { type: "add_checklist_item"; label: string; targetId: number; title: string };
+  | { type: "add_checklist_item"; label: string; targetId: number; title: string }
+  | { type: "send_message"; label: string; recipientId: string; body: string };
+
+interface AssistantFriend {
+  id: string;
+  displayName: string | null;
+  username: string | null;
+  level: number;
+  streakDays: number;
+}
 
 interface WorkspaceActionPlan {
   summary: string;
@@ -149,9 +159,9 @@ const workspaceDecisionSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["type", "targetId", "name", "title", "color", "subject", "projectName", "priority", "dueDate", "description", "estimatedMinutes", "difficulty", "status", "blocked", "archived", "clearSubject", "clearProject", "clearDueDate", "clearDescription"],
+        required: ["type", "targetId", "name", "title", "color", "subject", "projectName", "priority", "dueDate", "description", "estimatedMinutes", "difficulty", "status", "blocked", "archived", "clearSubject", "clearProject", "clearDueDate", "clearDescription", "recipientId", "body"],
         properties: {
-          type: { type: "string", enum: ["create_subject", "update_subject", "delete_subject", "create_project", "update_project", "delete_project", "create_task", "update_task", "delete_task", "add_checklist_item"] },
+          type: { type: "string", enum: ["create_subject", "update_subject", "delete_subject", "create_project", "update_project", "delete_project", "create_task", "update_task", "delete_task", "add_checklist_item", "send_message"] },
           targetId: { type: ["integer", "null"] },
           name: { type: ["string", "null"] },
           title: { type: ["string", "null"] },
@@ -170,6 +180,8 @@ const workspaceDecisionSchema = {
           clearProject: { type: "boolean" },
           clearDueDate: { type: "boolean" },
           clearDescription: { type: "boolean" },
+          recipientId: { type: ["string", "null"] },
+          body: { type: ["string", "null"] },
         },
       },
     },
@@ -1026,6 +1038,7 @@ function validateWorkspacePlan(
     tasks: Array<typeof tasksTable.$inferSelect>;
     projects: Array<typeof projectsTable.$inferSelect>;
     subjects: Array<typeof subjectsTable.$inferSelect>;
+    friends: AssistantFriend[];
   },
 ): WorkspaceActionPlan | null {
   if (!value || !Array.isArray(value.operations)) return null;
@@ -1037,6 +1050,7 @@ function validateWorkspacePlan(
   const subjectById = new Map(current.subjects.map((item) => [item.id, item]));
   const projectNames = new Set(current.projects.map((item) => item.name.toLowerCase()));
   const subjectNames = new Set(current.subjects.map((item) => item.name.toLowerCase()));
+  const friendById = new Map(current.friends.map((friend) => [friend.id, friend]));
   const operations: WorkspaceOperation[] = [];
 
   for (const item of value.operations.slice(0, 25)) {
@@ -1101,6 +1115,11 @@ function validateWorkspacePlan(
       operations.push({ type, label: `Delete task ${taskById.get(targetId)?.title ?? `#${targetId}`}`, targetId });
     } else if (type === "add_checklist_item" && taskIds.has(targetId) && title) {
       operations.push({ type, label: `Add checklist item to ${taskById.get(targetId)?.title ?? `task #${targetId}`}: ${title}`, targetId, title: title.slice(0, 200) });
+    } else if (type === "send_message") {
+      const recipientId = typeof raw.recipientId === "string" ? raw.recipientId : "";
+      const body = typeof raw.body === "string" ? raw.body.trim().slice(0, 2000) : "";
+      const friend = friendById.get(recipientId);
+      if (friend && body) operations.push({ type, label: `Send message to ${friend.displayName ?? friend.username ?? "friend"}: ${body.slice(0, 80)}${body.length > 80 ? "..." : ""}`, recipientId, body });
     }
   }
 
@@ -1111,23 +1130,37 @@ function validateWorkspacePlan(
   };
 }
 
+async function loadAcceptedFriends(userId: string): Promise<AssistantFriend[]> {
+  const relationships = await db.select().from(friendshipsTable).where(and(eq(friendshipsTable.status, "accepted"), or(eq(friendshipsTable.requesterId, userId), eq(friendshipsTable.recipientId, userId))));
+  return Promise.all(relationships.map(async (relationship) => {
+    const friendId = relationship.requesterId === userId ? relationship.recipientId : relationship.requesterId;
+    const [[profile], [stats]] = await Promise.all([
+      db.select({ id: usersTable.id, displayName: usersTable.firstName, username: usersTable.username }).from(usersTable).where(eq(usersTable.id, friendId)),
+      db.select({ level: userStatsTable.tier, streakDays: userStatsTable.streakDays }).from(userStatsTable).where(eq(userStatsTable.userId, friendId)),
+    ]);
+    return { id: friendId, displayName: profile?.displayName ?? null, username: profile?.username ?? null, level: stats?.level ?? 1, streakDays: stats?.streakDays ?? 0 };
+  }));
+}
+
 async function generateWorkspaceActionPlan(userId: string, message: string, history: ChatHistoryMessage[], log?: AssistantLogger) {
-  const [tasks, projects, subjects] = await Promise.all([
+  const [tasks, projects, subjects, friends] = await Promise.all([
     db.select().from(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.archived, false))),
     db.select().from(projectsTable).where(eq(projectsTable.userId, userId)),
     db.select().from(subjectsTable).where(eq(subjectsTable.userId, userId)),
+    loadAcceptedFriends(userId),
   ]);
-  const current = { tasks, projects, subjects };
+  const current = { tasks, projects, subjects, friends };
   const context = {
     tasks: tasks.slice(0, 100).map((task) => ({ id: task.id, title: task.title, priority: task.priority, status: task.status, subject: task.subject, projectId: task.projectId, dueDate: task.dueDate })),
     projects: projects.slice(0, 60).map((project) => ({ id: project.id, name: project.name, subject: project.subject, priority: project.priority, status: project.status, archived: project.archived })),
     subjects: subjects.slice(0, 40).map((subjectItem) => ({ id: subjectItem.id, name: subjectItem.name, archived: subjectItem.archived })),
+    friends,
   };
   const instruction = [
-    "Decide whether the user wants Velocity data changed or is asking for a general answer.",
+    "Decide whether the user wants Velocity workspace data changed, wants to inspect visible workspace data, or is outside Velocity's productivity scope.",
     "Set intent to workspace_changes whenever the desired result includes creating, saving, editing, organizing, rescheduling, archiving, or deleting tasks, projects, subjects, or checklist steps. Infer this semantically from the full request; do not depend on exact command words.",
     "Set intent to workspace_query when the user wants to inspect, filter, count, or get advice about their saved Velocity data without changing it.",
-    "Set intent to general for math, explanations, essays, brainstorming, or a plan that should only be shown in chat. If the user asks both to develop a plan and add its work to Velocity, use workspace_changes and create every concrete operation needed.",
+    "Set intent to general for unrelated math, explanations, essays, coding, or creative writing. Task planning and prioritization are in scope. If the user asks both to develop a plan and add its work to Velocity, use workspace_changes and create every concrete operation needed.",
     "For general and workspace_query intents, return an empty operations array. For workspace_changes, return all operations in dependency order.",
     "For every unused nullable operation field return null. Set clearSubject, clearProject, clearDueDate, or clearDescription true only when the user explicitly asks to remove that value; otherwise each flag must be false. Use targetId from the current workspace for updates and deletes; never guess an ID.",
     "A new project with a subject and tasks normally requires: create_subject only when missing, then create_project, then specific create_task operations whose projectName exactly matches the project name and whose subject matches the project subject.",
@@ -1135,6 +1168,8 @@ async function generateWorkspaceActionPlan(userId: string, message: string, hist
     "Preserve priorities, dates, durations, statuses, and relationships. A task or project without an explicit deadline must have dueDate null and must still be created.",
     "When an update refers to an existing item, resolve it from the supplied workspace by meaning and use its exact ID. If the reference is genuinely ambiguous, choose general and explain the ambiguity in summary instead of guessing.",
     "Task statuses may be todo, backlog, or in_progress. Project statuses may be active, planning, waiting, or completed. Task completion must use the normal task UI because it awards VP.",
+    "A request to message someone may use send_message only when that person is uniquely matched in Current workspace friends. Use the exact friend id as recipientId and include the intended text as body. Messages always require preview confirmation.",
+    "For friend activity questions, use only the level and streak values supplied in Current workspace friends. Say when other activity is unavailable; never invent it.",
     `Today is ${formatDate(new Date())}. Current workspace: ${JSON.stringify(context)}. Current user request: ${JSON.stringify(message)}`,
   ].join(" ");
 
@@ -1237,6 +1272,12 @@ function formatAiError(err: unknown) {
     .slice(0, 400);
 }
 
+function isVelocityProductivityRequest(message: string, history: ChatHistoryMessage[]) {
+  if ((looksLikeMathRequest(message) || looksLikeGeneralCreationRequest(message)) && !hasExplicitTaskCue(message)) return false;
+  const recentContext = history.slice(-4).map((item) => item.content).join(" ");
+  return /\b(task|tasks|todo|project|projects|deadline|due|schedule|calendar|study|homework|priority|prioritize|focus|habit|canvas|subject|assignment|quiz|exam|friend|message|streak|challenge|organize|remind|checklist|workload|inbox)\b/i.test(`${recentContext} ${message}`);
+}
+
 router.post("/ai/chat", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Unauthorized" });
@@ -1272,18 +1313,36 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       return;
     }
 
+    if (decision.intent === "general" && !isVelocityProductivityRequest(message, history)) {
+      res.json({
+        reply: "I am focused on organizing work inside Velocity. I can create or sort tasks and projects, plan your workload, review deadlines, or message an accepted friend. Turn this into something you want to track, and I will help set it up.",
+        provider: "velocity",
+        taskCreated: false,
+        task: null,
+        tasks: [],
+        taskPreview: [],
+        workspacePreview: null,
+        planPreview: null,
+        actionPreview: null,
+      });
+      return;
+    }
+
     let semanticContext = "This is a general request. Do not create, update, or claim to save any Velocity data.";
     if (decision.intent === "workspace_query") {
-      const [tasks, projects, subjects] = await Promise.all([
+      const [tasks, projects, subjects, friends] = await Promise.all([
         db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"))),
         db.select().from(projectsTable).where(eq(projectsTable.userId, req.user.id)),
         db.select().from(subjectsTable).where(eq(subjectsTable.userId, req.user.id)),
+        loadAcceptedFriends(req.user.id),
       ]);
       semanticContext = [
         "Answer using only the user's actual Velocity workspace data. Do not invent records or claim changes.",
         `Tasks: ${JSON.stringify(tasks.slice(0, 100).map((task) => ({ title: task.title, dueDate: task.dueDate, priority: task.priority, status: task.status, subject: task.subject, projectId: task.projectId, estimatedMinutes: task.estimatedMinutes, blocked: task.blocked })))}`,
         `Projects: ${JSON.stringify(projects.slice(0, 60).map((project) => ({ id: project.id, name: project.name, subject: project.subject, priority: project.priority, dueDate: project.dueDate, status: project.status })))}`,
         `Subjects: ${JSON.stringify(subjects.slice(0, 40).map((subject) => subject.name))}`,
+        `Accepted friends and visible public progress: ${JSON.stringify(friends)}`,
+        "No other friend activity is available. State that plainly instead of inferring it.",
       ].join(" ");
     }
     const semanticReply = await generateAssistantReply(message, semanticContext, history, req.log);
@@ -1422,12 +1481,13 @@ router.post("/ai/tasks/confirm", async (req, res): Promise<void> => {
 
 router.post("/ai/workspace/confirm", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const [tasks, projects, subjects] = await Promise.all([
+  const [tasks, projects, subjects, friends] = await Promise.all([
     db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false))),
     db.select().from(projectsTable).where(eq(projectsTable.userId, req.user.id)),
     db.select().from(subjectsTable).where(eq(subjectsTable.userId, req.user.id)),
+    loadAcceptedFriends(req.user.id),
   ]);
-  const plan = validateWorkspacePlan(req.body?.plan && typeof req.body.plan === "object" ? req.body.plan as Record<string, unknown> : null, { tasks, projects, subjects });
+  const plan = validateWorkspacePlan(req.body?.plan && typeof req.body.plan === "object" ? req.body.plan as Record<string, unknown> : null, { tasks, projects, subjects, friends });
   if (!plan) { res.status(400).json({ error: "The workspace preview is no longer valid. Ask the assistant to refresh it." }); return; }
 
   const applied = await db.transaction(async (tx) => {
@@ -1534,6 +1594,9 @@ router.post("/ai/workspace/confirm", async (req, res): Promise<void> => {
       } else if (operation.type === "add_checklist_item") {
         if (!taskMap.has(operation.targetId)) throw new Error("Task no longer exists.");
         await tx.insert(checklistItemsTable).values({ taskId: operation.targetId, title: operation.title });
+      } else if (operation.type === "send_message") {
+        if (!friends.some((friend) => friend.id === operation.recipientId)) throw new Error("Messaging is available only between accepted friends.");
+        await tx.insert(directMessagesTable).values({ senderId: req.user.id, recipientId: operation.recipientId, body: operation.body });
       }
       results.push(operation.label);
     }

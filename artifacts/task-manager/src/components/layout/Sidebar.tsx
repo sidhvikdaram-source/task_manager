@@ -1,3 +1,8 @@
+import {
+  useEffect,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { Link, useLocation } from "wouter";
 import {
   CalendarDays,
@@ -6,6 +11,8 @@ import {
   FolderKanban,
   GraduationCap,
   ListChecks,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings2,
   Timer,
   Users,
@@ -29,13 +36,21 @@ const coreLinks = [
 ];
 
 const advancedLinks = [
-  { href: "/calendar", label: "Schedule", icon: CalendarDays },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/analytics", label: "Insights", icon: ChartNoAxesCombined },
   { href: "/social", label: "Social", icon: Users },
 ];
 
-function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
+function SidebarBody({
+  onNavigate,
+  collapsed = false,
+  onToggle,
+}: {
+  onNavigate: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
+}) {
   const [location] = useLocation();
   const { data: stats } = useGetUserStats();
   const { preferences, updatePreferences } = useExperience();
@@ -60,24 +75,57 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
   return (
     <div
       data-tour="primary-navigation"
-      className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground"
+      className="flex h-full min-h-0 flex-col bg-background text-foreground"
     >
-      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-sidebar-border px-5">
+      <div
+        className={cn(
+          "flex h-14 shrink-0 items-center border-b border-border/70",
+          collapsed ? "justify-center px-2" : "gap-3 px-4",
+        )}
+      >
         <Link href="/" onClick={onNavigate}>
-          <div className="flex cursor-pointer items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[0.82rem] bg-[#141414] text-white shadow-[0_8px_18px_rgba(0,0,0,0.16)]">
-              <Zap className="h-5 w-5 fill-white text-white" />
+          <div
+            className="flex cursor-pointer items-center gap-2.5"
+            title="Velocity"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.78rem] bg-[#141414] text-white shadow-[0_6px_14px_rgba(0,0,0,0.14)]">
+              <Zap className="h-4 w-4 fill-white text-white" />
             </div>
-            <span className="text-xl font-black tracking-tight">Velocity</span>
+            {!collapsed && (
+              <span className="text-lg font-black tracking-tight">
+                Velocity
+              </span>
+            )}
           </div>
         </Link>
+        {onToggle && !collapsed && (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        <p className="px-3 text-[10px] font-black uppercase text-muted-foreground">
-          Workspace
-        </p>
-        <nav className="mt-2 space-y-1" aria-label="Primary navigation">
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto py-3",
+          collapsed ? "px-2" : "px-3",
+        )}
+      >
+        {!collapsed && (
+          <p className="px-2 text-[10px] font-black uppercase text-muted-foreground">
+            Workspace
+          </p>
+        )}
+        <nav
+          className={cn("space-y-1", !collapsed && "mt-2")}
+          aria-label="Primary navigation"
+        >
           {navigation.map((item) => {
             const Icon = item.icon;
             const active = location === item.href;
@@ -85,21 +133,25 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
               <Link key={item.href} href={item.href} onClick={onNavigate}>
                 <div
                   className={cn(
-                    "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-bold transition-colors",
+                    "flex cursor-pointer items-center rounded-lg text-sm font-bold transition-colors",
+                    collapsed
+                      ? "h-10 justify-center px-2"
+                      : "gap-3 px-2.5 py-2.5",
                     active
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
+                  title={collapsed ? item.label : undefined}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1">{item.label}</span>
+                  {!collapsed && <span className="flex-1">{item.label}</span>}
                 </div>
               </Link>
             );
           })}
         </nav>
 
-        {preferences.advancedFeaturesEnabled ? (
+        {!collapsed && preferences.advancedFeaturesEnabled ? (
           <div className="mt-6">
             <div className="flex items-center justify-between px-3">
               <p className="text-[10px] font-black uppercase text-muted-foreground">
@@ -123,8 +175,8 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
                       className={cn(
                         "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
                         active
-                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -135,14 +187,14 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
               })}
             </nav>
           </div>
-        ) : (
+        ) : !collapsed ? (
           <section className="mt-6 rounded-lg border border-primary/20 bg-primary/8 p-3">
             <div className="flex items-center gap-2 text-primary">
               <Settings2 className="h-4 w-4" />
               <h2 className="text-sm font-black">Need more?</h2>
             </div>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">
-              Turn on Advanced Workspace whenever you want Schedule, Projects,
+              Turn on Advanced Workspace whenever you want Calendar, Projects,
               Insights, and Social.
             </p>
             <button
@@ -153,41 +205,138 @@ function SidebarBody({ onNavigate }: { onNavigate: () => void }) {
               Show advanced tools <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </section>
-        )}
+        ) : null}
       </div>
 
       {stats && (
-        <div className="shrink-0 border-t border-sidebar-border p-3">
+        <div
+          className={cn(
+            "shrink-0 border-t border-border/70",
+            collapsed ? "p-2" : "p-3",
+          )}
+        >
           <Link href="/profile" onClick={onNavigate}>
-            <div className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-sidebar-accent">
+            <div
+              className={cn(
+                "flex cursor-pointer items-center rounded-lg hover:bg-muted",
+                collapsed ? "justify-center p-2" : "gap-3 px-2 py-2.5",
+              )}
+              title={
+                collapsed
+                  ? `Tier ${stats.tier} - ${stats.tierProgress}/100 VP`
+                  : undefined
+              }
+            >
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Zap className="h-4 w-4 fill-primary" />
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-black">Tier {stats.tier}</p>
-                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${stats.tierProgress}%` }}
-                  />
-                </div>
-              </div>
-              <span className="text-[10px] font-bold text-muted-foreground">
-                {stats.tierProgress}/100
-              </span>
+              {!collapsed && (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-black">Tier {stats.tier}</p>
+                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${stats.tierProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-bold text-muted-foreground">
+                    {stats.tierProgress}/100
+                  </span>
+                </>
+              )}
             </div>
           </Link>
         </div>
+      )}
+
+      {collapsed && onToggle && (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
+          className="absolute bottom-16 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-lg border bg-background text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </button>
       )}
     </div>
   );
 }
 
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const [width, setWidth] = useState(() => {
+    const saved = Number(window.localStorage.getItem("velocity-sidebar-width"));
+    return Number.isFinite(saved) ? Math.min(288, Math.max(184, saved)) : 224;
+  });
+  const [collapsed, setCollapsed] = useState(
+    () => window.localStorage.getItem("velocity-sidebar-collapsed") === "true",
+  );
+
+  useEffect(() => {
+    window.localStorage.setItem("velocity-sidebar-width", String(width));
+  }, [width]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "velocity-sidebar-collapsed",
+      String(collapsed),
+    );
+  }, [collapsed]);
+
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    const move = (moveEvent: PointerEvent) => {
+      setWidth(
+        Math.min(288, Math.max(184, startWidth + moveEvent.clientX - startX)),
+      );
+    };
+    const stop = () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
+  }
+
   return (
     <>
-      <aside className="hidden h-[100dvh] w-64 shrink-0 border-r border-sidebar-border lg:block">
-        <SidebarBody onNavigate={() => undefined} />
+      <aside
+        className="relative hidden h-[100dvh] shrink-0 border-r border-border/70 lg:block"
+        style={{ width: collapsed ? 64 : width }}
+      >
+        <SidebarBody
+          onNavigate={() => undefined}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((value) => !value)}
+        />
+        {!collapsed && (
+          <div
+            role="separator"
+            aria-label="Resize sidebar"
+            aria-orientation="vertical"
+            aria-valuemin={184}
+            aria-valuemax={288}
+            aria-valuenow={width}
+            tabIndex={0}
+            onPointerDown={startResize}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft")
+                setWidth((value) => Math.max(184, value - 8));
+              if (event.key === "ArrowRight")
+                setWidth((value) => Math.min(288, value + 8));
+            }}
+            className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize transition-colors hover:bg-primary/20 focus-visible:bg-primary/25 focus-visible:outline-none"
+          />
+        )}
       </aside>
 
       {open && (
@@ -198,7 +347,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             onClick={onClose}
             className="absolute inset-0 bg-black/45 backdrop-blur-sm"
           />
-          <aside className="relative h-full w-[min(86vw,300px)] border-r border-sidebar-border shadow-2xl">
+          <aside className="relative h-full w-[min(82vw,280px)] border-r border-border bg-background shadow-2xl">
             <button
               type="button"
               onClick={onClose}

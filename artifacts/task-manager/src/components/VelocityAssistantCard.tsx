@@ -144,7 +144,7 @@ export function VelocityAssistantCard() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'How can I speed up your day? Try: "Remind me to study math next Tuesday at 4 PM."',
+      content: 'I organize your Velocity workspace. Try: "Prioritize today\'s tasks" or "Create a science project with three study tasks."',
     },
   ]);
   const [input, setInput] = useState('');
@@ -155,7 +155,7 @@ export function VelocityAssistantCard() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const canSend = input.trim().length > 0 && !isSending;
-  const placeholder = useMemo(() => isSending ? 'Velocity Assistant is thinking...' : 'Type a command or ask for a plan...', [isSending]);
+  const placeholder = useMemo(() => isSending ? 'Velocity Assistant is thinking...' : 'Create, sort, schedule, or review work...', [isSending]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
