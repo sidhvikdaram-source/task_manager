@@ -1,5 +1,9 @@
 import React, { lazy, Suspense, useEffect, useState } from "react";
 import { TopNav } from "./TopNav";
+import { Loader2 } from "lucide-react";
+import { useExperience } from "@/experience";
+import { OnboardingFlow } from "@/components/OnboardingFlow";
+import { TutorialTour } from "@/components/TutorialTour";
 
 const VelocityAssistantCard = lazy(() =>
   import("@/components/VelocityAssistantCard").then((module) => ({
@@ -8,6 +12,7 @@ const VelocityAssistantCard = lazy(() =>
 );
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  const { preferences, loading } = useExperience();
   const [assistantReady, setAssistantReady] = useState(false);
   useEffect(() => {
     const requestIdle =
@@ -17,6 +22,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     const id = requestIdle(() => setAssistantReady(true));
     return () => cancelIdle(id);
   }, []);
+  if (loading)
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    );
   return (
     <div className="tech-shell flex flex-col h-[100dvh] w-full overflow-hidden bg-background">
       <TopNav />
@@ -25,11 +36,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
-      {assistantReady && (
+      {assistantReady && preferences.onboardingCompleted && (
         <Suspense fallback={null}>
           <VelocityAssistantCard />
         </Suspense>
       )}
+      {!preferences.onboardingCompleted && <OnboardingFlow />}
+      {preferences.onboardingCompleted && <TutorialTour />}
     </div>
   );
 }

@@ -27,9 +27,15 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "avatar_style" varchar DEFAULT 'bolt' NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_cosmetic" varchar DEFAULT 'starter-bolt' NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_frame" varchar DEFAULT 'none' NOT NULL,
-      ADD COLUMN IF NOT EXISTS "equipped_pet" varchar DEFAULT 'none' NOT NULL;
+      ADD COLUMN IF NOT EXISTS "equipped_pet" varchar DEFAULT 'none' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "main_goal" varchar,
+      ADD COLUMN IF NOT EXISTS "onboarding_completed" boolean DEFAULT false NOT NULL,
+      ADD COLUMN IF NOT EXISTS "advanced_features_enabled" boolean DEFAULT false NOT NULL,
+      ADD COLUMN IF NOT EXISTS "tutorial_completed" boolean DEFAULT false NOT NULL;
   `);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_username_unique" ON "users" ("username") WHERE "username" IS NOT NULL;`);
+  await db.execute(
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_username_unique" ON "users" ("username") WHERE "username" IS NOT NULL;`,
+  );
 
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS "user_cosmetics" (

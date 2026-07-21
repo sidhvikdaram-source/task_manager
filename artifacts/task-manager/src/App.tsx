@@ -9,8 +9,9 @@ import { Loader2, Lock, Mail, User, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "@/theme";
 import { useCanvasSync } from "@/hooks/useCanvasSync";
+import { ExperienceProvider } from "@/experience";
 
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
 const FocusArena = lazy(() => import("@/pages/FocusArena"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
@@ -232,33 +233,35 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 function Router() {
   useCanvasSync(true);
   return (
-    <AppLayout>
-      <Suspense
-        fallback={
-          <div
-            className="flex min-h-[45vh] items-center justify-center"
-            role="status"
-            aria-label="Loading page"
-          >
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        }
-      >
-        <Switch>
-          <Route path="/" component={Dashboard} />
-          <Route path="/calendar" component={Calendar} />
-          <Route path="/workspace" component={Workspace} />
-          <Route path="/school" component={SchoolPlanner} />
-          <Route path="/projects" component={Projects} />
-          <Route path="/review" component={WeeklyReview} />
-          <Route path="/focus" component={FocusArena} />
-          <Route path="/social" component={Social} />
-          <Route path="/analytics" component={Analytics} />
-          <Route path="/profile" component={Profile} />
-          <Route component={NotFound} />
-        </Switch>
-      </Suspense>
-    </AppLayout>
+    <ExperienceProvider>
+      <AppLayout>
+        <Suspense
+          fallback={
+            <div
+              className="flex min-h-[45vh] items-center justify-center"
+              role="status"
+              aria-label="Loading page"
+            >
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          }
+        >
+          <Switch>
+            <Route path="/" component={Today} />
+            <Route path="/calendar" component={Calendar} />
+            <Route path="/workspace" component={Workspace} />
+            <Route path="/school" component={SchoolPlanner} />
+            <Route path="/projects" component={Projects} />
+            <Route path="/review" component={WeeklyReview} />
+            <Route path="/focus" component={FocusArena} />
+            <Route path="/social" component={Social} />
+            <Route path="/analytics" component={Analytics} />
+            <Route path="/profile" component={Profile} />
+            <Route component={NotFound} />
+          </Switch>
+        </Suspense>
+      </AppLayout>
+    </ExperienceProvider>
   );
 }
 

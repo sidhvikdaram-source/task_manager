@@ -7,14 +7,16 @@ import {
   FileText,
   FolderKanban,
   Pencil,
-  Plus,
   Settings2,
   Trash2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { Link } from "wouter";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 import { CanvasSyncPanel } from "@/components/CanvasSyncPanel";
+import { QuickCapture } from "@/components/QuickCapture";
+import { useExperience } from "@/experience";
 
 type Subject = { id: number; name: string; color: string };
 type SchoolTask = {
@@ -40,6 +42,7 @@ type SchoolProject = {
 };
 
 export default function SchoolPlanner() {
+  const { preferences } = useExperience();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [tasks, setTasks] = useState<SchoolTask[]>([]);
   const [projects, setProjects] = useState<SchoolProject[]>([]);
@@ -47,9 +50,6 @@ export default function SchoolPlanner() {
   const [selectedTask, setSelectedTask] = useState<number | null>(null);
   const [addingSubject, setAddingSubject] = useState(false);
   const [newSubject, setNewSubject] = useState("");
-  const [quickTitle, setQuickTitle] = useState("");
-  const [quickKind, setQuickKind] = useState("assignment");
-  const [quickDate, setQuickDate] = useState("");
   const load = async () => {
     const [s, t, p] = await Promise.all([
       fetch("/api/subjects", { credentials: "include" }),
@@ -121,31 +121,6 @@ export default function SchoolPlanner() {
       toast.success("Subject removed");
     } else toast.error("Subject could not be removed");
   };
-  const addTask = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!quickTitle.trim()) return;
-    const response = await fetch("/api/tasks", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: quickTitle,
-        priority:
-          quickKind === "test" || quickKind === "project" ? "high" : "medium",
-        subject: selectedSubject,
-        taskKind: quickKind,
-        dueDate: quickDate || undefined,
-        calendarDate: quickDate || undefined,
-        organized: true,
-      }),
-    });
-    if (response.ok) {
-      setQuickTitle("");
-      setQuickDate("");
-      await load();
-      toast.success("Added to school planner");
-    }
-  };
   const subjectProjects = projects.filter(
     (project) =>
       project.subject === selectedSubject &&
@@ -165,13 +140,22 @@ export default function SchoolPlanner() {
               history.
             </p>
           </div>
-          <button
-            onClick={() => setAddingSubject(true)}
-            className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold"
-          >
-            <Settings2 className="h-4 w-4" />
-            Customize subjects
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {preferences.advancedFeaturesEnabled && (
+              <Link href="/projects">
+                <button className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold">
+                  <FolderKanban className="h-4 w-4" /> Projects
+                </button>
+              </Link>
+            )}
+            <button
+              onClick={() => setAddingSubject(true)}
+              className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold"
+            >
+              <Settings2 className="h-4 w-4" />
+              Customize subjects
+            </button>
+          </div>
         </div>
       </section>
       <CanvasSyncPanel subjects={subjects} onChanged={load} />
@@ -210,40 +194,13 @@ export default function SchoolPlanner() {
             </div>
             <BookOpen className="h-5 w-5 text-primary" />
           </header>
-          <form
-            onSubmit={addTask}
-            className="flex flex-wrap gap-2 border-b bg-muted/20 p-3"
-          >
-            <input
-              value={quickTitle}
-              onChange={(e) => setQuickTitle(e.target.value)}
-              placeholder={`Add ${selectedSubject} work`}
-              className="min-w-[220px] flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none"
+          <div className="border-b bg-muted/20 px-3 pb-3">
+            <QuickCapture
+              contextSubject={selectedSubject}
+              placeholder={`Add ${selectedSubject} work tomorrow high priority`}
+              onCreated={() => void load()}
             />
-            <select
-              value={quickKind}
-              onChange={(e) => setQuickKind(e.target.value)}
-              className="rounded-lg border bg-background px-2 text-sm"
-            >
-              <option value="assignment">Assignment</option>
-              <option value="test">Test</option>
-              <option value="quiz">Quiz</option>
-              <option value="project">Project</option>
-              <option value="note">Note</option>
-              <option value="reading">Reading</option>
-              <option value="practice">Practice</option>
-            </select>
-            <input
-              type="date"
-              value={quickDate}
-              onChange={(e) => setQuickDate(e.target.value)}
-              className="rounded-lg border bg-background px-2 text-sm"
-            />
-            <button className="rounded-lg bg-primary p-2.5 text-primary-foreground">
-              <span className="sr-only">Add {selectedSubject} task</span>
-              <Plus className="h-4 w-4" />
-            </button>
-          </form>
+          </div>
           <div className="grid gap-3 p-4 md:grid-cols-2">
             {active.map((task, index) => (
               <motion.button

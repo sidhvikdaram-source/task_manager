@@ -493,4 +493,11 @@
     border-radius: 0.85rem;
     box-shadow: var(--logo-glow);
   }
+
+  .velocity-tour-target {
+    position: relative;
+    z-index: 70;
+    outline: 3px solid hsl(var(--primary) / 0.55);
+    outline-offset: 4px;
+  }
 }

@@ -2,7 +2,6 @@ import React, { lazy, Suspense } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard,
   CalendarDays,
   Timer,
   LineChart,
@@ -19,6 +18,7 @@ import {
   ListChecks,
   Check,
   FolderKanban,
+  Settings2,
 } from "lucide-react";
 import {
   getListTasksQueryKey,
@@ -29,6 +29,7 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { themes, useTheme, type ThemeId } from "@/theme";
+import { useExperience } from "@/experience";
 
 const CreateTaskModal = lazy(() =>
   import("@/components/CreateTaskModal").then((module) => ({
@@ -62,6 +63,7 @@ export function TopNav() {
   );
   const { user, logout, login, isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
+  const { preferences, updatePreferences } = useExperience();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -93,14 +95,12 @@ export function TopNav() {
   }, []);
 
   const links = [
-    { href: "/", label: "Home", icon: LayoutDashboard },
-    { href: "/workspace", label: "Tasks", icon: ListChecks },
-    { href: "/projects", label: "Projects", icon: FolderKanban },
-    { href: "/school", label: "School", icon: Library },
-    { href: "/calendar", label: "Calendar", icon: CalendarDays },
+    { href: "/", label: "My Day", icon: ListChecks },
+    { href: "/school", label: "Academics", icon: Library },
+    ...(preferences.advancedFeaturesEnabled
+      ? [{ href: "/calendar", label: "Schedule", icon: CalendarDays }]
+      : []),
     { href: "/focus", label: "Focus", icon: Timer },
-    { href: "/social", label: "Social", icon: Users },
-    { href: "/analytics", label: "Insights", icon: LineChart },
   ];
 
   const upcomingNotifications = (tasks ?? [])
@@ -117,7 +117,10 @@ export function TopNav() {
 
   return (
     <>
-      <header className="h-14 border-b neon-rule bg-background/78 backdrop-blur-xl flex items-center px-3 sm:px-4 gap-3 shrink-0 sticky top-0 z-40 shadow-[0_12px_40px_rgba(0,0,0,0.32)]">
+      <header
+        data-tour="primary-navigation"
+        className="h-14 border-b neon-rule bg-background/78 backdrop-blur-xl flex items-center px-3 sm:px-4 gap-3 shrink-0 sticky top-0 z-40 shadow-[0_12px_40px_rgba(0,0,0,0.32)]"
+      >
         <Link href="/">
           <motion.div
             className="flex shrink-0 items-center gap-2 cursor-pointer"
@@ -134,14 +137,14 @@ export function TopNav() {
           </motion.div>
         </Link>
 
-        <nav className="mx-auto hidden min-w-0 max-w-4xl flex-1 items-center justify-between gap-0.5 xl:flex">
+        <nav className="mx-auto hidden min-w-0 max-w-2xl flex-1 items-center justify-center gap-2 lg:flex">
           {links.map((link) => {
             const isActive = location === link.href;
             return (
               <Link key={link.href} href={link.href}>
                 <motion.div
                   data-testid={`nav-link-${link.label.toLowerCase().replace(" ", "-")}`}
-                  className={`relative flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer transition-colors ${
+                  className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
                     isActive
                       ? "text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -319,7 +322,7 @@ export function TopNav() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.95 }}
                   transition={{ duration: 0.13 }}
-                  className="absolute right-0 top-11 w-48 bg-popover border rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
+                  className="absolute right-0 top-11 w-64 bg-popover border rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
                 >
                   {user && (
                     <div className="px-3 py-2 border-b">
@@ -330,6 +333,12 @@ export function TopNav() {
                         <p className="text-[11px] text-muted-foreground truncate">
                           {user.email}
                         </p>
+                      )}
+                      {stats && (
+                        <div className="mt-2 flex items-center justify-between rounded-lg bg-primary/10 px-2 py-1.5 text-[11px] font-bold text-primary">
+                          <span>Tier {stats.tier}</span>
+                          <span>{stats.tierProgress}/100 VP</span>
+                        </div>
                       )}
                     </div>
                   )}
@@ -342,6 +351,80 @@ export function TopNav() {
                       Profile
                     </button>
                   </Link>
+                  <div className="border-t px-2 py-2">
+                    <button
+                      type="button"
+                      aria-pressed={preferences.advancedFeaturesEnabled}
+                      onClick={() =>
+                        void updatePreferences({
+                          advancedFeaturesEnabled:
+                            !preferences.advancedFeaturesEnabled,
+                        })
+                      }
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted"
+                    >
+                      <Settings2 className="h-3.5 w-3.5 text-primary" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold">
+                          Advanced workspace
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          Schedule and planning tools
+                        </span>
+                      </span>
+                      <span
+                        className={`h-5 w-9 rounded-full p-0.5 transition-colors ${preferences.advancedFeaturesEnabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+                        aria-hidden="true"
+                      >
+                        <span
+                          className={`block h-4 w-4 rounded-full bg-white transition-transform ${preferences.advancedFeaturesEnabled ? "translate-x-4" : ""}`}
+                        />
+                      </span>
+                    </button>
+                    {!preferences.advancedFeaturesEnabled && (
+                      <p className="px-2 pt-1 text-[10px] text-muted-foreground">
+                        Optional now. Recommended from Tier 2.
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAccountOpen(false);
+                        void updatePreferences({ tutorialCompleted: false });
+                      }}
+                      className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <Check className="h-3.5 w-3.5" /> Replay tutorial
+                    </button>
+                  </div>
+                  {preferences.advancedFeaturesEnabled && (
+                    <div className="border-t py-1">
+                      <Link href="/projects">
+                        <button
+                          onClick={() => setAccountOpen(false)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <FolderKanban className="h-3.5 w-3.5" /> Projects
+                        </button>
+                      </Link>
+                      <Link href="/analytics">
+                        <button
+                          onClick={() => setAccountOpen(false)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <LineChart className="h-3.5 w-3.5" /> Insights
+                        </button>
+                      </Link>
+                      <Link href="/social">
+                        <button
+                          onClick={() => setAccountOpen(false)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <Users className="h-3.5 w-3.5" /> Social
+                        </button>
+                      </Link>
+                    </div>
+                  )}
                   {isAuthenticated ? (
                     <button
                       onClick={() => {
@@ -373,10 +456,18 @@ export function TopNav() {
           <AnimatePresence>
             {stats !== undefined && (
               <motion.div
+                role="button"
+                tabIndex={0}
+                aria-label="Open tier progress"
+                onClick={() => setAccountOpen(true)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ")
+                    setAccountOpen(true);
+                }}
                 initial={{ opacity: 0, scale: 0.85, x: 8 }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 transition={{ type: "spring", stiffness: 380, damping: 24 }}
-                className="hidden 2xl:flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-2.5 py-1.5 shadow-[0_0_24px_rgba(0,213,255,0.12)]"
+                className="hidden cursor-pointer sm:flex items-center gap-1.5 bg-primary/10 border border-primary/30 rounded-lg px-2.5 py-1.5"
               >
                 {stats.multiplier > 1.0 && (
                   <motion.div
@@ -397,7 +488,7 @@ export function TopNav() {
                   transition={{ type: "spring", stiffness: 400, damping: 22 }}
                   className="text-sm font-bold text-primary"
                 >
-                  {stats.totalVp.toLocaleString()} VP
+                  Tier {stats.tier} · {stats.tierProgress}/100 VP
                 </motion.span>
                 {stats.multiplier > 1.0 && (
                   <span className="text-xs text-amber-600 font-semibold">
@@ -423,7 +514,7 @@ export function TopNav() {
         </div>
       </header>
 
-      <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-border/70 bg-background/90 px-3 py-2 xl:hidden">
+      <nav className="flex shrink-0 justify-center gap-1 overflow-x-auto border-b border-border/70 bg-background/90 px-3 py-2 lg:hidden">
         {links.map((link) => {
           const active = location === link.href;
           return (

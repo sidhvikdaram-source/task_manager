@@ -21,7 +21,15 @@ type Preview = {
   warnings: string[];
 };
 
-export function QuickCapture({ onCreated }: { onCreated?: () => void }) {
+export function QuickCapture({
+  onCreated,
+  contextSubject,
+  placeholder = "Call mom Sunday afternoon #Personal p1",
+}: {
+  onCreated?: () => void;
+  contextSubject?: string;
+  placeholder?: string;
+}) {
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [saving, setSaving] = useState(false);
@@ -38,7 +46,7 @@ export function QuickCapture({ onCreated }: { onCreated?: () => void }) {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, contextSubject }),
           signal: controller.signal,
         });
         if (response.ok) setPreview(await response.json());
@@ -51,7 +59,7 @@ export function QuickCapture({ onCreated }: { onCreated?: () => void }) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [text]);
+  }, [text, contextSubject]);
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -62,7 +70,7 @@ export function QuickCapture({ onCreated }: { onCreated?: () => void }) {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, contextSubject }),
       });
       const data = (await response.json()) as {
         task?: { title: string };
@@ -91,7 +99,7 @@ export function QuickCapture({ onCreated }: { onCreated?: () => void }) {
           value={text}
           onChange={(event) => setText(event.target.value)}
           rows={2}
-          placeholder="Call mom Sunday afternoon #Personal p1"
+          placeholder={placeholder}
           className="min-h-12 flex-1 resize-none bg-transparent px-2 py-1 text-sm outline-none"
         />
         <button

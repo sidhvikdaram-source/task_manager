@@ -4,10 +4,18 @@ import { parseQuickCapture } from "../src/lib/quickCapture.ts";
 
 const now = new Date(2026, 6, 16, 12, 0, 0);
 const projects = [{ id: 1, name: "Personal" }];
-const subjects = [{ id: 2, name: "Math" }];
+const subjects = [
+  { id: 2, name: "Math" },
+  { id: 3, name: "Computer Science" },
+];
 
 test("parses Todoist-style schedule, project, and priority tokens", () => {
-  const parsed = parseQuickCapture("Call mom Sunday afternoon #Personal p1", projects, subjects, now);
+  const parsed = parseQuickCapture(
+    "Call mom Sunday afternoon #Personal p1",
+    projects,
+    subjects,
+    now,
+  );
 
   assert.equal(parsed.title, "Call mom");
   assert.equal(parsed.dueDate, "2026-07-19");
@@ -30,11 +38,48 @@ test("turns additional lines into a real checklist", () => {
   assert.equal(parsed.subject, "Math");
   assert.equal(parsed.priority, "high");
   assert.equal(parsed.estimatedMinutes, 45);
-  assert.deepEqual(parsed.checklist, ["Review fraction rules", "Solve 10 practice problems"]);
+  assert.deepEqual(parsed.checklist, [
+    "Review fraction rules",
+    "Solve 10 practice problems",
+  ]);
+});
+
+test("uses a matching hashtag as a subject when it is not a project", () => {
+  const parsed = parseQuickCapture(
+    "Finish algebra homework tomorrow #Math high priority",
+    projects,
+    subjects,
+    now,
+  );
+
+  assert.equal(parsed.title, "Finish algebra homework");
+  assert.equal(parsed.subject, "Math");
+  assert.equal(parsed.projectId, null);
+  assert.equal(parsed.dueDate, "2026-07-17");
+  assert.equal(parsed.priority, "high");
+  assert.deepEqual(parsed.warnings, []);
+});
+
+test("recognizes compact subject initials", () => {
+  const parsed = parseQuickCapture(
+    "Finish coding lab #CS",
+    projects,
+    subjects,
+    now,
+  );
+
+  assert.equal(parsed.title, "Finish coding lab");
+  assert.equal(parsed.subject, "Computer Science");
+  assert.deepEqual(parsed.warnings, []);
 });
 
 test("does not silently attach unknown organization tokens", () => {
-  const parsed = parseQuickCapture("Finish worksheet #Unknown @History", projects, subjects, now);
+  const parsed = parseQuickCapture(
+    "Finish worksheet #Unknown @History",
+    projects,
+    subjects,
+    now,
+  );
 
   assert.equal(parsed.title, "Finish worksheet");
   assert.equal(parsed.projectId, null);
@@ -43,9 +88,24 @@ test("does not silently attach unknown organization tokens", () => {
 });
 
 test("understands natural priority language and handles negation first", () => {
-  const urgent = parseQuickCapture("Finish lab report very important", projects, subjects, now);
-  const relaxed = parseQuickCapture("Organize downloads not important", projects, subjects, now);
-  const noRush = parseQuickCapture("Clean notes no rush", projects, subjects, now);
+  const urgent = parseQuickCapture(
+    "Finish lab report very important",
+    projects,
+    subjects,
+    now,
+  );
+  const relaxed = parseQuickCapture(
+    "Organize downloads not important",
+    projects,
+    subjects,
+    now,
+  );
+  const noRush = parseQuickCapture(
+    "Clean notes no rush",
+    projects,
+    subjects,
+    now,
+  );
 
   assert.equal(urgent.title, "Finish lab report");
   assert.equal(urgent.priority, "critical");
@@ -56,7 +116,12 @@ test("understands natural priority language and handles negation first", () => {
 });
 
 test("explicit p-level tokens override natural priority words", () => {
-  const parsed = parseQuickCapture("Review notes urgent p4", projects, subjects, now);
+  const parsed = parseQuickCapture(
+    "Review notes urgent p4",
+    projects,
+    subjects,
+    now,
+  );
 
   assert.equal(parsed.title, "Review notes");
   assert.equal(parsed.priority, "low");
