@@ -33,7 +33,7 @@ export function useCompletionFeedback() {
     },
     celebrate(prepared: { origin: { x: number; y: number }; soundReady: Promise<void> }) {
       if (preferences.completionSoundEnabled) {
-        void playCompletionSound(prepared.soundReady);
+        void playCompletionSound(prepared.soundReady).catch(() => undefined);
       }
       playCompletionEffect(
         data?.equipped?.completion_effect ?? "clean-confetti",

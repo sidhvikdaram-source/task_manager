@@ -137,8 +137,8 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background/92 px-3 py-2.5 backdrop-blur-xl sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
+      <header className={`sticky top-0 z-40 flex shrink-0 flex-wrap items-center justify-between gap-x-3 border-b border-border/70 bg-background/92 px-3 backdrop-blur-xl sm:px-6 ${location === "/" ? "min-h-28 gap-y-2 py-3 sm:min-h-32 sm:py-4" : "min-h-16 py-2.5"}`}>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <button
             type="button"
             onClick={onOpenSidebar}
@@ -160,13 +160,8 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
           </Link>
           {location === "/" ? (
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="truncate text-base font-black sm:text-xl">{greeting}, {user?.firstName || user?.email?.split("@")[0] || "there"}.</p>
-                <span className="hidden items-center gap-1 rounded-full bg-secondary/10 px-2 py-1 text-[10px] font-black text-secondary sm:inline-flex">
-                  <MomentumIcon className="h-3 w-3" /> {stats?.streakDays ?? 0}
-                </span>
-              </div>
-              <p className="hidden text-xs text-muted-foreground sm:block">{overdue ? `${overdue} overdue - ${dueToday} due today` : dueToday ? `${dueToday} due today` : "Choose one useful thing and begin."}</p>
+              <p className="truncate text-lg font-black leading-tight sm:text-2xl">{greeting}, {user?.firstName || user?.email?.split("@")[0] || "there"}.</p>
+              <p className="mt-0.5 hidden text-xs text-muted-foreground sm:block">Your day at a glance</p>
             </div>
           ) : (
             <h1 className="truncate text-base font-black sm:text-lg">{pageTitles[location] ?? "Velocity"}</h1>
@@ -480,6 +475,26 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
             <Plus className="w-4 h-4" />
           </motion.button>
         </div>
+        {location === "/" && (
+          <div className="order-3 flex w-full items-stretch gap-2 overflow-x-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-24 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card/65 px-3 py-2">
+              <Zap className="h-4 w-4 text-primary" />
+              <span><span className="block text-[10px] font-bold uppercase text-muted-foreground">VP</span><span className="block text-sm font-black leading-none">{stats?.totalVp ?? 0}</span></span>
+            </div>
+            <div className="flex min-w-28 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card/65 px-3 py-2">
+              <MomentumIcon className="h-4 w-4 text-secondary" />
+              <span><span className="block text-[10px] font-bold uppercase text-muted-foreground">Momentum</span><span className="block text-sm font-black leading-none">{stats?.streakDays ?? 0} days</span></span>
+            </div>
+            <div className="min-w-36 shrink-0 rounded-lg border border-border/70 bg-card/65 px-3 py-2">
+              <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase text-muted-foreground"><span>Tier {stats?.tier ?? 1}</span><span>{stats?.tierProgress ?? 0}/100</span></div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"><motion.div className="h-full rounded-full bg-primary" initial={false} animate={{ width: `${stats?.tierProgress ?? 0}%` }} /></div>
+            </div>
+            <div className="flex min-w-48 flex-1 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card/65 px-3 py-2">
+              <AlertTriangle className={`h-4 w-4 ${overdue ? "text-destructive" : "text-primary"}`} />
+              <span><span className="block text-[10px] font-bold uppercase text-muted-foreground">Today</span><span className="block text-sm font-black leading-none">{overdue ? `${overdue} overdue, ${dueToday} due` : dueToday ? `${dueToday} due today` : "Nothing urgent"}</span></span>
+            </div>
+          </div>
+        )}
       </header>
 
       {isCreateModalOpen && (

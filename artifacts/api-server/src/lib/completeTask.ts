@@ -6,6 +6,7 @@ import {
   usersTable,
   userStatsTable,
 } from "@workspace/db";
+import { completionDisposition } from "./taskCompletionRules";
 
 export class TaskNotFoundError extends Error {}
 
@@ -26,7 +27,8 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
       .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)));
     if (!existing) throw new TaskNotFoundError("Task not found");
 
-    if (existing.status === "completed") {
+    const disposition = completionDisposition(existing.status, existing.completionAwardedAt);
+    if (disposition === "already-complete") {
       if (!existing.completionAwardedAt) {
         await tx.update(tasksTable).set({ completionAwardedAt: existing.completedAt ?? new Date() })
           .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId), isNull(tasksTable.completionAwardedAt)));
@@ -35,6 +37,14 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
     }
 
     const completedAt = new Date();
+    if (disposition === "complete-without-award") {
+      const [task] = await tx.update(tasksTable)
+        .set({ status: "completed", completedAt })
+        .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)))
+        .returning();
+      return { task: task ?? existing, vpAwarded: 0, multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
+    }
+
     const [task] = await tx.update(tasksTable)
       .set({ status: "completed", completedAt, completionAwardedAt: completedAt })
       .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId), isNull(tasksTable.completionAwardedAt)))

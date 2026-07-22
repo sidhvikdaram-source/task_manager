@@ -13,8 +13,12 @@ function getCompletionAudioContext() {
 }
 
 export async function primeCompletionSound() {
-  const context = getCompletionAudioContext();
-  if (context?.state === "suspended") await context.resume();
+  try {
+    const context = getCompletionAudioContext();
+    if (context?.state === "suspended") await context.resume();
+  } catch {
+    // Completion still succeeds when a browser blocks audio initialization.
+  }
 }
 
 export async function playCompletionSound(ready?: Promise<void>) {

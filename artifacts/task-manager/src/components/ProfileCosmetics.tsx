@@ -134,8 +134,6 @@ export function PetPreview({ petId, earnedVp = 0, className }: { petId?: string 
       className={cn("relative flex items-center justify-center rounded-2xl border-2 border-background shadow-lg", definition.color, className)}
     >
       <Icon className="h-[55%] w-[55%]" />
-      {stage >= 1 && <motion.span animate={reduceMotion ? undefined : { rotate: 360 }} transition={{ duration: 5, repeat: Infinity, ease: "linear" }} className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-background bg-current opacity-70" />}
-      {stage >= 3 && <span className="absolute -bottom-1 left-1 h-2 w-2 rounded-full border border-background bg-white/80" />}
     </motion.div>
   );
 }

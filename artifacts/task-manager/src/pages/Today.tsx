@@ -16,7 +16,6 @@ import {
   getGetDashboardOverviewQueryKey,
   getGetUserStatsQueryKey,
   getListTasksQueryKey,
-  useCompleteTask,
   useGetUserStats,
   useListTasks,
   type Task,
@@ -26,7 +25,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DailyChecklist } from "@/components/DailyChecklist";
 import { QuickCapture } from "@/components/QuickCapture";
-import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
+import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
 import { MomentumIcon } from "@/components/MomentumIcon";
 import { localDateKey } from "@/lib/localDate";
 
@@ -72,8 +71,7 @@ function viewLabel(view: View) {
 
 export default function Today() {
   const queryClient = useQueryClient();
-  const completeTask = useCompleteTask();
-  const completionFeedback = useCompletionFeedback();
+  const taskCompletion = useReliableTaskCompletion();
   const { data: stats } = useGetUserStats();
   const { data: tasks = [], isLoading } = useListTasks(
     { sortBy: "dueDate" },
@@ -198,31 +196,14 @@ export default function Today() {
   }
 
   function complete(task: Task, target?: HTMLElement | null) {
-    if (task.externalSource === "canvas") {
-      toast("Canvas will complete this after you submit it.");
-      return;
-    }
-    const preparedFeedback = completionFeedback.prepare(target);
-    completeTask.mutate(
-      { id: task.id },
-      {
+    void taskCompletion.complete(task, target, {
         onSuccess: async (result) => {
-          completionFeedback.celebrate(preparedFeedback);
-          const completion = result as typeof result & {
-            firstCompletionToday?: boolean;
-            streakDays?: number | null;
-          };
-          if (completion.firstCompletionToday && completion.streakDays) {
-            setStreakCelebration(completion.streakDays);
+          if (result.firstCompletionToday && result.streakDays) {
+            setStreakCelebration(result.streakDays);
           }
-          toast.success(
-            result.vpAwarded ? `Done - +${result.vpAwarded} VP` : "Task done",
-          );
           await refresh();
         },
-        onError: () => toast.error("That task could not be completed"),
-      },
-    );
+      });
   }
 
   return (
@@ -405,7 +386,7 @@ export default function Today() {
                   >
                     <button
                       type="button"
-                      disabled={isComplete || completeTask.isPending}
+                      disabled={isComplete || taskCompletion.isPending(task.id)}
                       onClick={(event) => {
                         event.stopPropagation();
                         complete(task, event.currentTarget);
@@ -413,12 +394,15 @@ export default function Today() {
                       aria-label={
                         isComplete ? "Task completed" : "Complete task"
                       }
-                      className="text-muted-foreground hover:text-primary disabled:opacity-70"
+                      aria-busy={taskCompletion.isPending(task.id)}
+                      className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-70"
                     >
-                      {isComplete ? (
-                        <CheckCircle2 className="h-5 w-5 text-primary" />
+                      {taskCompletion.isPending(task.id) ? (
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      ) : isComplete ? (
+                        <CheckCircle2 className="h-6 w-6 text-primary" />
                       ) : (
-                        <Circle className="h-5 w-5" />
+                        <Circle className="h-6 w-6" />
                       )}
                     </button>
                     <div className="min-w-0 flex-1">

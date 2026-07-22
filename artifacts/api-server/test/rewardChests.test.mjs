@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { earnedChestSources } from "../src/lib/rewardChestRules.ts";
+import {
+  chestRarityUpgraded,
+  earnedChestSources,
+  rollChestRarity,
+} from "../src/lib/rewardChestRules.ts";
 
 test("milestone chest source keys are deterministic and unique", () => {
   const sources = earnedChestSources({ tier: 15, tasksCompleted: 100, focusMinutes: 1200 });
@@ -14,4 +18,18 @@ test("milestone chest source keys are deterministic and unique", () => {
 
 test("no milestone chests are created before thresholds", () => {
   assert.deepEqual(earnedChestSources({ tier: 1, tasksCompleted: 9, focusMinutes: 119 }), []);
+});
+
+test("common chests can stay common or upgrade with bounded rarity rolls", () => {
+  assert.equal(rollChestRarity("common", 0.9), "common");
+  assert.equal(rollChestRarity("common", 0.1), "rare");
+  assert.equal(rollChestRarity("common", 0.01), "epic");
+  assert.equal(chestRarityUpgraded("common", "rare"), true);
+  assert.equal(chestRarityUpgraded("rare", "rare"), false);
+});
+
+test("rare chests only upgrade to epic and epic chests remain epic", () => {
+  assert.equal(rollChestRarity("rare", 0.05), "epic");
+  assert.equal(rollChestRarity("rare", 0.5), "rare");
+  assert.equal(rollChestRarity("epic", 0), "epic");
 });

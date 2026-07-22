@@ -210,7 +210,7 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
 
   try {
     const result = await completeTaskAndAward(userId, taskId);
-    await reconcileRewardChests(userId).catch((error) =>
+    void reconcileRewardChests(userId).catch((error) =>
       req.log?.warn({ err: error }, "Reward chest reconciliation deferred"),
     );
     const full = await getTaskWithCounts(result.task.id, userId);

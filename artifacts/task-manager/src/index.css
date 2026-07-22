@@ -471,6 +471,10 @@
     border-radius: 1.25rem;
     box-shadow: var(--bento-shadow);
     backdrop-filter: blur(18px);
+    transition:
+      border-color 160ms ease,
+      box-shadow 180ms ease,
+      background-color 160ms ease;
   }
 
   .bento-card-hot {

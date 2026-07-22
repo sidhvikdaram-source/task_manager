@@ -1,19 +1,18 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Circle, ListTodo, Plus, SlidersHorizontal, Zap } from 'lucide-react';
-import { useCompleteTask, useListTasks, getListTasksQueryKey } from '@workspace/api-client-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, Circle, ListTodo, Loader2, Plus, SlidersHorizontal, Zap } from 'lucide-react';
+import { useListTasks, getListTasksQueryKey } from '@workspace/api-client-react';
 import { CreateTaskModal } from '@/components/CreateTaskModal';
 import { TaskDetailsModal } from '@/components/TaskDetailsModal';
 import { Button } from '@/components/ui/button';
+import { useReliableTaskCompletion } from '@/hooks/useReliableTaskCompletion';
 
 export default function Tasks() {
   const [status, setStatus] = useState<'active' | 'completed'>('active');
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const { data: tasks = [] } = useListTasks({ sortBy: 'priority' }, { query: { queryKey: getListTasksQueryKey({ sortBy: 'priority' }) } });
-  const complete = useCompleteTask();
-  const queryClient = useQueryClient();
+  const taskCompletion = useReliableTaskCompletion();
   const visible = useMemo(() => tasks.filter((task) => status === 'completed' ? task.status === 'completed' : task.status !== 'completed'), [status, tasks]);
 
   return <div className="space-y-5">
@@ -36,7 +35,7 @@ export default function Tasks() {
       </div>
       <div className="divide-y divide-border/70">
         {visible.map((task, index) => <motion.div key={task.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .025 }} className="flex cursor-pointer items-center gap-3 p-4 hover:bg-muted/40" onClick={() => setSelectedId(task.id)}>
-          {status === 'active' ? <button className="text-muted-foreground hover:text-primary" onClick={(event) => { event.stopPropagation(); complete.mutate({ id: task.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: ['/api/tasks'] }) }); }}><Circle className="h-5 w-5" /></button> : <CheckCircle2 className="h-5 w-5 text-primary" />}
+          {status === 'active' ? <button type="button" aria-label="Complete task" disabled={taskCompletion.isPending(task.id)} className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-70" onClick={(event) => { event.stopPropagation(); void taskCompletion.complete(task, event.currentTarget); }}>{taskCompletion.isPending(task.id) ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : <Circle className="h-6 w-6" />}</button> : <div className="flex h-11 w-11 shrink-0 items-center justify-center"><CheckCircle2 className="h-6 w-6 text-primary" /></div>}
           <div className="min-w-0 flex-1"><p className="truncate font-bold">{task.title}</p><p className="mt-1 text-xs text-muted-foreground">{task.dueDate ? `Due ${new Date(`${task.dueDate}T12:00:00`).toLocaleDateString()}` : 'No deadline'}</p></div>
           <span className="rounded-lg bg-primary/10 px-2 py-1 text-xs font-black text-primary"><Zap className="mr-1 inline h-3 w-3 fill-primary" />{task.vpValue}</span>
         </motion.div>)}

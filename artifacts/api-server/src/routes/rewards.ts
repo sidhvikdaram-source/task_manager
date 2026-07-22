@@ -10,6 +10,7 @@ import {
   usersTable,
 } from "@workspace/db";
 import { reconcileRewardChests, type ChestRarity } from "../lib/rewardChests";
+import { chestRarityUpgraded, rollChestRarity } from "../lib/rewardChestRules";
 
 const router: IRouter = Router();
 
@@ -202,13 +203,27 @@ router.post("/rewards/chests/:id/open", async (req, res): Promise<void> => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${req.user.id}))`);
       const [chest] = await tx.update(userRewardChestsTable).set({ status: "opening" }).where(and(eq(userRewardChestsTable.id, chestId), eq(userRewardChestsTable.userId, req.user.id), eq(userRewardChestsTable.status, "unopened"))).returning();
       if (!chest) throw new Error("CHEST_UNAVAILABLE");
+      const initialRarity = chest.rarity as ChestRarity;
+      let finalRarity = rollChestRarity(initialRarity, randomInt(10_000) / 10_000);
       const ownedRows = await tx.select({ itemId: userCosmeticsTable.itemId }).from(userCosmeticsTable).where(eq(userCosmeticsTable.userId, req.user.id));
       const owned = new Set(ownedRows.map((entry) => entry.itemId));
-      let candidates = chestCollectables.filter((item) => item.chestRarity === chest.rarity && !owned.has(item.id));
-      if (!candidates.length) candidates = chestCollectables.filter((item) => !owned.has(item.id));
+      let candidates = chestCollectables.filter((item) => item.chestRarity === finalRarity && !owned.has(item.id));
+      if (!candidates.length) {
+        candidates = chestCollectables.filter((item) => !owned.has(item.id));
+        if (candidates.length) {
+          const availableRarities = (["epic", "rare", "common"] as const).filter((rarity) =>
+            candidates.some((item) => item.chestRarity === rarity),
+          );
+          const higherRarity = availableRarities.find((rarity) => chestRarityUpgraded(initialRarity, rarity));
+          if (higherRarity) {
+            finalRarity = higherRarity;
+            candidates = candidates.filter((item) => item.chestRarity === finalRarity);
+          }
+        }
+      }
       const reward = candidates.length ? candidates[randomInt(candidates.length)] : null;
       const fallbackByRarity: Record<ChestRarity, number> = { common: 50, rare: 100, epic: 180 };
-      const fallback = reward ? 0 : fallbackByRarity[chest.rarity as ChestRarity] ?? 50;
+      const fallback = reward ? 0 : fallbackByRarity[finalRarity];
       if (reward) {
         await tx.insert(userCosmeticsTable).values({ userId: req.user.id, itemId: reward.id }).onConflictDoNothing();
       } else {
@@ -217,8 +232,15 @@ router.post("/rewards/chests/:id/open", async (req, res): Promise<void> => {
         const progress = stats.tierProgress + fallback;
         await tx.update(userStatsTable).set({ totalVp: stats.totalVp + fallback, lifetimeVp: stats.lifetimeVp + fallback, tier: stats.tier + Math.floor(progress / 100), tierProgress: progress % 100, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
       }
-      const [opened] = await tx.update(userRewardChestsTable).set({ status: "opened", rewardItemId: reward?.id ?? null, vpFallback: fallback, openedAt: new Date() }).where(eq(userRewardChestsTable.id, chest.id)).returning();
-      return { chest: opened, reward, vpFallback: fallback };
+      const [opened] = await tx.update(userRewardChestsTable).set({ rarity: finalRarity, status: "opened", rewardItemId: reward?.id ?? null, vpFallback: fallback, openedAt: new Date() }).where(eq(userRewardChestsTable.id, chest.id)).returning();
+      return {
+        chest: opened,
+        reward,
+        vpFallback: fallback,
+        initialRarity,
+        finalRarity,
+        upgraded: chestRarityUpgraded(initialRarity, finalRarity),
+      };
     });
     res.json(result);
   } catch (error) {

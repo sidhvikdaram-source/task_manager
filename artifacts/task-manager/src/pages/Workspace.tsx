@@ -18,12 +18,12 @@ import { toast } from "sonner";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 import { localDateKey } from "@/lib/localDate";
-import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
+import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
 
 type WorkTask = {
   id: number;
   title: string;
-  status: string;
+  status: "todo" | "in_progress" | "completed";
   priority: string;
   dueDate: string | null;
   calendarDate: string | null;
@@ -70,7 +70,7 @@ function canvasCategoryLabel(taskKind: string) {
 }
 
 export default function Workspace() {
-  const completionFeedback = useCompletionFeedback();
+  const taskCompletion = useReliableTaskCompletion();
   const [tasks, setTasks] = useState<WorkTask[]>([]);
   const [view, setView] = useState<ViewId>("today");
   const [selected, setSelected] = useState<number | null>(null);
@@ -162,19 +162,18 @@ export default function Workspace() {
     }
   };
   const complete = async (id: number, target?: HTMLElement | null) => {
-    const preparedFeedback = completionFeedback.prepare(target);
-    const response = await fetch(`/api/tasks/${id}/complete`, {
-      method: "POST",
-      credentials: "include",
+    const task = tasks.find((item) => item.id === id);
+    if (!task) return;
+    const previousStatus = task.status;
+    await taskCompletion.complete(task, target, {
+      onOptimistic: () => setTasks((current) => current.map((item) =>
+        item.id === id ? { ...item, status: "completed" } : item,
+      )),
+      onSuccess: load,
+      onError: () => setTasks((current) => current.map((item) =>
+        item.id === id ? { ...item, status: previousStatus } : item,
+      )),
     });
-    if (response.ok) {
-      completionFeedback.celebrate(preparedFeedback);
-      await load();
-      toast.success("Task complete");
-      return;
-    }
-    const data = await response.json().catch(() => null);
-    toast.error(data?.error ?? "Could not complete this task.");
   };
   const organize = async (id: number) => {
     await fetch(`/api/inbox/${id}/organize`, {
@@ -322,19 +321,23 @@ export default function Workspace() {
                   }}
                   disabled={
                     task.status === "completed" ||
-                    task.externalSource === "canvas"
+                    task.externalSource?.startsWith("canvas") ||
+                    taskCompletion.isPending(task.id)
                   }
                   title={
-                    task.externalSource === "canvas"
+                    task.externalSource?.startsWith("canvas")
                       ? "Canvas updates this assignment when it is submitted or graded"
                       : "Mark task complete"
                   }
-                  className="text-muted-foreground hover:text-primary disabled:cursor-not-allowed disabled:opacity-45"
+                  aria-busy={taskCompletion.isPending(task.id)}
+                  className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  {task.status === "completed" ? (
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                  {taskCompletion.isPending(task.id) ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  ) : task.status === "completed" ? (
+                    <CheckCircle2 className="h-6 w-6 text-primary" />
                   ) : (
-                    <Circle className="h-5 w-5" />
+                    <Circle className="h-6 w-6" />
                   )}
                 </button>
                 <div className="min-w-0 flex-1">

@@ -268,6 +268,21 @@ function SocialRoute() {
   );
 }
 
+function PageLoadingSkeleton() {
+  return (
+    <div className="space-y-4" role="status" aria-label="Loading page">
+      <div className="bento-card p-5">
+        <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+        <div className="mt-3 h-7 w-52 max-w-full animate-pulse rounded bg-muted" />
+        <div className="mt-3 h-3 w-72 max-w-full animate-pulse rounded bg-muted/80" />
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[0, 1].map((item) => <div key={item} className="bento-card space-y-3 p-5"><div className="h-4 w-32 animate-pulse rounded bg-muted" /><div className="h-16 animate-pulse rounded-lg bg-muted/70" /><div className="h-16 animate-pulse rounded-lg bg-muted/70" /></div>)}
+      </div>
+    </div>
+  );
+}
+
 function AnimatedRoutes() {
   const [location] = useLocation();
   const reduceMotion = useReducedMotion();
@@ -281,20 +296,20 @@ function AnimatedRoutes() {
   });
   const style = data?.equipped?.transition ?? "velocity-slide";
   const variants = style === "quick-stack"
-    ? { initial: { opacity: 0, y: 14, scale: 0.985 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -8, scale: 0.99 } }
+    ? { initial: { opacity: 0, y: 8, scale: 0.995 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -4, scale: 0.997 } }
     : style === "panel-sweep"
-      ? { initial: { opacity: 0, x: 42 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -26 } }
+      ? { initial: { opacity: 0, x: 14 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -8 } }
       : style === "soft-glide"
-        ? { initial: { opacity: 0, x: 12 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -8 } }
-        : { initial: { opacity: 0, x: 26 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -16 } };
+        ? { initial: { opacity: 0, y: 6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -3 } }
+        : { initial: { opacity: 0, x: 10 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -6 } };
   const resolved = reduceMotion
     ? { initial: { opacity: 1 }, animate: { opacity: 1 }, exit: { opacity: 1 } }
     : variants;
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div key={location} initial={resolved.initial} animate={resolved.animate} exit={resolved.exit} transition={{ duration: style === "soft-glide" ? 0.28 : 0.2, ease: "easeOut" }}>
+    <AnimatePresence mode="popLayout" initial={false}>
+      <motion.div key={location} initial={resolved.initial} animate={resolved.animate} exit={resolved.exit} transition={{ duration: style === "soft-glide" ? 0.2 : 0.16, ease: [0.22, 1, 0.36, 1] }} className="min-h-full will-change-transform">
         <PageErrorBoundary>
-          <Suspense fallback={<div className="flex min-h-[45vh] items-center justify-center" role="status" aria-label="Loading page"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
+          <Suspense fallback={<PageLoadingSkeleton />}>
             <Switch>
               <Route path="/" component={Today} />
               <Route path="/calendar" component={Calendar} />
