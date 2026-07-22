@@ -4,6 +4,8 @@ import { db, focusSessionsTable, projectsTable, subjectsTable, tasksTable, users
 import { scoreTaskRecommendation, type RecommendationEnergy } from "../lib/taskRecommendation";
 import { addCalendarDays, calendarDateToUtc, localDateKey, startOfWeekKey } from "../lib/localDate";
 import { reconcileRewardChests } from "../lib/rewardChests";
+import { awardBpInTransaction, lockEconomyUser } from "../lib/bpEconomy";
+import { BP_RULES, VP_RULES } from "../lib/economyConfig";
 
 const router: IRouter = Router();
 const defaultSubjects = [
@@ -127,7 +129,7 @@ router.get("/weekly-review", async (req, res): Promise<void> => {
   });
   const active = tasks.filter((task) => task.status !== "completed");
   const projectAttention = projects.map((project) => { const related = tasks.filter((task) => task.projectId === project.id); const done = related.filter((task) => task.status === "completed").length; return { ...project, taskCount: related.length, progress: related.length ? Math.round(done / related.length * 100) : 0 }; }).filter((project) => project.progress < 100 && (project.dueDate || project.taskCount > 0));
-  res.json({ weekStart, completed, overdue: active.filter((task) => task.dueDate && task.dueDate < today), dueNextWeek: active.filter((task) => task.dueDate && task.dueDate >= weekEnd && task.dueDate < nextEnd), focusMinutes: weekSessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + session.durationMinutes, 0), vpEarned: completed.reduce((sum, task) => sum + task.vpValue, 0) + weekSessions.reduce((sum, session) => sum + (session.vpAwarded ?? 0), 0), streakDays: stats?.streakDays ?? 0, projects: projectAttention, inboxCount: active.filter((task) => !task.organized).length, unfinished: active, completedReview: Boolean(receipt), review: receipt ?? null });
+  res.json({ weekStart, completed, overdue: active.filter((task) => task.dueDate && task.dueDate < today), dueNextWeek: active.filter((task) => task.dueDate && task.dueDate >= weekEnd && task.dueDate < nextEnd), focusMinutes: weekSessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + session.durationMinutes, 0), vpEarned: completed.reduce((sum, task) => sum + task.vpValue, 0) + weekSessions.reduce((sum, session) => sum + (session.vpAwarded ?? 0), 0), streakDays: stats?.streakDays ?? 0, projects: projectAttention, inboxCount: active.filter((task) => !task.organized).length, unfinished: active, completedReview: Boolean(receipt), reviewRewards: { vp: VP_RULES.weeklyReview, bp: BP_RULES.weeklyReview }, review: receipt ?? null });
 });
 
 router.post("/weekly-review/complete", async (req, res): Promise<void> => {
@@ -135,16 +137,19 @@ router.post("/weekly-review/complete", async (req, res): Promise<void> => {
   const { today } = await userDateContext(req.user.id);
   const weekStart = startOfWeekKey(today); const priorities = Array.isArray(req.body?.topPriorities) ? req.body.topPriorities.filter((value: unknown): value is string => typeof value === "string").slice(0,3) : [];
   const focusGoalMinutes = Math.min(1200, Math.max(0, Number(req.body?.focusGoalMinutes) || 0));
-  const award = 40;
+  const award = VP_RULES.weeklyReview;
+  const bpAward = BP_RULES.weeklyReview;
   const result = await db.transaction(async (tx) => {
-    const [receipt] = await tx.insert(weeklyReviewsTable).values({ userId: req.user.id, weekStart, topPriorities: priorities, focusGoalMinutes, vpAwarded: award }).onConflictDoNothing().returning();
-    if (!receipt) return { awarded: 0, alreadyCompleted: true };
+    await lockEconomyUser(tx, req.user.id);
+    const [receipt] = await tx.insert(weeklyReviewsTable).values({ userId: req.user.id, weekStart, topPriorities: priorities, focusGoalMinutes, vpAwarded: award, bpAwarded: bpAward }).onConflictDoNothing().returning();
+    if (!receipt) return { awarded: 0, bpAwarded: 0, alreadyCompleted: true };
     const [stats] = await tx.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id));
     if (stats) {
       const progress = stats.tierProgress + award;
-      await tx.update(userStatsTable).set({ totalVp: sql`${userStatsTable.totalVp} + ${award}`, lifetimeVp: stats.lifetimeVp + award, tier: stats.tier + Math.floor(progress / 100), tierProgress: progress % 100, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
+      await tx.update(userStatsTable).set({ totalVp: sql`${userStatsTable.totalVp} + ${award}`, lifetimeVp: stats.lifetimeVp + award, tier: stats.tier + Math.floor(progress / VP_RULES.tierSize), tierProgress: progress % VP_RULES.tierSize, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
     } else await tx.insert(userStatsTable).values({ userId: req.user.id, totalVp: award, lifetimeVp: award, tierProgress: award });
-    return { awarded: award, alreadyCompleted: false };
+    const bpResult = await awardBpInTransaction(tx, req.user.id, bpAward, `weekly-review:${weekStart}`, "Weekly review completed");
+    return { awarded: award, bpAwarded: bpResult.awarded, alreadyCompleted: false };
   });
   await reconcileRewardChests(req.user.id).catch((error) =>
     req.log?.warn({ err: error }, "Reward chest reconciliation deferred"),

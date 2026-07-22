@@ -67,16 +67,20 @@ export function playCompletionEffect(
 ) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const base = { origin, disableForReducedMotion: true, zIndex: 120 };
-  if (effectId === "signal-rings") {
+  if (effectId === "signal-rings" || effectId === "signal-finish") {
     void confetti({ ...base, particleCount: 34, spread: 360, startVelocity: 18, gravity: 0.7, scalar: 0.72, colors: ["#22d3ee", "#3b82f6", "#ffffff"] });
     return;
   }
-  if (effectId === "prism-pop") {
+  if (effectId === "prism-pop" || effectId === "prism-check") {
     void confetti({ ...base, particleCount: 48, spread: 76, startVelocity: 28, gravity: 0.9, scalar: 0.82, colors: ["#22d3ee", "#a78bfa", "#fb7185", "#facc15"] });
     return;
   }
   if (effectId === "paper-stream") {
     void confetti({ ...base, particleCount: 56, spread: 52, startVelocity: 24, gravity: 0.62, scalar: 1.05, drift: 0.4, colors: ["#f8fafc", "#fdba74", "#60a5fa", "#34d399"] });
+    return;
+  }
+  if (effectId === "aurora-finish") {
+    void confetti({ ...base, particleCount: 64, spread: 92, startVelocity: 26, gravity: 0.7, scalar: 0.88, colors: ["#67e8f9", "#c4b5fd", "#fda4af", "#ffffff"] });
     return;
   }
   void confetti({ ...base, particleCount: 28, spread: 52, startVelocity: 22, gravity: 0.95, scalar: 0.72, colors: ["#22d3ee", "#fb923c", "#f8fafc"] });

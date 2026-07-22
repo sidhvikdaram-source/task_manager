@@ -17,6 +17,7 @@ import {
   Settings2,
   Menu,
   Gift,
+  CircleDollarSign,
 } from "lucide-react";
 import {
   getListTasksQueryKey,
@@ -112,7 +113,9 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   useEffect(() => {
     if (rewards?.newlyUnlockedTitles.length) {
       toast.success(`Title unlocked: ${rewards.newlyUnlockedTitles[0]}`, {
-        description: "Equip it from your profile.",
+        description: rewards.achievementBpAwarded
+          ? `Equip it from your profile. +${rewards.achievementBpAwarded} BP earned.`
+          : "Equip it from your profile.",
       });
     }
   }, [rewards?.newlyUnlockedTitles]);
@@ -477,9 +480,12 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
         </div>
         {location === "/" && (
           <div className="order-3 flex w-full items-stretch gap-2 overflow-x-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="flex min-w-24 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card/65 px-3 py-2">
+            <div className="flex min-w-36 shrink-0 items-center gap-3 rounded-lg border border-border/70 bg-card/65 px-3 py-2">
               <Zap className="h-4 w-4 text-primary" />
-              <span><span className="block text-[10px] font-bold uppercase text-muted-foreground">VP</span><span className="block text-sm font-black leading-none">{stats?.totalVp ?? 0}</span></span>
+              <span><span className="block text-[10px] font-bold uppercase text-muted-foreground">VP growth</span><span className="block text-sm font-black leading-none">{stats?.totalVp ?? 0}</span></span>
+              <span className="h-7 w-px bg-border" />
+              <CircleDollarSign className="h-4 w-4 text-secondary" />
+              <span><span className="block text-[10px] font-bold uppercase text-muted-foreground">BP</span><span className="block text-sm font-black leading-none">{rewards?.bpBalance ?? 0}</span></span>
             </div>
             <div className="flex min-w-28 shrink-0 items-center gap-2 rounded-lg border border-border/70 bg-card/65 px-3 py-2">
               <MomentumIcon className="h-4 w-4 text-secondary" />

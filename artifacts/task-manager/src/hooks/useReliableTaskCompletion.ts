@@ -13,6 +13,8 @@ type CompletableTask = Pick<Task, "id" | "title" | "status" | "externalSource">;
 type CompletionResult = Awaited<ReturnType<typeof requestTaskCompletion>> & {
   firstCompletionToday?: boolean;
   streakDays?: number | null;
+  bpAwarded?: number;
+  momentumRewards?: Array<{ days: number; bp: number }>;
 };
 type CompletionHandlers = {
   onOptimistic?: () => void;
@@ -87,6 +89,14 @@ export function useReliableTaskCompletion() {
       );
       feedback.celebrate(preparedFeedback);
       toast.success(result.vpAwarded ? `Done - +${result.vpAwarded} VP` : "Task complete");
+      if (result.bpAwarded) {
+        const milestone = result.momentumRewards?.at(-1);
+        toast.success(`+${result.bpAwarded} BP earned`, {
+          description: milestone
+            ? `${milestone.days} Momentum days reached. Momentum never resets.`
+            : "Added to your store balance.",
+        });
+      }
       try {
         await handlers.onSuccess?.(result);
       } catch {

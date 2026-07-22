@@ -3,7 +3,9 @@ import test from "node:test";
 import {
   chestRarityUpgraded,
   earnedChestSources,
+  rollChestBp,
   rollChestRarity,
+  rollChestRewardType,
 } from "../src/lib/rewardChestRules.ts";
 
 test("milestone chest source keys are deterministic and unique", () => {
@@ -28,8 +30,17 @@ test("common chests can stay common or upgrade with bounded rarity rolls", () =>
   assert.equal(chestRarityUpgraded("rare", "rare"), false);
 });
 
-test("rare chests only upgrade to epic and epic chests remain epic", () => {
+test("higher-rarity chests can upgrade through legendary", () => {
   assert.equal(rollChestRarity("rare", 0.05), "epic");
   assert.equal(rollChestRarity("rare", 0.5), "rare");
-  assert.equal(rollChestRarity("epic", 0), "epic");
+  assert.equal(rollChestRarity("epic", 0), "legendary");
+  assert.equal(rollChestRarity("legendary", 0), "legendary");
+  assert.equal(chestRarityUpgraded("epic", "legendary"), true);
+});
+
+test("chests can yield BP and key rewards with bounded BP amounts", () => {
+  assert.equal(rollChestRewardType("common", 0.6), "bp");
+  assert.equal(rollChestRewardType("common", 0.99), "key");
+  assert.equal(rollChestBp("common", 0), 30);
+  assert.equal(rollChestBp("legendary", 0.999999), 650);
 });

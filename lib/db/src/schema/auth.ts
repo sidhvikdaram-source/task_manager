@@ -59,6 +59,18 @@ export const usersTable = pgTable("users", {
   equippedTransition: varchar("equipped_transition")
     .notNull()
     .default("velocity-slide"),
+  equippedProfileTheme: varchar("equipped_profile_theme")
+    .notNull()
+    .default("none"),
+  equippedFocusSound: varchar("equipped_focus_sound")
+    .notNull()
+    .default("none"),
+  equippedBadgeDisplay: varchar("equipped_badge_display")
+    .notNull()
+    .default("none"),
+  equippedMomentumCosmetic: varchar("equipped_momentum_cosmetic")
+    .notNull()
+    .default("none"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -94,6 +106,9 @@ export const userRewardChestsTable = pgTable(
     status: varchar("status").notNull().default("unopened"),
     rewardItemId: varchar("reward_item_id"),
     vpFallback: integer("vp_fallback").notNull().default(0),
+    bpReward: integer("bp_reward").notNull().default(0),
+    chestKeysReward: integer("chest_keys_reward").notNull().default(0),
+    requiresKey: boolean("requires_key").notNull().default(false),
     awardedAt: timestamp("awarded_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -105,6 +120,28 @@ export const userRewardChestsTable = pgTable(
       table.sourceKey,
     ),
     index("user_reward_chests_user_status_idx").on(table.userId, table.status),
+  ],
+);
+
+export const bpTransactionsTable = pgTable(
+  "bp_transactions",
+  {
+    id: serial("id").primaryKey(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    type: varchar("type").notNull(),
+    sourceKey: varchar("source_key").notNull(),
+    description: varchar("description").notNull(),
+    balanceAfter: integer("balance_after").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("bp_transactions_source_unique").on(table.userId, table.sourceKey),
+    index("bp_transactions_user_created_idx").on(table.userId, table.createdAt),
   ],
 );
 

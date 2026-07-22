@@ -7,6 +7,8 @@ import {
   userStatsTable,
 } from "@workspace/db";
 import { completionDisposition } from "./taskCompletionRules";
+import { awardBpInTransaction, awardMomentumMilestonesInTransaction, lockEconomyUser } from "./bpEconomy";
+import { BP_RULES, VP_RULES } from "./economyConfig";
 
 export class TaskNotFoundError extends Error {}
 
@@ -23,6 +25,7 @@ function localDateKey(date: Date, timeZone: string) {
 
 export async function completeTaskAndAward(userId: string, taskId: number) {
   return db.transaction(async (tx) => {
+    await lockEconomyUser(tx, userId);
     const [existing] = await tx.select().from(tasksTable)
       .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)));
     if (!existing) throw new TaskNotFoundError("Task not found");
@@ -33,7 +36,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         await tx.update(tasksTable).set({ completionAwardedAt: existing.completedAt ?? new Date() })
           .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId), isNull(tasksTable.completionAwardedAt)));
       }
-      return { task: existing, vpAwarded: 0, multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
+      return { task: existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
     }
 
     const completedAt = new Date();
@@ -42,7 +45,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         .set({ status: "completed", completedAt })
         .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)))
         .returning();
-      return { task: task ?? existing, vpAwarded: 0, multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
+      return { task: task ?? existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
     }
 
     const [task] = await tx.update(tasksTable)
@@ -51,7 +54,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
       .returning();
     if (!task) {
       const [current] = await tx.select().from(tasksTable).where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)));
-      return { task: current ?? existing, vpAwarded: 0, multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
+      return { task: current ?? existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
     }
 
     let [stats] = await tx.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
@@ -64,7 +67,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
     const vpAwarded = Math.round((task.vpValue ?? 10) * multiplier);
     const newTotal = stats.totalVp + vpAwarded;
     const progress = stats.tierProgress + vpAwarded;
-    const tierUps = Math.floor(progress / 100);
+    const tierUps = Math.floor(progress / VP_RULES.tierSize);
     const newTier = stats.tier + tierUps;
     const timezone = user?.timezone ?? "UTC";
     const today = localDateKey(completedAt, timezone);
@@ -76,9 +79,17 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
     const newStreak = firstCompletionToday ? stats.streakDays + 1 : stats.streakDays;
     const newMultiplier = newStreak >= 14 ? 2 : newStreak >= 7 ? 1.5 : newStreak >= 3 ? 1.2 : 1;
 
-    await tx.update(userStatsTable).set({ totalVp: newTotal, lifetimeVp: stats.lifetimeVp + vpAwarded, tier: newTier, tierProgress: progress % 100,
+    await tx.update(userStatsTable).set({ totalVp: newTotal, lifetimeVp: stats.lifetimeVp + vpAwarded, tier: newTier, tierProgress: progress % VP_RULES.tierSize,
       tasksCompleted: stats.tasksCompleted + 1, streakDays: newStreak, multiplier: newMultiplier,
       lastActivityDate: completedAt, updatedAt: completedAt }).where(eq(userStatsTable.id, stats.id));
+
+    const momentumRewards = firstCompletionToday
+      ? await awardMomentumMilestonesInTransaction(tx, userId, stats.streakDays, newStreak)
+      : [];
+    const dailyBp = firstCompletionToday
+      ? await awardBpInTransaction(tx, userId, BP_RULES.dailyCompletion, `daily-task:${today}`, "Daily task reward")
+      : { awarded: 0 };
+    const bpAwarded = dailyBp.awarded + momentumRewards.reduce((sum, reward) => sum + reward.bp, 0);
 
     const copy: Record<number, [string, string]> = {
       50: ["First Sprint", "Earned your first 50 VP"], 100: ["Century Mark", "Reached 100 total VP"],
@@ -92,6 +103,6 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         await tx.insert(milestonesTable).values({ userId, title, description, vpThreshold: threshold, achievedAt: completedAt });
       }
     }
-    return { task, vpAwarded, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null, firstCompletionToday, streakDays: newStreak };
+    return { task, vpAwarded, bpAwarded, momentumRewards, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null, firstCompletionToday, streakDays: newStreak };
   });
 }

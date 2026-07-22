@@ -38,6 +38,7 @@ type Review = {
   inboxCount: number;
   unfinished: Task[];
   completedReview: boolean;
+  reviewRewards: { vp: number; bp: number };
   review: { topPriorities: string[]; focusGoalMinutes: number } | null;
 };
 
@@ -106,6 +107,7 @@ export default function WeeklyReview() {
       const result = (await response.json()) as {
         alreadyCompleted?: boolean;
         awarded?: number;
+        bpAwarded?: number;
         error?: string;
       };
       if (!response.ok) {
@@ -115,7 +117,7 @@ export default function WeeklyReview() {
       toast.success(
         result.alreadyCompleted
           ? "Review already completed this week"
-          : `Weekly review complete - +${result.awarded ?? 0} VP`,
+          : `Weekly review complete - +${result.awarded ?? 0} VP and +${result.bpAwarded ?? 0} BP`,
       );
       await load();
     } finally {
@@ -263,7 +265,7 @@ export default function WeeklyReview() {
               ? "Review completed"
               : finishing
                 ? "Saving..."
-                : "Complete review - +40 VP"}
+                : `Complete review - +${data.reviewRewards.vp} VP and +${data.reviewRewards.bp} BP`}
           </button>
         </section>
       </div>

@@ -42,6 +42,7 @@ const frameClasses: Record<string, string> = {
   "pulse-grid": "p-1 rounded-full border-[4px] border-blue-500 bg-slate-950 shadow-[0_0_18px_rgba(59,130,246,.5)]",
   "aurora-edge": "p-1.5 rounded-full border-[3px] border-emerald-300 bg-indigo-950 shadow-[0_0_20px_rgba(110,231,183,.42)]",
   "carbon-halo": "p-1 rounded-full border-[4px] border-zinc-500 bg-black shadow-[0_0_0_2px_rgb(212,212,216),0_0_22px_rgba(255,255,255,.22)]",
+  "founders-edge": "p-1.5 rounded-full border-[3px] border-rose-300 bg-zinc-950 shadow-[0_0_0_2px_rgb(251,113,133),0_0_24px_rgba(244,63,94,.38)]",
 };
 
 export function ProfilePhoto({
@@ -93,6 +94,7 @@ const petDefinitions = {
   "lumen-bot": { stages: 4, icons: [Bot, Cpu, Bot, AudioWaveform], color: "bg-yellow-300 text-zinc-950" },
   "orbit-bud": { stages: 3, icons: [Circle, CircleDot, Orbit], color: "bg-indigo-400 text-white" },
   "tempo-kite": { stages: 4, icons: [Asterisk, Music2, Star, Rocket], color: "bg-rose-400 text-zinc-950" },
+  "vector-pet": { stages: 5, icons: [Gem, Boxes, Orbit, Cpu, Sparkles], color: "bg-zinc-950 text-rose-300" },
 } as const;
 
 export function PetPreview({ petId, earnedVp = 0, className }: { petId?: string | null; earnedVp?: number; className?: string }) {

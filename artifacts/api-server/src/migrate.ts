@@ -38,7 +38,11 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "calendar_view" varchar DEFAULT 'month' NOT NULL,
       ADD COLUMN IF NOT EXISTS "completion_sound_enabled" boolean DEFAULT true NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_completion_effect" varchar DEFAULT 'clean-confetti' NOT NULL,
-      ADD COLUMN IF NOT EXISTS "equipped_transition" varchar DEFAULT 'velocity-slide' NOT NULL;
+      ADD COLUMN IF NOT EXISTS "equipped_transition" varchar DEFAULT 'velocity-slide' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_profile_theme" varchar DEFAULT 'none' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_focus_sound" varchar DEFAULT 'none' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_badge_display" varchar DEFAULT 'none' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_momentum_cosmetic" varchar DEFAULT 'none' NOT NULL;
   `);
   await db.execute(
     sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_username_unique" ON "users" ("username") WHERE "username" IS NOT NULL;`,
@@ -62,12 +66,21 @@ export async function runMigrations(): Promise<void> {
       "status" varchar DEFAULT 'unopened' NOT NULL,
       "reward_item_id" varchar,
       "vp_fallback" integer DEFAULT 0 NOT NULL,
+      "bp_reward" integer DEFAULT 0 NOT NULL,
+      "chest_keys_reward" integer DEFAULT 0 NOT NULL,
+      "requires_key" boolean DEFAULT false NOT NULL,
       "awarded_at" timestamp with time zone DEFAULT now() NOT NULL,
       "opened_at" timestamp with time zone,
       UNIQUE ("user_id", "source_key")
     );
     CREATE INDEX IF NOT EXISTS "user_reward_chests_user_status_idx"
       ON "user_reward_chests" ("user_id", "status");
+  `);
+  await db.execute(sql`
+    ALTER TABLE "user_reward_chests"
+      ADD COLUMN IF NOT EXISTS "bp_reward" integer DEFAULT 0 NOT NULL,
+      ADD COLUMN IF NOT EXISTS "chest_keys_reward" integer DEFAULT 0 NOT NULL,
+      ADD COLUMN IF NOT EXISTS "requires_key" boolean DEFAULT false NOT NULL;
   `);
 
   await db.execute(sql`
@@ -123,6 +136,9 @@ export async function runMigrations(): Promise<void> {
       "user_id" varchar,
       "total_vp" integer DEFAULT 0 NOT NULL,
       "lifetime_vp" integer DEFAULT 0 NOT NULL,
+      "bp_balance" integer DEFAULT 0 NOT NULL,
+      "lifetime_bp" integer DEFAULT 0 NOT NULL,
+      "chest_keys" integer DEFAULT 0 NOT NULL,
       "tier" integer DEFAULT 1 NOT NULL,
       "tier_progress" integer DEFAULT 0 NOT NULL,
       "streak_days" integer DEFAULT 0 NOT NULL,
@@ -134,6 +150,25 @@ export async function runMigrations(): Promise<void> {
     );
   `);
   await db.execute(sql`ALTER TABLE "user_stats" ADD COLUMN IF NOT EXISTS "lifetime_vp" integer DEFAULT 0 NOT NULL;`);
+  await db.execute(sql`
+    ALTER TABLE "user_stats"
+      ADD COLUMN IF NOT EXISTS "bp_balance" integer DEFAULT 0 NOT NULL,
+      ADD COLUMN IF NOT EXISTS "lifetime_bp" integer DEFAULT 0 NOT NULL,
+      ADD COLUMN IF NOT EXISTS "chest_keys" integer DEFAULT 0 NOT NULL;
+    CREATE TABLE IF NOT EXISTS "bp_transactions" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "amount" integer NOT NULL,
+      "type" varchar NOT NULL,
+      "source_key" varchar NOT NULL,
+      "description" varchar NOT NULL,
+      "balance_after" integer NOT NULL,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("user_id", "source_key")
+    );
+    CREATE INDEX IF NOT EXISTS "bp_transactions_user_created_idx"
+      ON "bp_transactions" ("user_id", "created_at");
+  `);
   await db.execute(sql`UPDATE "user_stats" SET "lifetime_vp" = GREATEST("lifetime_vp", "total_vp", (("tier" - 1) * 100) + "tier_progress");`);
 
   // Create tasks table
@@ -370,10 +405,12 @@ export async function runMigrations(): Promise<void> {
       "top_priorities" jsonb DEFAULT '[]'::jsonb NOT NULL,
       "focus_goal_minutes" integer DEFAULT 0 NOT NULL,
       "vp_awarded" integer DEFAULT 0 NOT NULL,
+      "bp_awarded" integer DEFAULT 0 NOT NULL,
       "completed_at" timestamp with time zone DEFAULT now() NOT NULL,
       UNIQUE ("user_id", "week_start")
     );
   `);
+  await db.execute(sql`ALTER TABLE "weekly_reviews" ADD COLUMN IF NOT EXISTS "bp_awarded" integer DEFAULT 0 NOT NULL;`);
 
   await db.execute(sql`
     DO $$

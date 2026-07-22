@@ -19,7 +19,7 @@ import {
   VolumeX,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
@@ -34,6 +34,8 @@ interface FocusTask {
   status?: string;
 }
 
+type FocusSound = "none" | "rain" | "library" | "cafe" | "white-noise" | "forest" | "library-after-hours" | "deep-rain-pack";
+
 export default function FocusArena() {
   const queryClient = useQueryClient();
   const [selectedDuration, setSelectedDuration] = useState(25);
@@ -43,15 +45,22 @@ export default function FocusArena() {
   const [focusTask, setFocusTask] = useState<FocusTask | null>(null);
   const [availableTasks, setAvailableTasks] = useState<FocusTask[]>([]);
   const [focusSubject, setFocusSubject] = useState<string | null>(null);
-  const [sound, setSound] = useState<
-    "none" | "rain" | "library" | "cafe" | "white-noise" | "forest"
-  >("none");
+  const [sound, setSound] = useState<FocusSound>("none");
   const soundContextRef = useRef<AudioContext | null>(null);
   const soundNodesRef = useRef<AudioNode[]>([]);
 
   const createSession = useCreateFocusSession();
   const completeSession = useCompleteFocusSession();
   const { data: sessions, isLoading } = useListFocusSessions();
+  const { data: rewardSettings } = useQuery({
+    queryKey: ["rewards"],
+    queryFn: async () => {
+      const response = await fetch("/api/rewards", { credentials: "include" });
+      if (!response.ok) return null;
+      return response.json() as Promise<{ owned: string[]; equipped: { focus_sound?: string } }>;
+    },
+    staleTime: 60_000,
+  });
 
   const timerRef = useRef<number | null>(null);
 
@@ -88,6 +97,13 @@ export default function FocusArena() {
     };
   }, []);
 
+  useEffect(() => {
+    const equipped = rewardSettings?.equipped.focus_sound;
+    if (sound === "none" && (equipped === "library-after-hours" || equipped === "deep-rain-pack")) {
+      setSound(equipped);
+    }
+  }, [rewardSettings?.equipped.focus_sound]);
+
   const stopFocusSound = () => {
     soundNodesRef.current.forEach((node) => {
       try {
@@ -111,7 +127,7 @@ export default function FocusArena() {
     if (!AudioCtor) return;
     const context = new AudioCtor();
     const gain = context.createGain();
-    gain.gain.value = sound === "white-noise" ? 0.025 : 0.018;
+    gain.gain.value = sound === "white-noise" ? 0.025 : sound === "deep-rain-pack" ? 0.022 : 0.018;
     gain.connect(context.destination);
     soundContextRef.current = context;
     const buffer = context.createBuffer(
@@ -127,11 +143,11 @@ export default function FocusArena() {
     source.loop = true;
     const filter = context.createBiquadFilter();
     filter.type =
-      sound === "cafe" || sound === "library" ? "bandpass" : "lowpass";
+      sound === "cafe" || sound === "library" || sound === "library-after-hours" ? "bandpass" : "lowpass";
     filter.frequency.value =
       sound === "forest"
         ? 950
-        : sound === "rain"
+        : sound === "rain" || sound === "deep-rain-pack"
           ? 1800
           : sound === "cafe"
             ? 550
@@ -419,16 +435,16 @@ export default function FocusArena() {
                       )}
                     </div>
                     <div className="flex flex-wrap justify-center gap-2">
-                      {(
-                        [
+                      {([
                           "none",
                           "rain",
                           "library",
                           "cafe",
                           "white-noise",
                           "forest",
-                        ] as const
-                      ).map((option) => (
+                          ...(rewardSettings?.owned.includes("library-after-hours") ? ["library-after-hours" as const] : []),
+                          ...(rewardSettings?.owned.includes("deep-rain-pack") ? ["deep-rain-pack" as const] : []),
+                        ] as FocusSound[]).map((option) => (
                         <button
                           key={option}
                           type="button"
@@ -437,6 +453,10 @@ export default function FocusArena() {
                         >
                           {option === "white-noise"
                             ? "White noise"
+                            : option === "library-after-hours"
+                              ? "Library after hours"
+                              : option === "deep-rain-pack"
+                                ? "Deep rain"
                             : option === "none"
                               ? "Off"
                               : option[0].toUpperCase() + option.slice(1)}
