@@ -12,6 +12,7 @@ import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
 type CompletableTask = Pick<Task, "id" | "title" | "status" | "externalSource">;
 type CompletionResult = Awaited<ReturnType<typeof requestTaskCompletion>> & {
   firstCompletionToday?: boolean;
+  consecutiveMomentum?: boolean;
   streakDays?: number | null;
   bpAwarded?: number;
   momentumRewards?: Array<{ days: number; bp: number }>;
@@ -88,6 +89,11 @@ export function useReliableTaskCompletion() {
         ),
       );
       feedback.celebrate(preparedFeedback);
+      if (result.consecutiveMomentum && result.streakDays) {
+        window.dispatchEvent(new CustomEvent("velocity:consecutive-momentum", {
+          detail: { momentumDays: result.streakDays },
+        }));
+      }
       toast.success(result.vpAwarded ? `Done - +${result.vpAwarded} VP` : "Task complete");
       if (result.bpAwarded) {
         const milestone = result.momentumRewards?.at(-1);

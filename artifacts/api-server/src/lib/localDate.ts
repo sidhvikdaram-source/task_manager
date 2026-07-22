@@ -57,6 +57,10 @@ export function addCalendarDays(dateKey: string, amount: number) {
   });
 }
 
+export function areConsecutiveCalendarDates(previous: string, current: string) {
+  return addCalendarDays(previous, 1) === current;
+}
+
 export function calendarWeekday(dateKey: string) {
   return calendarDateToUtc(dateKey).getUTCDay();
 }

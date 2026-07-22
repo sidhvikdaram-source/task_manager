@@ -6,6 +6,7 @@ import { OnboardingFlow } from "@/components/OnboardingFlow";
 import { TutorialTour } from "@/components/TutorialTour";
 import { Sidebar } from "./Sidebar";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { ConsecutiveMomentumCelebration } from "@/components/ConsecutiveMomentumCelebration";
 
 const VelocityAssistantCard = lazy(() =>
   import("@/components/VelocityAssistantCard").then((module) => ({
@@ -50,6 +51,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
       {!preferences.onboardingCompleted && <OnboardingFlow />}
       {preferences.onboardingCompleted && <TutorialTour />}
+      <ConsecutiveMomentumCelebration />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   addCalendarDays,
+  areConsecutiveCalendarDates,
   calendarWeekday,
   localDateKey,
   startOfWeekKey,
@@ -23,4 +24,10 @@ test("calendar arithmetic stays stable through DST boundaries", () => {
 
 test("weekday calculations use date-only UTC arithmetic", () => {
   assert.equal(calendarWeekday("2026-07-21"), 2);
+});
+
+test("consecutive Momentum uses adjacent local calendar dates", () => {
+  assert.equal(areConsecutiveCalendarDates("2026-07-21", "2026-07-22"), true);
+  assert.equal(areConsecutiveCalendarDates("2026-07-20", "2026-07-22"), false);
+  assert.equal(areConsecutiveCalendarDates("2026-03-08", "2026-03-09"), true);
 });

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CheckCircle2, Circle, Clock, Loader2, Maximize2, Timer } from "lucide-react";
 import { Task } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ function parseVelocityType(notes?: string | null) {
 export function TaskCard({ task, layoutId }: TaskCardProps) {
   const [, setLocation] = useLocation();
   const taskCompletion = useReliableTaskCompletion();
+  const reduceMotion = useReducedMotion();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [completionPop, setCompletionPop] = useState(false);
   const isCompleted = task.status === "completed";
@@ -70,22 +71,26 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
     <>
       <motion.div
         layoutId={layoutId}
-        initial={{ opacity: 0, y: 12 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.98 }}
-        whileHover={{ scale: 1.008 }}
+        whileHover={reduceMotion ? undefined : { y: -2 }}
+        whileTap={reduceMotion ? undefined : { scale: 0.995 }}
         onClick={() => setDetailsOpen(true)}
         className={`group relative cursor-pointer rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md ${isCompleted ? "opacity-60 grayscale-[0.5]" : ""}`}
       >
+        <AnimatePresence>
         {completionPop && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: -4 }}
             className="pointer-events-none absolute inset-x-4 top-3 z-10 rounded-xl border border-primary/30 bg-primary px-3 py-2 text-center text-xs font-black text-primary-foreground shadow-lg"
           >
             Complete +VP
           </motion.div>
         )}
+        </AnimatePresence>
 
         <div className="absolute right-2 top-2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={startFocusSpace} title="Focus Space">
@@ -114,13 +119,11 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
             disabled={pending || isCompleted}
             className={`-ml-2 -mt-1 flex h-11 w-11 flex-shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-70 ${isCompleted ? "text-primary" : ""}`}
           >
-            {pending ? (
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            ) : isCompleted ? (
-              <CheckCircle2 className="h-6 w-6" />
-            ) : (
-              <Circle className="h-6 w-6" />
-            )}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span key={pending ? "pending" : isCompleted ? "complete" : "open"} initial={reduceMotion ? false : { scale: 0.72, opacity: 0, rotate: -12 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={reduceMotion ? undefined : { scale: 0.72, opacity: 0 }} transition={{ duration: 0.14 }}>
+                {pending ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : isCompleted ? <CheckCircle2 className="h-6 w-6" /> : <Circle className="h-6 w-6" />}
+              </motion.span>
+            </AnimatePresence>
           </button>
 
           <div className="min-w-0 flex-1">
@@ -166,7 +169,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
         </div>
       </motion.div>
 
-      <TaskDetailsModal taskId={task.id} open={detailsOpen} onOpenChange={setDetailsOpen} />
+      {detailsOpen && <TaskDetailsModal taskId={task.id} open onOpenChange={setDetailsOpen} />}
     </>
   );
 }

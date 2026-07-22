@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  CalendarDays,
   ArrowUp,
+  CalendarDays,
   FolderKanban,
   ListChecks,
   Loader2,
@@ -33,12 +34,17 @@ export function QuickCapture({
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [saving, setSaving] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (!text.trim()) {
       setPreview(null);
+      setParsing(false);
       return;
     }
+    setPreview(null);
+    setParsing(true);
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
@@ -51,8 +57,11 @@ export function QuickCapture({
         });
         if (response.ok) setPreview(await response.json());
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === "AbortError"))
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
           setPreview(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) setParsing(false);
       }
     }, 250);
     return () => {
@@ -63,7 +72,7 @@ export function QuickCapture({
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
-    if (!text.trim() || saving) return;
+    if (!text.trim() || !preview?.title || saving) return;
     setSaving(true);
     try {
       const response = await fetch("/api/quick-capture", {
@@ -76,114 +85,118 @@ export function QuickCapture({
         task?: { title: string };
         error?: string;
       };
-      if (!response.ok || !data.task)
+      if (!response.ok || !data.task) {
         throw new Error(data.error || "Task could not be created.");
+      }
       toast.success(`Created ${data.task.title}`);
       setText("");
       setPreview(null);
       onCreated?.();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Task could not be created.",
-      );
+      toast.error(error instanceof Error ? error.message : "Task could not be created.");
     } finally {
       setSaving(false);
     }
   }
 
+  const append = (value: string) => setText((current) => `${current.trimEnd()} ${value}`.trimStart());
+
   return (
-    <form onSubmit={create} className="mt-3 w-full text-left">
-      <div className="flex items-end gap-2 rounded-xl border bg-background p-2 shadow-sm focus-within:border-primary/50">
-        <textarea
-          aria-label="Quick capture task"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          rows={2}
-          placeholder={placeholder}
-          className="min-h-12 flex-1 resize-none bg-transparent px-2 py-1 text-sm outline-none"
-        />
-        <button
-          type="submit"
-          aria-label="Create parsed task"
-          disabled={!preview?.title || saving}
-          title="Create parsed task"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
-        >
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <ArrowUp className="h-4 w-4" />
-          )}
-        </button>
-      </div>
-      <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-muted-foreground">
-        <button
-          type="button"
-          onClick={() => setText((value) => `${value.trimEnd()} #`)}
-          className="rounded-md border px-2 py-1 hover:bg-muted"
-        >
-          #Subject
-        </button>
-        <button
-          type="button"
-          onClick={() => setText((value) => `${value.trimEnd()} p1`)}
-          className="rounded-md border px-2 py-1 hover:bg-muted"
-        >
-          Priority
-        </button>
-        <button
-          type="button"
-          onClick={() => setText((value) => `${value.trimEnd()} tomorrow 4 PM`)}
-          className="rounded-md border px-2 py-1 hover:bg-muted"
-        >
-          Due date
-        </button>
-      </div>
-      {preview?.title && (
-        <div className="mt-3 border-t border-border/70 pt-3">
-          <p className="text-sm font-bold">{preview.title}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-            {preview.dueDate && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
-                <CalendarDays className="h-3 w-3" />
-                {preview.dueDate}
-                {preview.time ? ` · ${preview.time}` : ""}
-              </span>
-            )}
-            {preview.projectName && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
-                <FolderKanban className="h-3 w-3" />
-                {preview.projectName}
-              </span>
-            )}
-            {preview.subject && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
-                <Tag className="h-3 w-3" />
-                {preview.subject}
-              </span>
-            )}
-            <span className="rounded-md bg-muted px-2 py-1 capitalize">
-              {preview.priority}
-            </span>
-            {preview.estimatedMinutes && (
-              <span className="rounded-md bg-muted px-2 py-1">
-                {preview.estimatedMinutes} min
-              </span>
-            )}
-            {preview.checklist.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1">
-                <ListChecks className="h-3 w-3" />
-                {preview.checklist.length} steps
-              </span>
-            )}
-          </div>
-          {preview.warnings.map((warning) => (
-            <p key={warning} className="mt-2 text-xs text-secondary">
-              {warning}
-            </p>
-          ))}
+    <motion.form
+      onSubmit={create}
+      className="mt-3 w-full text-left"
+      initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.18 }}
+    >
+      <div className="quick-capture-shell">
+        <div className="relative z-[1] flex items-end gap-2 rounded-[calc(0.9rem-1px)] bg-background p-2">
+          <textarea
+            aria-label="Quick capture task"
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            rows={2}
+            placeholder={placeholder}
+            className="min-h-12 flex-1 resize-none bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground/75"
+          />
+          <motion.button
+            type="submit"
+            aria-label="Create parsed task"
+            disabled={!preview?.title || saving}
+            title="Create parsed task"
+            whileHover={!reduceMotion && preview?.title ? { y: -1 } : undefined}
+            whileTap={!reduceMotion && preview?.title ? { scale: 0.94 } : undefined}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm disabled:opacity-40"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+          </motion.button>
         </div>
-      )}
-    </form>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-muted-foreground">
+        {[
+          ["#Subject", "#"],
+          ["Priority", "p1"],
+          ["Due date", "tomorrow 4 PM"],
+        ].map(([label, value]) => (
+          <motion.button
+            key={label}
+            type="button"
+            onClick={() => append(value)}
+            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+            className="rounded-md border px-2 py-1 transition-colors hover:bg-muted"
+          >
+            {label}
+          </motion.button>
+        ))}
+      </div>
+
+      <AnimatePresence mode="wait" initial={false}>
+        {parsing && !preview?.title ? (
+          <motion.div
+            key="parsing"
+            role="status"
+            aria-label="Parsing task"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="mt-3 flex items-center gap-2 border-t border-border/70 pt-3 text-xs font-semibold text-muted-foreground"
+          >
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+            Parsing task details
+          </motion.div>
+        ) : preview?.title ? (
+          <motion.div
+            key="preview"
+            initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -3 }}
+            transition={{ duration: 0.15 }}
+            className="mt-3 border-t border-border/70 pt-3"
+          >
+            <p className="text-sm font-bold">{preview.title}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+              {preview.dueDate && <PreviewTag icon={<CalendarDays className="h-3 w-3" />} text={`${preview.dueDate}${preview.time ? ` at ${preview.time}` : ""}`} />}
+              {preview.projectName && <PreviewTag icon={<FolderKanban className="h-3 w-3" />} text={preview.projectName} />}
+              {preview.subject && <PreviewTag icon={<Tag className="h-3 w-3" />} text={preview.subject} />}
+              <PreviewTag text={preview.priority} capitalize />
+              {preview.estimatedMinutes && <PreviewTag text={`${preview.estimatedMinutes} min`} />}
+              {preview.checklist.length > 0 && <PreviewTag icon={<ListChecks className="h-3 w-3" />} text={`${preview.checklist.length} steps`} />}
+            </div>
+            {preview.warnings.map((warning) => <p key={warning} className="mt-2 text-xs text-secondary">{warning}</p>)}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </motion.form>
   );
+}
+
+function PreviewTag({ icon, text, capitalize = false }: { icon?: React.ReactNode; text: string; capitalize?: boolean }) {
+  return <span className={`inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 ${capitalize ? "capitalize" : ""}`}>{icon}{text}</span>;
 }

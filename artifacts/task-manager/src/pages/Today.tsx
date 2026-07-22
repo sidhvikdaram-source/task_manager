@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   CalendarClock,
   Check,
@@ -23,10 +23,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { DailyChecklist } from "@/components/DailyChecklist";
 import { QuickCapture } from "@/components/QuickCapture";
 import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
-import { MomentumIcon } from "@/components/MomentumIcon";
 import { localDateKey } from "@/lib/localDate";
 
 const TaskDetailsModal = lazy(() =>
@@ -72,6 +72,7 @@ function viewLabel(view: View) {
 export default function Today() {
   const queryClient = useQueryClient();
   const taskCompletion = useReliableTaskCompletion();
+  const reduceMotion = useReducedMotion();
   const { data: stats } = useGetUserStats();
   const { data: tasks = [], isLoading } = useListTasks(
     { sortBy: "dueDate" },
@@ -99,9 +100,6 @@ export default function Today() {
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [availableMinutes, setAvailableMinutes] = useState(30);
   const [energy, setEnergy] = useState<"low" | "medium" | "high">("medium");
-  const [streakCelebration, setStreakCelebration] = useState<number | null>(
-    null,
-  );
   const [selectedTask, setSelectedTask] = useState<number | null>(null);
   const [highlighted, setHighlighted] = useState<number | null>(() => {
     const value = sessionStorage.getItem("velocity-highlight-task");
@@ -121,12 +119,6 @@ export default function Today() {
   useEffect(() => {
     localStorage.setItem("velocity-task-views", JSON.stringify(enabledViews));
   }, [enabledViews]);
-
-  useEffect(() => {
-    if (streakCelebration === null) return;
-    const timer = window.setTimeout(() => setStreakCelebration(null), 3200);
-    return () => window.clearTimeout(timer);
-  }, [streakCelebration]);
 
   async function refresh() {
     await Promise.all([
@@ -198,9 +190,6 @@ export default function Today() {
   function complete(task: Task, target?: HTMLElement | null) {
     void taskCompletion.complete(task, target, {
         onSuccess: async (result) => {
-          if (result.firstCompletionToday && result.streakDays) {
-            setStreakCelebration(result.streakDays);
-          }
           await refresh();
         },
       });
@@ -257,8 +246,9 @@ export default function Today() {
                     <SlidersHorizontal className="h-3.5 w-3.5" /> Views
                     <ChevronDown className="h-3 w-3" />
                   </Button>
+                  <AnimatePresence>
                   {viewsOpen && (
-                    <div className="absolute right-0 top-10 z-30 w-52 rounded-lg border bg-popover p-2 shadow-xl">
+                    <motion.div initial={reduceMotion ? false : { opacity: 0, y: -5, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.98 }} transition={{ duration: 0.14 }} className="absolute right-0 top-10 z-30 w-52 rounded-lg border bg-popover p-2 shadow-xl">
                       <p className="px-2 pb-1 text-[10px] font-black uppercase text-muted-foreground">
                         Add task views
                       </p>
@@ -287,22 +277,25 @@ export default function Today() {
                           </button>
                         );
                       })}
-                    </div>
+                    </motion.div>
                   )}
+                  </AnimatePresence>
                 </div>
               </div>
             </div>
             <div className="mt-3 flex max-w-full overflow-x-auto rounded-lg bg-muted p-1">
               {(["today", "all", "completed", ...enabledViews] as View[]).map(
                 (item) => (
-                  <button
+                  <motion.button
                     key={item}
                     type="button"
                     onClick={() => setView(item)}
-                    className={`shrink-0 rounded-md px-2.5 py-1.5 text-xs font-bold ${view === item ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+                    whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                    className={`relative shrink-0 rounded-md px-2.5 py-1.5 text-xs font-bold ${view === item ? "text-foreground" : "text-muted-foreground"}`}
                   >
-                    {viewLabel(item)}
-                  </button>
+                    {view === item && <motion.span layoutId="today-view-active" className="absolute inset-0 rounded-md bg-background shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                    <span className="relative">{viewLabel(item)}</span>
+                  </motion.button>
                 ),
               )}
             </div>
@@ -378,9 +371,10 @@ export default function Today() {
                   <motion.div
                     layout
                     key={task.id}
-                    initial={{ opacity: 0, y: 6 }}
+                    initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: 10 }}
+                    whileHover={reduceMotion ? undefined : { x: 2 }}
                     onClick={() => setSelectedTask(task.id)}
                     className={`flex cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/35 ${isHighlighted ? "bg-primary/10 ring-2 ring-inset ring-primary/45" : ""}`}
                   >
@@ -397,13 +391,11 @@ export default function Today() {
                       aria-busy={taskCompletion.isPending(task.id)}
                       className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-70"
                     >
-                      {taskCompletion.isPending(task.id) ? (
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      ) : isComplete ? (
-                        <CheckCircle2 className="h-6 w-6 text-primary" />
-                      ) : (
-                        <Circle className="h-6 w-6" />
-                      )}
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span key={taskCompletion.isPending(task.id) ? "pending" : isComplete ? "complete" : "open"} initial={reduceMotion ? false : { opacity: 0, scale: 0.72, rotate: -10 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} exit={reduceMotion ? undefined : { opacity: 0, scale: 0.72 }} transition={{ duration: 0.14 }}>
+                          {taskCompletion.isPending(task.id) ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : isComplete ? <CheckCircle2 className="h-6 w-6 text-primary" /> : <Circle className="h-6 w-6" />}
+                        </motion.span>
+                      </AnimatePresence>
                     </button>
                     <div className="min-w-0 flex-1">
                       <p
@@ -444,8 +436,9 @@ export default function Today() {
                 );
               })}
             </AnimatePresence>
+            {isLoading && [0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 px-4 py-3.5"><Skeleton className="h-7 w-7 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-3.5 w-2/5" /><Skeleton className="h-3 w-1/4" /></div></div>)}
             {!isLoading && visibleTasks.length === 0 && (
-              <div className="px-5 py-12 text-center">
+              <motion.div initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="px-5 py-12 text-center">
                 <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
@@ -457,7 +450,7 @@ export default function Today() {
                     ? "Capture something above or take a real break."
                     : "Tasks in this view will appear here."}
                 </p>
-              </div>
+              </motion.div>
             )}
           </div>
         </section>
@@ -482,55 +475,6 @@ export default function Today() {
           />
         </Suspense>
       )}
-      <AnimatePresence>
-        {streakCelebration !== null && (
-          <motion.div
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setStreakCelebration(null)}
-          >
-            <motion.div
-              role="status"
-              aria-live="polite"
-              initial={{ scale: 0.72, y: 24 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.88, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 18 }}
-              onClick={(event) => event.stopPropagation()}
-              className="w-full max-w-sm rounded-xl border border-secondary/40 bg-card p-7 text-center shadow-2xl"
-            >
-              <div className="relative mx-auto flex h-28 w-28 items-center justify-center" aria-hidden="true">
-                <motion.span className="absolute inset-1 rounded-full border border-primary/25" initial={{ scale: 0.45, opacity: 0 }} animate={{ scale: [0.45, 1.08, 1], opacity: [0, 0.9, 0.3] }} transition={{ duration: 1.1 }} />
-                <motion.span className="absolute inset-3 rounded-full border-2 border-dashed border-secondary/45" animate={{ rotate: 360 }} transition={{ duration: 5, repeat: Infinity, ease: "linear" }} />
-                {[0, 1, 2, 3, 4, 5].map((particle) => <motion.span key={particle} className="absolute h-2 w-2 rounded-full bg-primary" initial={{ x: 0, y: 0, opacity: 0 }} animate={{ x: Math.cos((particle / 6) * Math.PI * 2) * 50, y: Math.sin((particle / 6) * Math.PI * 2) * 50, opacity: [0, 1, 0], scale: [0.4, 1, 0.4] }} transition={{ duration: 1.25, delay: particle * 0.06 }} />)}
-                <motion.div animate={{ y: [0, -5, 0], scale: [1, 1.12, 1] }} transition={{ duration: 1.1 }} className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-[0_0_28px_hsl(var(--secondary)/.35)]">
-                  <MomentumIcon className="h-9 w-9" />
-                </motion.div>
-                <div className="absolute bottom-1 flex h-5 items-end gap-1">{[9, 16, 12, 20, 14].map((height, index) => <motion.span key={index} className="w-1 rounded-full bg-primary" initial={{ height: 2 }} animate={{ height: [2, height, 4] }} transition={{ duration: 0.8, delay: 0.35 + index * 0.06 }} />)}</div>
-              </div>
-              <p className="mt-4 text-xs font-black uppercase text-secondary">
-                Momentum kept
-              </p>
-              <p className="mt-1 text-3xl font-black">
-                {streakCelebration} momentum days
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Every active day counts. Missing a day never erases your
-                progress.
-              </p>
-              <Button
-                className="mt-5"
-                size="sm"
-                onClick={() => setStreakCelebration(null)}
-              >
-                Keep going
-              </Button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

@@ -9,19 +9,9 @@ import {
 import { completionDisposition } from "./taskCompletionRules";
 import { awardBpInTransaction, awardMomentumMilestonesInTransaction, lockEconomyUser } from "./bpEconomy";
 import { BP_RULES, VP_RULES } from "./economyConfig";
+import { areConsecutiveCalendarDates, localDateKey } from "./localDate";
 
 export class TaskNotFoundError extends Error {}
-
-function localDateKey(date: Date, timeZone: string) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
-}
 
 export async function completeTaskAndAward(userId: string, taskId: number) {
   return db.transaction(async (tx) => {
@@ -36,7 +26,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         await tx.update(tasksTable).set({ completionAwardedAt: existing.completedAt ?? new Date() })
           .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId), isNull(tasksTable.completionAwardedAt)));
       }
-      return { task: existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
+      return { task: existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, consecutiveMomentum: false, streakDays: null };
     }
 
     const completedAt = new Date();
@@ -45,7 +35,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         .set({ status: "completed", completedAt })
         .where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)))
         .returning();
-      return { task: task ?? existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
+      return { task: task ?? existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, consecutiveMomentum: false, streakDays: null };
     }
 
     const [task] = await tx.update(tasksTable)
@@ -54,7 +44,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
       .returning();
     if (!task) {
       const [current] = await tx.select().from(tasksTable).where(and(eq(tasksTable.id, taskId), eq(tasksTable.userId, userId)));
-      return { task: current ?? existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, streakDays: null };
+      return { task: current ?? existing, vpAwarded: 0, bpAwarded: 0, momentumRewards: [], multiplier: 1, newTotal: null, tierUp: false, newTier: null, firstCompletionToday: false, consecutiveMomentum: false, streakDays: null };
     }
 
     let [stats] = await tx.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
@@ -75,6 +65,7 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
       ? localDateKey(stats.lastActivityDate, timezone)
       : null;
     const firstCompletionToday = lastActivity !== today;
+    const consecutiveMomentum = firstCompletionToday && lastActivity !== null && areConsecutiveCalendarDates(lastActivity, today);
     // Momentum counts active days. Missing a day never erases progress.
     const newStreak = firstCompletionToday ? stats.streakDays + 1 : stats.streakDays;
     const newMultiplier = newStreak >= 14 ? 2 : newStreak >= 7 ? 1.5 : newStreak >= 3 ? 1.2 : 1;
@@ -103,6 +94,6 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         await tx.insert(milestonesTable).values({ userId, title, description, vpThreshold: threshold, achievedAt: completedAt });
       }
     }
-    return { task, vpAwarded, bpAwarded, momentumRewards, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null, firstCompletionToday, streakDays: newStreak };
+    return { task, vpAwarded, bpAwarded, momentumRewards, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null, firstCompletionToday, consecutiveMomentum, streakDays: newStreak };
   });
 }

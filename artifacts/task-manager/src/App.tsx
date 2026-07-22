@@ -12,6 +12,7 @@ import { useCanvasSync } from "@/hooks/useCanvasSync";
 import { ExperienceProvider, useExperience } from "@/experience";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
@@ -272,12 +273,12 @@ function PageLoadingSkeleton() {
   return (
     <div className="space-y-4" role="status" aria-label="Loading page">
       <div className="bento-card p-5">
-        <div className="h-3 w-24 animate-pulse rounded bg-muted" />
-        <div className="mt-3 h-7 w-52 max-w-full animate-pulse rounded bg-muted" />
-        <div className="mt-3 h-3 w-72 max-w-full animate-pulse rounded bg-muted/80" />
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-3 h-7 w-52 max-w-full" />
+        <Skeleton className="mt-3 h-3 w-72 max-w-full" />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        {[0, 1].map((item) => <div key={item} className="bento-card space-y-3 p-5"><div className="h-4 w-32 animate-pulse rounded bg-muted" /><div className="h-16 animate-pulse rounded-lg bg-muted/70" /><div className="h-16 animate-pulse rounded-lg bg-muted/70" /></div>)}
+        {[0, 1].map((item) => <div key={item} className="bento-card space-y-3 p-5"><Skeleton className="h-4 w-32" /><Skeleton className="h-16 rounded-lg" /><Skeleton className="h-16 rounded-lg" /></div>)}
       </div>
     </div>
   );

@@ -45,6 +45,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
 
 interface TaskLink {
   url: string;
@@ -63,6 +64,7 @@ export function TaskDetailsModal({
   onOpenChange,
 }: TaskDetailsModalProps) {
   const queryClient = useQueryClient();
+  const taskCompletion = useReliableTaskCompletion();
   const [newChecklistTitle, setNewChecklistTitle] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
@@ -96,6 +98,10 @@ export function TaskDetailsModal({
   };
 
   const handleUpdate = (field: string, value: unknown) => {
+    if (field === "status" && value === "completed" && task && task.status !== "completed") {
+      void taskCompletion.complete(task, null, { onSuccess: invalidate });
+      return;
+    }
     updateTask.mutate(
       { id: taskId, data: { [field]: value } as never },
       {
@@ -346,7 +352,7 @@ export function TaskDetailsModal({
                   value={task.status}
                   onValueChange={(val) => handleUpdate("status", val)}
                 >
-                  <SelectTrigger disabled={canvasControlsCompletion}>
+                  <SelectTrigger disabled={canvasControlsCompletion || taskCompletion.isPending(task.id)}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
