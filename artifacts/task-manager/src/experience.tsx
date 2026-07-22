@@ -58,9 +58,14 @@ export function ExperienceProvider({
       })
       .then((value) => {
         if (!active) return;
-        setPreferences(value);
+        const resolved = {
+          ...defaults,
+          ...value,
+          completionSoundEnabled: value.completionSoundEnabled ?? true,
+        };
+        setPreferences(resolved);
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (timezone && timezone !== value.timezone) {
+        if (timezone && timezone !== resolved.timezone) {
           void fetch("/api/user/preferences", {
             method: "PATCH",
             credentials: "include",

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Award, BadgeCheck, Check, CircleDollarSign, Gift, Headphones, ImagePlus, KeyRound, Lock, Navigation2, PackageOpen, Palette, PartyPopper, ShoppingBag, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useGetUserStats } from "@workspace/api-client-react";
@@ -8,6 +9,7 @@ import { toast } from "sonner";
 import { MomentumIcon } from "@/components/MomentumIcon";
 import { FramePreview, PetPreview, ProfilePhoto } from "@/components/ProfileCosmetics";
 import { useQueryClient } from "@tanstack/react-query";
+import { sortRewardChests } from "@/lib/rewardUi";
 
 type RewardKind = "frame" | "pet" | "title" | "completion_effect" | "transition" | "profile_theme" | "focus_sound" | "badge_display" | "momentum_cosmetic" | "chest_key";
 type StoreCategory = "profile_customization" | "pet_cosmetics" | "focus_items" | "chest_items" | "reward_effects" | "limited_items" | "momentum_cosmetics";
@@ -133,11 +135,10 @@ export default function Profile() {
     const owned = item.repeatable ? false : rewards?.owned.includes(item.id);
     return ownership === "all" || (ownership === "owned" ? owned : !owned);
   }), [category, ownership, rewards]);
-  const sortedChests = useMemo(() => [...(rewards?.chests ?? [])].sort((a, b) => {
-    if (a.status === "unopened" && b.status !== "unopened") return -1;
-    if (a.status !== "unopened" && b.status === "unopened") return 1;
-    return new Date(b.awardedAt).getTime() - new Date(a.awardedAt).getTime();
-  }), [rewards?.chests]);
+  const sortedChests = useMemo(
+    () => sortRewardChests(rewards?.chests ?? []),
+    [rewards?.chests],
+  );
   const equippedTitle = rewards?.items.find((item) => item.id === rewards.equipped.title)?.name;
   const profileThemeClass = rewards?.equipped.profile_theme === "carbon-profile"
     ? "border-neutral-700 bg-neutral-950 text-white"
@@ -188,9 +189,15 @@ export default function Profile() {
     setWorking(`chest-${chest.id}`);
     setReveal(null);
     setOpening({ stage: "shaking", initialRarity: chest.rarity, finalRarity: chest.rarity, upgraded: false });
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
     try {
       const startedAt = performance.now();
-      const response = await fetch(`/api/rewards/chests/${chest.id}/open`, { method: "POST", credentials: "include" });
+      const response = await fetch(`/api/rewards/chests/${chest.id}/open`, {
+        method: "POST",
+        credentials: "include",
+        signal: controller.signal,
+      });
       const data = await response.json().catch(() => ({})) as ChestOpenResponse;
       if (!response.ok) throw new Error(data.error || "Chest could not be opened");
       const remainingIntro = reduceMotion ? 0 : Math.max(0, 320 - (performance.now() - startedAt));
@@ -235,8 +242,16 @@ export default function Profile() {
       void Promise.all([loadRewards(true), refetchStats()]).catch(() => undefined);
     } catch (error) {
       setOpening(null);
-      toast.error(error instanceof Error ? error.message : "Chest could not be opened");
+      void loadRewards(true).catch(() => undefined);
+      toast.error(
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Chest opening took too long. Your rewards are being refreshed."
+          : error instanceof Error
+            ? error.message
+            : "Chest could not be opened",
+      );
     } finally {
+      window.clearTimeout(timeout);
       setWorking(null);
     }
   };
@@ -448,7 +463,7 @@ export default function Profile() {
           </motion.button>)}
         </div>
       </motion.section>
-      <AnimatePresence mode="wait">
+      {createPortal(<AnimatePresence mode="wait">
         {opening && (
           <motion.div key="chest-opening" className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div role="dialog" aria-modal="true" aria-label="Opening reward chest" className="bento-card w-full max-w-sm overflow-hidden p-7 text-center" initial={{ y: 18, scale: 0.94, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }}>
@@ -493,7 +508,7 @@ export default function Profile() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>, document.body)}
     </div>
   );
 }

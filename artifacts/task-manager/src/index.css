@@ -529,10 +529,11 @@
       hsl(var(--secondary) / 0.75) 338deg,
       transparent 360deg
     );
-    animation: quick-capture-trace 4.2s linear infinite;
+    animation: quick-capture-trace 3.6s linear infinite;
     animation-play-state: paused;
-    opacity: 0.55;
+    opacity: 0.78;
     transform-origin: center;
+    will-change: transform;
     transition: opacity 180ms ease;
   }
 

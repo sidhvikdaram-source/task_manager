@@ -1,5 +1,7 @@
 import {
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -23,7 +25,8 @@ import { useGetUserStats } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import { boundsWithin } from "@/lib/motionGeometry";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 type SidebarProps = {
   open: boolean;
@@ -56,6 +59,13 @@ function SidebarBody({
   const { data: stats } = useGetUserStats();
   const { preferences, updatePreferences } = useExperience();
   const reduceMotion = useReducedMotion();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [activeBounds, setActiveBounds] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const activeTransition = reduceMotion
     ? { duration: 0 }
     : { type: "spring" as const, stiffness: 440, damping: 38, mass: 0.7 };
@@ -77,15 +87,54 @@ function SidebarBody({
     ? [...coreLinks, advancedLinks[0]]
     : coreLinks;
 
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    let frame = 0;
+    const update = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const active = root.querySelector<HTMLElement>("[data-sidebar-active='true']");
+        if (!active) {
+          setActiveBounds(null);
+          return;
+        }
+        const rootRect = root.getBoundingClientRect();
+        const activeRect = active.getBoundingClientRect();
+        setActiveBounds(boundsWithin(rootRect, activeRect));
+      });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(root);
+    root.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      root.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [collapsed, location, preferences.advancedFeaturesEnabled, preferences.socialEnabled, Boolean(stats)]);
+
   return (
-    <LayoutGroup id="velocity-sidebar-navigation">
     <div
+      ref={rootRef}
       data-tour="primary-navigation"
-      className="flex h-full min-h-0 flex-col bg-background text-foreground"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground"
     >
+      {activeBounds && (
+        <motion.div
+          aria-hidden="true"
+          className="pointer-events-none absolute z-[1] rounded-lg bg-primary shadow-sm"
+          initial={false}
+          animate={activeBounds}
+          transition={activeTransition}
+        />
+      )}
       <div
         className={cn(
-          "flex h-16 shrink-0 items-center border-b border-border/70",
+          "relative z-10 flex h-16 shrink-0 items-center border-b border-border/70 bg-background",
           collapsed ? "justify-center px-2" : "gap-3 px-4",
         )}
       >
@@ -140,7 +189,7 @@ function SidebarBody({
                 <motion.div
                   whileTap={reduceMotion ? undefined : { scale: 0.985 }}
                   className={cn(
-                    "relative flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
+                    "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
                     collapsed
                       ? "h-10 justify-center px-2"
                       : "gap-3 px-2.5 py-2.5",
@@ -148,9 +197,9 @@ function SidebarBody({
                       ? "text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
+                  data-sidebar-active={active}
                   title={collapsed ? item.label : undefined}
                 >
-                  {active && <motion.span layoutId="sidebar-active" className="absolute inset-0 rounded-lg bg-primary shadow-sm" transition={activeTransition} />}
                   <Icon className="relative z-10 h-4 w-4 shrink-0" />
                   {!collapsed && <span className="relative z-10 flex-1">{item.label}</span>}
                 </motion.div>
@@ -182,13 +231,13 @@ function SidebarBody({
                     <motion.div
                       whileTap={reduceMotion ? undefined : { scale: 0.985 }}
                       className={cn(
-                        "relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
+                        "relative z-10 flex cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
                         active
                           ? "text-primary-foreground"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
+                      data-sidebar-active={active}
                     >
-                      {active && <motion.span layoutId="sidebar-active" className="absolute inset-0 rounded-lg bg-primary shadow-sm" transition={activeTransition} />}
                       <Icon className="relative z-10 h-4 w-4" />
                       <span className="relative z-10">{item.label}</span>
                     </motion.div>
@@ -220,8 +269,7 @@ function SidebarBody({
 
       <div className={cn("shrink-0 border-t border-border/70", collapsed ? "p-2" : "px-3 py-2")}>
         <Link href="/settings" onClick={onNavigate} aria-current={location === "/settings" ? "page" : undefined}>
-          <motion.div whileTap={reduceMotion ? undefined : { scale: 0.985 }} className={cn("relative flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors", location === "/settings" ? "text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground", collapsed ? "h-10 justify-center" : "gap-3 px-2.5 py-2")} title={collapsed ? "Settings" : undefined}>
-            {location === "/settings" && <motion.span layoutId="sidebar-active" className="absolute inset-0 rounded-lg bg-primary shadow-sm" transition={activeTransition} />}
+          <motion.div whileTap={reduceMotion ? undefined : { scale: 0.985 }} data-sidebar-active={location === "/settings"} className={cn("relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors", location === "/settings" ? "text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground", collapsed ? "h-10 justify-center" : "gap-3 px-2.5 py-2")} title={collapsed ? "Settings" : undefined}>
             <Settings2 className="relative z-10 h-4 w-4" />{!collapsed && <span className="relative z-10">Settings</span>}
           </motion.div>
         </Link>
@@ -237,8 +285,9 @@ function SidebarBody({
           <Link href="/profile" onClick={onNavigate} aria-current={location === "/profile" ? "page" : undefined}>
             <motion.div
               whileTap={reduceMotion ? undefined : { scale: 0.985 }}
+              data-sidebar-active={location === "/profile"}
               className={cn(
-                "relative flex cursor-pointer items-center overflow-hidden rounded-lg transition-colors",
+                "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg transition-colors",
                 location === "/profile" ? "text-primary-foreground" : "hover:bg-muted",
                 collapsed ? "justify-center p-2" : "gap-3 px-2 py-2.5",
               )}
@@ -248,7 +297,6 @@ function SidebarBody({
                   : undefined
               }
             >
-              {location === "/profile" && <motion.span layoutId="sidebar-active" className="absolute inset-0 rounded-lg bg-primary shadow-sm" transition={activeTransition} />}
               <div className={cn("relative z-10 flex h-8 w-8 items-center justify-center rounded-lg", location === "/profile" ? "bg-primary-foreground/15 text-primary-foreground" : "bg-primary/10 text-primary")}>
                 <Zap className="h-4 w-4 fill-current" />
               </div>
@@ -285,7 +333,6 @@ function SidebarBody({
         </button>
       )}
     </div>
-    </LayoutGroup>
   );
 }
 

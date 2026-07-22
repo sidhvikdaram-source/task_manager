@@ -4,6 +4,7 @@ import {
   completionOrigin,
   playCompletionEffect,
   playCompletionSound,
+  playCompletionTick,
   primeCompletionSound,
 } from "@/lib/completionSound";
 
@@ -24,11 +25,15 @@ export function useCompletionFeedback() {
 
   return {
     prepare(element?: HTMLElement | null) {
+      const soundReady = preferences.completionSoundEnabled
+        ? primeCompletionSound()
+        : Promise.resolve();
+      if (preferences.completionSoundEnabled) {
+        void playCompletionTick(soundReady).catch(() => undefined);
+      }
       return {
         origin: completionOrigin(element),
-        soundReady: preferences.completionSoundEnabled
-          ? primeCompletionSound()
-          : Promise.resolve(),
+        soundReady,
       };
     },
     celebrate(prepared: { origin: { x: number; y: number }; soundReady: Promise<void> }) {

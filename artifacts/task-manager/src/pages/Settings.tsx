@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Check, Settings2, ShieldCheck, Sparkles, Users, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
+import { playCompletionSound, primeCompletionSound } from "@/lib/completionSound";
 
 export default function Settings() {
   const { preferences, updatePreferences } = useExperience();
@@ -31,6 +32,15 @@ export default function Settings() {
         <SettingRow icon={Sparkles} title="Advanced workspace" detail="Projects, Calendar, Insights, and other planning tools." enabled={preferences.advancedFeaturesEnabled} disabled={saving === "advancedFeaturesEnabled"} onChange={(value) => void toggle("advancedFeaturesEnabled", value)} />
         <SettingRow icon={Volume2} title="Completion sounds" detail="Play a short confirmation sound when a task is completed." enabled={preferences.completionSoundEnabled} disabled={saving === "completionSoundEnabled"} onChange={(value) => void toggle("completionSoundEnabled", value)} />
       </section>
+      {preferences.completionSoundEnabled && (
+        <button
+          type="button"
+          onClick={() => void playCompletionSound(primeCompletionSound())}
+          className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-black text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Volume2 className="h-4 w-4" /> Preview completion sound
+        </button>
+      )}
       <section className="bento-card p-5">
         <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 text-primary" /><div><h2 className="font-black">Privacy by default</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">Turning Social off keeps existing friendships and messages stored, but blocks Social access and removes your profile from search until you turn it on again.</p></div></div>
       </section>

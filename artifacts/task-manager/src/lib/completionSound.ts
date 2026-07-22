@@ -63,6 +63,27 @@ export async function playCompletionSound(ready?: Promise<void>) {
   if ("vibrate" in navigator) navigator.vibrate([18, 25, 24]);
 }
 
+export async function playCompletionTick(ready?: Promise<void>) {
+  await ready;
+  const context = getCompletionAudioContext();
+  if (!context) return;
+  if (context.state === "suspended") await context.resume();
+  if (context.state !== "running") return;
+
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(440, context.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(660, context.currentTime + 0.08);
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.11);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(context.currentTime);
+  oscillator.stop(context.currentTime + 0.12);
+}
+
 export type CompletionOrigin = { x: number; y: number };
 
 export function completionOrigin(element?: HTMLElement | null): CompletionOrigin {
