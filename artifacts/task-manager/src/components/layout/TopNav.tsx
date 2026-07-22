@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LineChart,
@@ -16,6 +16,7 @@ import {
   FolderKanban,
   Settings2,
   Menu,
+  Gift,
 } from "lucide-react";
 import {
   getListTasksQueryKey,
@@ -31,6 +32,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ProfilePhoto } from "@/components/ProfileCosmetics";
 import type { RewardsResponse } from "@/pages/Profile";
 import { toast } from "sonner";
+import { MomentumIcon } from "@/components/MomentumIcon";
+import { localDateKey } from "@/lib/localDate";
 
 const CreateTaskModal = lazy(() =>
   import("@/components/CreateTaskModal").then((module) => ({
@@ -56,6 +59,7 @@ function notificationLabel(task: Task) {
 }
 
 export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
+  const [location] = useLocation();
   const { data: stats } = useGetUserStats();
   const { data: tasks } = useListTasks(
     { sortBy: "dueDate" },
@@ -124,30 +128,49 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
         item.days !== null && item.days >= 0 && item.days <= 2,
     )
     .slice(0, 8);
+  const todayKey = localDateKey();
+  const dueToday = (tasks ?? []).filter((task) => task.status !== "completed" && (task.dueDate || task.calendarDate) === todayKey).length;
+  const overdue = (tasks ?? []).filter((task) => task.status !== "completed" && Boolean((task.dueDate || task.calendarDate) && (task.dueDate || task.calendarDate)! < todayKey)).length;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const pageTitles: Record<string, string> = { "/calendar": "Calendar", "/school": "Academics", "/projects": "Projects", "/focus": "Focus", "/analytics": "Insights", "/social": "Social", "/profile": "Profile", "/settings": "Settings", "/review": "Weekly review", "/workspace": "Workspace" };
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background/92 px-3 backdrop-blur-xl sm:px-4 lg:justify-end">
-        <div className="flex items-center gap-2 lg:hidden">
+      <header className="sticky top-0 z-40 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background/92 px-3 py-2.5 backdrop-blur-xl sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
             onClick={onOpenSidebar}
             data-tour="mobile-navigation"
             aria-label="Open navigation"
-            className="hidden h-9 w-9 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground md:flex"
+            className="hidden h-9 w-9 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground md:flex lg:hidden"
           >
             <Menu className="h-4 w-4" />
           </button>
-          <Link href="/">
-            <div className="flex cursor-pointer items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[0.78rem] bg-[#141414] text-white">
-                <Zap className="h-4 w-4 fill-white text-white" />
+          <Link href="/" className="lg:hidden">
+            <div className="flex cursor-pointer items-center gap-2.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-sm">
+                <Zap className="h-5 w-5 fill-white text-white" />
               </div>
-              <span className="text-lg font-black tracking-tight text-foreground">
+              <span className="hidden text-lg font-black tracking-tight text-foreground sm:inline">
                 Velocity
               </span>
             </div>
           </Link>
+          {location === "/" ? (
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-base font-black sm:text-xl">{greeting}, {user?.firstName || user?.email?.split("@")[0] || "there"}.</p>
+                <span className="hidden items-center gap-1 rounded-full bg-secondary/10 px-2 py-1 text-[10px] font-black text-secondary sm:inline-flex">
+                  <MomentumIcon className="h-3 w-3" /> {stats?.streakDays ?? 0}
+                </span>
+              </div>
+              <p className="hidden text-xs text-muted-foreground sm:block">{overdue ? `${overdue} overdue - ${dueToday} due today` : dueToday ? `${dueToday} due today` : "Choose one useful thing and begin."}</p>
+            </div>
+          ) : (
+            <h1 className="truncate text-base font-black sm:text-lg">{pageTitles[location] ?? "Velocity"}</h1>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
@@ -191,6 +214,19 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
               )}
             </AnimatePresence>
           </div>
+
+          <Link href="/profile">
+            <motion.button
+              type="button"
+              aria-label={`${rewards?.unopenedChestCount ?? 0} unopened reward chests`}
+              title="Reward chests"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground"
+              whileTap={{ scale: 0.92 }}
+            >
+              <Gift className="h-4 w-4" />
+              {(rewards?.unopenedChestCount ?? 0) > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-black text-secondary-foreground">{rewards?.unopenedChestCount}</span>}
+            </motion.button>
+          </Link>
 
           <div className="relative" ref={notificationsRef}>
             <motion.button
@@ -273,7 +309,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
               onClick={() => setAccountOpen((o) => !o)}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.94 }}
-              className="h-9 w-9 rounded-xl ring-2 ring-transparent transition-all hover:ring-primary/40"
+              className="h-9 w-9 rounded-full ring-2 ring-transparent transition-all hover:ring-primary/40"
               title="Account"
             >
               <ProfilePhoto

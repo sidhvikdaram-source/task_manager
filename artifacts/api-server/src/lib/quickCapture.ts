@@ -52,33 +52,20 @@ const weekdays = [
   "saturday",
 ];
 
-function formatDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function addDays(date: Date, amount: number) {
-  const result = new Date(date);
-  result.setDate(result.getDate() + amount);
-  return result;
-}
-
-function parseDate(text: string, now: Date) {
+function parseDate(text: string, referenceDate: string) {
   const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
   if (iso) return { value: iso[1], matched: iso[0] };
   if (/\btoday\b/i.test(text))
-    return { value: formatDate(now), matched: text.match(/\btoday\b/i)![0] };
+    return { value: referenceDate, matched: text.match(/\btoday\b/i)![0] };
   if (/\btomorrow\b/i.test(text))
     return {
-      value: formatDate(addDays(now, 1)),
+      value: addCalendarDays(referenceDate, 1),
       matched: text.match(/\btomorrow\b/i)![0],
     };
   const relative = text.match(/\bin\s+(\d+)\s+days?\b/i);
   if (relative)
     return {
-      value: formatDate(addDays(now, Number(relative[1]))),
+      value: addCalendarDays(referenceDate, Number(relative[1])),
       matched: relative[0],
     };
   const month = text.match(
@@ -88,27 +75,26 @@ function parseDate(text: string, now: Date) {
     ),
   );
   if (month) {
-    const year = month[3] ? Number(month[3]) : now.getFullYear();
-    let date = new Date(
-      year,
-      monthNumbers[month[1].toLowerCase()] - 1,
-      Number(month[2]),
-    );
-    if (
-      !month[3] &&
-      date < new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    )
-      date = new Date(year + 1, date.getMonth(), date.getDate());
-    return { value: formatDate(date), matched: month[0] };
+    const currentYear = calendarDateToUtc(referenceDate).getUTCFullYear();
+    let year = month[3] ? Number(month[3]) : currentYear;
+    const candidate = `${year}-${String(monthNumbers[month[1].toLowerCase()]).padStart(2, "0")}-${String(Number(month[2])).padStart(2, "0")}`;
+    if (!month[3] && candidate < referenceDate) year += 1;
+    return {
+      value: `${year}-${String(monthNumbers[month[1].toLowerCase()]).padStart(2, "0")}-${String(Number(month[2])).padStart(2, "0")}`,
+      matched: month[0],
+    };
   }
   const weekday = text.match(
     /\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i,
   );
   if (weekday) {
     const target = weekdays.indexOf(weekday[2].toLowerCase());
-    let offset = (target - now.getDay() + 7) % 7;
-    if (offset === 0 || weekday[1]) offset += 7;
-    return { value: formatDate(addDays(now, offset)), matched: weekday[0] };
+    let offset = (target - calendarWeekday(referenceDate) + 7) % 7;
+    if (offset === 0) offset += 7;
+    return {
+      value: addCalendarDays(referenceDate, offset),
+      matched: weekday[0],
+    };
   }
   return null;
 }
@@ -203,7 +189,7 @@ export function parseQuickCapture(
   text: string,
   projects: NamedRecord[],
   subjects: NamedRecord[],
-  now = new Date(),
+  referenceDate = localDateKey(new Date(), "UTC"),
 ): QuickCaptureResult {
   const lines = text.split(/\r?\n/).map(cleanLine).filter(Boolean);
   const sourceTitle = lines[0] ?? "";
@@ -228,7 +214,7 @@ export function parseQuickCapture(
   const estimatedMinutes = duration
     ? Math.min(480, Number(duration[1]) * (/^h/i.test(duration[2]) ? 60 : 1))
     : null;
-  const date = parseDate(sourceTitle, now);
+  const date = parseDate(sourceTitle, referenceDate);
   const time = parseTime(sourceTitle);
   const warnings: string[] = [];
   if (projectToken && !project && !subject)
@@ -261,3 +247,9 @@ export function parseQuickCapture(
     warnings,
   };
 }
+import {
+  addCalendarDays,
+  calendarDateToUtc,
+  calendarWeekday,
+  localDateKey,
+} from "./localDate";

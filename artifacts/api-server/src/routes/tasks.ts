@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc, asc, and, inArray } from "drizzle-orm";
 import { db, tasksTable, checklistItemsTable, projectsTable } from "@workspace/db";
 import { completeTaskAndAward, TaskNotFoundError } from "../lib/completeTask";
+import { reconcileRewardChests } from "../lib/rewardChests";
 import {
   ListTasksQueryParams,
   CreateTaskBody,
@@ -209,6 +210,9 @@ router.post("/tasks/:id/complete", async (req, res): Promise<void> => {
 
   try {
     const result = await completeTaskAndAward(userId, taskId);
+    await reconcileRewardChests(userId).catch((error) =>
+      req.log?.warn({ err: error }, "Reward chest reconciliation deferred"),
+    );
     const full = await getTaskWithCounts(result.task.id, userId);
     res.json({ ...result, task: full });
     return;

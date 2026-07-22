@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Check, Settings2, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { Check, Settings2, ShieldCheck, Sparkles, Users, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
 
@@ -7,11 +7,11 @@ export default function Settings() {
   const { preferences, updatePreferences } = useExperience();
   const [saving, setSaving] = useState<string | null>(null);
 
-  async function toggle(key: "advancedFeaturesEnabled" | "socialEnabled", value: boolean) {
+  async function toggle(key: "advancedFeaturesEnabled" | "socialEnabled" | "completionSoundEnabled", value: boolean) {
     setSaving(key);
     try {
       await updatePreferences(key === "socialEnabled" && value ? { socialEnabled: true, advancedFeaturesEnabled: true } : { [key]: value });
-      toast.success(key === "socialEnabled" ? (value ? "Social is now available" : "Social is turned off") : (value ? "Advanced workspace enabled" : "Workspace simplified"));
+      toast.success(key === "socialEnabled" ? (value ? "Social is now available" : "Social is turned off") : key === "completionSoundEnabled" ? (value ? "Completion sounds enabled" : "Completion sounds muted") : (value ? "Advanced workspace enabled" : "Workspace simplified"));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Setting could not be saved");
     } finally {
@@ -29,6 +29,7 @@ export default function Settings() {
       <section className="bento-card divide-y">
         <SettingRow icon={Users} title="Social" detail="Friends, private messages, challenges, and friend activity. Your account is hidden from Social search while this is off." enabled={preferences.socialEnabled} disabled={saving === "socialEnabled"} onChange={(value) => void toggle("socialEnabled", value)} />
         <SettingRow icon={Sparkles} title="Advanced workspace" detail="Projects, Calendar, Insights, and other planning tools." enabled={preferences.advancedFeaturesEnabled} disabled={saving === "advancedFeaturesEnabled"} onChange={(value) => void toggle("advancedFeaturesEnabled", value)} />
+        <SettingRow icon={Volume2} title="Completion sounds" detail="Play a short confirmation sound when a task is completed." enabled={preferences.completionSoundEnabled} disabled={saving === "completionSoundEnabled"} onChange={(value) => void toggle("completionSoundEnabled", value)} />
       </section>
       <section className="bento-card p-5">
         <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 text-primary" /><div><h2 className="font-black">Privacy by default</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">Turning Social off keeps existing friendships and messages stored, but blocks Social access and removes your profile from search until you turn it on again.</p></div></div>

@@ -34,7 +34,11 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "advanced_features_enabled" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "tutorial_completed" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "social_enabled" boolean DEFAULT false NOT NULL,
-      ADD COLUMN IF NOT EXISTS "timezone" varchar DEFAULT 'UTC' NOT NULL;
+      ADD COLUMN IF NOT EXISTS "timezone" varchar DEFAULT 'UTC' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "calendar_view" varchar DEFAULT 'month' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "completion_sound_enabled" boolean DEFAULT true NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_completion_effect" varchar DEFAULT 'clean-confetti' NOT NULL,
+      ADD COLUMN IF NOT EXISTS "equipped_transition" varchar DEFAULT 'velocity-slide' NOT NULL;
   `);
   await db.execute(
     sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_username_unique" ON "users" ("username") WHERE "username" IS NOT NULL;`,
@@ -47,6 +51,23 @@ export async function runMigrations(): Promise<void> {
       "purchased_at" timestamp with time zone DEFAULT now() NOT NULL,
       PRIMARY KEY ("user_id", "item_id")
     );
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "user_reward_chests" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "source_key" varchar NOT NULL,
+      "rarity" varchar DEFAULT 'common' NOT NULL,
+      "status" varchar DEFAULT 'unopened' NOT NULL,
+      "reward_item_id" varchar,
+      "vp_fallback" integer DEFAULT 0 NOT NULL,
+      "awarded_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "opened_at" timestamp with time zone,
+      UNIQUE ("user_id", "source_key")
+    );
+    CREATE INDEX IF NOT EXISTS "user_reward_chests_user_status_idx"
+      ON "user_reward_chests" ("user_id", "status");
   `);
 
   await db.execute(sql`

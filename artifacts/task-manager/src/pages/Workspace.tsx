@@ -17,6 +17,8 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
+import { localDateKey } from "@/lib/localDate";
+import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
 
 type WorkTask = {
   id: number;
@@ -59,8 +61,6 @@ const views: Array<{ id: ViewId; label: string }> = [
   { id: "inbox", label: "Inbox" },
   { id: "focus", label: "Focus Mode" },
 ];
-const dateKey = (date: Date) => date.toISOString().slice(0, 10);
-
 function canvasCategoryLabel(taskKind: string) {
   if (taskKind === "test" || taskKind === "quiz") return "Quiz / Test";
   if (taskKind === "meeting") return "Meeting";
@@ -70,6 +70,7 @@ function canvasCategoryLabel(taskKind: string) {
 }
 
 export default function Workspace() {
+  const completionFeedback = useCompletionFeedback();
   const [tasks, setTasks] = useState<WorkTask[]>([]);
   const [view, setView] = useState<ViewId>("today");
   const [selected, setSelected] = useState<number | null>(null);
@@ -101,13 +102,13 @@ export default function Workspace() {
       .then(setSubjects)
       .catch(() => undefined);
   }, []);
-  const today = dateKey(new Date());
+  const today = localDateKey(new Date());
   const tomorrowDate = new Date();
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-  const tomorrow = dateKey(tomorrowDate);
+  const tomorrow = localDateKey(tomorrowDate);
   const weekEndDate = new Date();
   weekEndDate.setDate(weekEndDate.getDate() + 7);
-  const weekEnd = dateKey(weekEndDate);
+  const weekEnd = localDateKey(weekEndDate);
   const matches = (task: WorkTask, id: ViewId) => {
     const active = task.status !== "completed";
     if (id === "today")
@@ -160,12 +161,14 @@ export default function Workspace() {
       toast.success("Captured to Inbox");
     }
   };
-  const complete = async (id: number) => {
+  const complete = async (id: number, target?: HTMLElement | null) => {
+    const preparedFeedback = completionFeedback.prepare(target);
     const response = await fetch(`/api/tasks/${id}/complete`, {
       method: "POST",
       credentials: "include",
     });
     if (response.ok) {
+      completionFeedback.celebrate(preparedFeedback);
       await load();
       toast.success("Task complete");
       return;
@@ -315,7 +318,7 @@ export default function Workspace() {
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
-                    void complete(task.id);
+                    void complete(task.id, event.currentTarget);
                   }}
                   disabled={
                     task.status === "completed" ||

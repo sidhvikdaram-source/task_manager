@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { parseQuickCapture } from "../src/lib/quickCapture.ts";
 
-const now = new Date(2026, 6, 16, 12, 0, 0);
+const referenceDate = "2026-07-16";
 const projects = [{ id: 1, name: "Personal" }];
 const subjects = [
   { id: 2, name: "Math" },
@@ -14,7 +14,7 @@ test("parses Todoist-style schedule, project, and priority tokens", () => {
     "Call mom Sunday afternoon #Personal p1",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
 
   assert.equal(parsed.title, "Call mom");
@@ -30,7 +30,7 @@ test("turns additional lines into a real checklist", () => {
     "Study fractions tomorrow @Math p2 ~45m\nReview fraction rules\nSolve 10 practice problems",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
 
   assert.equal(parsed.title, "Study fractions");
@@ -49,7 +49,7 @@ test("uses a matching hashtag as a subject when it is not a project", () => {
     "Finish algebra homework tomorrow #Math high priority",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
 
   assert.equal(parsed.title, "Finish algebra homework");
@@ -65,7 +65,7 @@ test("recognizes compact subject initials", () => {
     "Finish coding lab #CS",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
 
   assert.equal(parsed.title, "Finish coding lab");
@@ -78,7 +78,7 @@ test("does not silently attach unknown organization tokens", () => {
     "Finish worksheet #Unknown @History",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
 
   assert.equal(parsed.title, "Finish worksheet");
@@ -92,19 +92,19 @@ test("understands natural priority language and handles negation first", () => {
     "Finish lab report very important",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
   const relaxed = parseQuickCapture(
     "Organize downloads not important",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
   const noRush = parseQuickCapture(
     "Clean notes no rush",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
 
   assert.equal(urgent.title, "Finish lab report");
@@ -120,9 +120,51 @@ test("explicit p-level tokens override natural priority words", () => {
     "Review notes urgent p4",
     projects,
     subjects,
-    now,
+    referenceDate,
   );
 
   assert.equal(parsed.title, "Review notes");
   assert.equal(parsed.priority, "low");
+});
+
+test("today and tomorrow resolve from the supplied user date", () => {
+  const today = parseQuickCapture(
+    "Finish worksheet today #Math",
+    projects,
+    subjects,
+    "2026-07-21",
+  );
+  const tomorrow = parseQuickCapture(
+    "Read chapter tomorrow",
+    projects,
+    subjects,
+    "2026-07-21",
+  );
+
+  assert.equal(today.dueDate, "2026-07-21");
+  assert.equal(today.title, "Finish worksheet");
+  assert.equal(tomorrow.dueDate, "2026-07-22");
+});
+
+test("dates are removed from task titles", () => {
+  const result = parseQuickCapture(
+    "Shubhada homework August 1",
+    projects,
+    subjects,
+    "2026-07-21",
+  );
+
+  assert.equal(result.title, "Shubhada homework");
+  assert.equal(result.dueDate, "2026-08-01");
+});
+
+test("weekday parsing stays anchored to the supplied date", () => {
+  const result = parseQuickCapture(
+    "Practice vocabulary next Monday",
+    projects,
+    subjects,
+    "2026-07-21",
+  );
+
+  assert.equal(result.dueDate, "2026-07-27");
 });

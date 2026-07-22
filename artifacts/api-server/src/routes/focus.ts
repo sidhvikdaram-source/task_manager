@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc, and } from "drizzle-orm";
 import { db, focusSessionsTable, userStatsTable } from "@workspace/db";
 import { CreateFocusSessionBody, CompleteFocusSessionParams } from "@workspace/api-zod";
+import { reconcileRewardChests } from "../lib/rewardChests";
 
 const router: IRouter = Router();
 
@@ -54,6 +55,10 @@ router.post("/focus-sessions/:id/complete", async (req, res): Promise<void> => {
     .from(focusSessionsTable)
     .where(and(eq(focusSessionsTable.id, params.data.id), eq(focusSessionsTable.userId, userId)));
   if (!existing) { res.status(404).json({ error: "Focus session not found" }); return; }
+  if (existing.status === "completed") {
+    res.json(existing);
+    return;
+  }
 
   const stats = await getOrCreateUserStats(userId);
   const multiplier = stats.multiplier ?? 1.0;
@@ -85,6 +90,10 @@ router.post("/focus-sessions/:id/complete", async (req, res): Promise<void> => {
     multiplier: newMultiplier,
     updatedAt: new Date(),
   }).where(eq(userStatsTable.id, stats.id));
+
+  await reconcileRewardChests(userId).catch((error) =>
+    req.log?.warn({ err: error }, "Reward chest reconciliation deferred"),
+  );
 
   res.json(session);
 });

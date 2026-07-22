@@ -41,6 +41,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { CanvasSyncButton } from "@/components/CanvasSyncButton";
 import { toast } from "sonner";
+import { useExperience } from "@/experience";
 
 type CanvasEvent = {
   id: number;
@@ -114,15 +115,25 @@ function canvasTaskCategory(task: Task) {
 
 export default function Calendar() {
   const queryClient = useQueryClient();
+  const { preferences, updatePreferences } = useExperience();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [view, setView] = useState<CalendarView>("agenda");
+  const [view, setView] = useState<CalendarView>(preferences.calendarView);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [createDate, setCreateDate] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [eventCategories, setEventCategories] = useState<Set<string>>(
     new Set(canvasCategories),
   );
+
+  function selectView(nextView: CalendarView) {
+    setView(nextView);
+    if (nextView !== preferences.calendarView) {
+      void updatePreferences({ calendarView: nextView }).catch(() => {
+        toast.error("Calendar view preference could not be saved.");
+      });
+    }
+  }
 
   const { data: tasks = [], isLoading } = useListTasks(
     { sortBy: "dueDate" },
@@ -333,7 +344,7 @@ export default function Calendar() {
             <button
               key={item.id}
               type="button"
-              onClick={() => setView(item.id)}
+              onClick={() => selectView(item.id)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold",
                 (item.id === "week" || item.id === "day") && "hidden sm:inline-flex",

@@ -1,7 +1,9 @@
 import { and, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
-import { db, focusSessionsTable, projectsTable, subjectsTable, tasksTable, userStatsTable, weeklyReviewsTable } from "@workspace/db";
+import { db, focusSessionsTable, projectsTable, subjectsTable, tasksTable, usersTable, userStatsTable, weeklyReviewsTable } from "@workspace/db";
 import { scoreTaskRecommendation, type RecommendationEnergy } from "../lib/taskRecommendation";
+import { addCalendarDays, calendarDateToUtc, localDateKey, startOfWeekKey } from "../lib/localDate";
+import { reconcileRewardChests } from "../lib/rewardChests";
 
 const router: IRouter = Router();
 const defaultSubjects = [
@@ -10,9 +12,11 @@ const defaultSubjects = [
   ["Band", "#c026d3"], ["Computer Science", "#475569"], ["Other", "#64748b"],
 ] as const;
 
-function dateOnly(date: Date) { return date.toISOString().slice(0, 10); }
-function startOfWeek() { const date = new Date(); date.setUTCHours(0,0,0,0); const day = date.getUTCDay(); date.setUTCDate(date.getUTCDate() - (day === 0 ? 6 : day - 1)); return date; }
-function addDays(date: Date, days: number) { const result = new Date(date); result.setUTCDate(result.getUTCDate() + days); return result; }
+async function userDateContext(userId: string) {
+  const [user] = await db.select({ timezone: usersTable.timezone }).from(usersTable).where(eq(usersTable.id, userId));
+  const timezone = user?.timezone ?? "UTC";
+  return { timezone, today: localDateKey(new Date(), timezone) };
+}
 
 async function ensureSubjects(userId: string) {
   const current = await db.select().from(subjectsTable).where(eq(subjectsTable.userId, userId));
@@ -88,7 +92,7 @@ router.get("/recommendations/next", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const minutes = Math.min(60, Math.max(10, Number(req.query.minutes) || 30));
   const energy: RecommendationEnergy = ["low","medium","high"].includes(String(req.query.energy)) ? String(req.query.energy) as RecommendationEnergy : "medium";
-  const today = dateOnly(new Date());
+  const { today } = await userDateContext(req.user.id);
   const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"), eq(tasksTable.blocked, false)));
   const scored = tasks.map((task) => ({ task, ranking: scoreTaskRecommendation(task, { minutes, energy, today }) }))
     .filter((item) => item.ranking.eligible)
@@ -103,23 +107,33 @@ router.get("/recommendations/next", async (req, res): Promise<void> => {
 
 router.get("/weekly-review", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const weekStart = startOfWeek(); const weekEnd = addDays(weekStart, 7); const nextEnd = addDays(weekEnd, 7); const today = dateOnly(new Date());
+  const { timezone, today } = await userDateContext(req.user.id);
+  const weekStart = startOfWeekKey(today);
+  const weekEnd = addCalendarDays(weekStart, 7);
+  const nextEnd = addCalendarDays(weekEnd, 7);
+  const sessionWindowStart = calendarDateToUtc(addCalendarDays(weekStart, -1));
+  const sessionWindowEnd = calendarDateToUtc(addCalendarDays(weekEnd, 1));
   const [tasks, sessions, stats, projects, receipt] = await Promise.all([
     db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false))),
-    db.select().from(focusSessionsTable).where(and(eq(focusSessionsTable.userId, req.user.id), gte(focusSessionsTable.createdAt, weekStart), lt(focusSessionsTable.createdAt, weekEnd))),
+    db.select().from(focusSessionsTable).where(and(eq(focusSessionsTable.userId, req.user.id), gte(focusSessionsTable.createdAt, sessionWindowStart), lt(focusSessionsTable.createdAt, sessionWindowEnd))),
     db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id)).then((rows) => rows[0]),
     db.select().from(projectsTable).where(and(eq(projectsTable.userId, req.user.id), eq(projectsTable.archived, false))),
-    db.select().from(weeklyReviewsTable).where(and(eq(weeklyReviewsTable.userId, req.user.id), eq(weeklyReviewsTable.weekStart, dateOnly(weekStart)))).then((rows) => rows[0]),
+    db.select().from(weeklyReviewsTable).where(and(eq(weeklyReviewsTable.userId, req.user.id), eq(weeklyReviewsTable.weekStart, weekStart))).then((rows) => rows[0]),
   ]);
-  const completed = tasks.filter((task) => task.completedAt && task.completedAt >= weekStart && task.completedAt < weekEnd);
+  const completed = tasks.filter((task) => task.completedAt && localDateKey(task.completedAt, timezone) >= weekStart && localDateKey(task.completedAt, timezone) < weekEnd);
+  const weekSessions = sessions.filter((session) => {
+    const key = localDateKey(session.createdAt, timezone);
+    return key >= weekStart && key < weekEnd;
+  });
   const active = tasks.filter((task) => task.status !== "completed");
   const projectAttention = projects.map((project) => { const related = tasks.filter((task) => task.projectId === project.id); const done = related.filter((task) => task.status === "completed").length; return { ...project, taskCount: related.length, progress: related.length ? Math.round(done / related.length * 100) : 0 }; }).filter((project) => project.progress < 100 && (project.dueDate || project.taskCount > 0));
-  res.json({ weekStart: dateOnly(weekStart), completed, overdue: active.filter((task) => task.dueDate && task.dueDate < today), dueNextWeek: active.filter((task) => task.dueDate && task.dueDate >= dateOnly(weekEnd) && task.dueDate < dateOnly(nextEnd)), focusMinutes: sessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + session.durationMinutes, 0), vpEarned: completed.reduce((sum, task) => sum + task.vpValue, 0) + sessions.reduce((sum, session) => sum + (session.vpAwarded ?? 0), 0), streakDays: stats?.streakDays ?? 0, projects: projectAttention, inboxCount: active.filter((task) => !task.organized).length, unfinished: active, completedReview: Boolean(receipt), review: receipt ?? null });
+  res.json({ weekStart, completed, overdue: active.filter((task) => task.dueDate && task.dueDate < today), dueNextWeek: active.filter((task) => task.dueDate && task.dueDate >= weekEnd && task.dueDate < nextEnd), focusMinutes: weekSessions.filter((session) => session.status === "completed").reduce((sum, session) => sum + session.durationMinutes, 0), vpEarned: completed.reduce((sum, task) => sum + task.vpValue, 0) + weekSessions.reduce((sum, session) => sum + (session.vpAwarded ?? 0), 0), streakDays: stats?.streakDays ?? 0, projects: projectAttention, inboxCount: active.filter((task) => !task.organized).length, unfinished: active, completedReview: Boolean(receipt), review: receipt ?? null });
 });
 
 router.post("/weekly-review/complete", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const weekStart = dateOnly(startOfWeek()); const priorities = Array.isArray(req.body?.topPriorities) ? req.body.topPriorities.filter((value: unknown): value is string => typeof value === "string").slice(0,3) : [];
+  const { today } = await userDateContext(req.user.id);
+  const weekStart = startOfWeekKey(today); const priorities = Array.isArray(req.body?.topPriorities) ? req.body.topPriorities.filter((value: unknown): value is string => typeof value === "string").slice(0,3) : [];
   const focusGoalMinutes = Math.min(1200, Math.max(0, Number(req.body?.focusGoalMinutes) || 0));
   const award = 40;
   const result = await db.transaction(async (tx) => {
@@ -132,6 +146,9 @@ router.post("/weekly-review/complete", async (req, res): Promise<void> => {
     } else await tx.insert(userStatsTable).values({ userId: req.user.id, totalVp: award, lifetimeVp: award, tierProgress: award });
     return { awarded: award, alreadyCompleted: false };
   });
+  await reconcileRewardChests(req.user.id).catch((error) =>
+    req.log?.warn({ err: error }, "Reward chest reconciliation deferred"),
+  );
   res.json(result);
 });
 

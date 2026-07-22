@@ -3,6 +3,7 @@ import Groq from "groq-sdk";
 import { Router, type IRouter } from "express";
 import { checklistItemsTable, db, directMessagesTable, friendshipsTable, projectsTable, subjectsTable, tasksTable, usersTable, userStatsTable } from "@workspace/db";
 import { and, eq, isNull, ne, or } from "drizzle-orm";
+import { addCalendarDays, localDateKey } from "../lib/localDate";
 
 const router: IRouter = Router();
 
@@ -1143,12 +1144,14 @@ async function loadAcceptedFriends(userId: string): Promise<AssistantFriend[]> {
 }
 
 async function generateWorkspaceActionPlan(userId: string, message: string, history: ChatHistoryMessage[], log?: AssistantLogger) {
-  const [tasks, projects, subjects, friends] = await Promise.all([
+  const [tasks, projects, subjects, friends, user] = await Promise.all([
     db.select().from(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.archived, false))),
     db.select().from(projectsTable).where(eq(projectsTable.userId, userId)),
     db.select().from(subjectsTable).where(eq(subjectsTable.userId, userId)),
     loadAcceptedFriends(userId),
+    db.select({ timezone: usersTable.timezone }).from(usersTable).where(eq(usersTable.id, userId)).then((rows) => rows[0]),
   ]);
+  const today = localDateKey(new Date(), user?.timezone);
   const current = { tasks, projects, subjects, friends };
   const context = {
     tasks: tasks.slice(0, 100).map((task) => ({ id: task.id, title: task.title, priority: task.priority, status: task.status, subject: task.subject, projectId: task.projectId, dueDate: task.dueDate })),
@@ -1170,7 +1173,7 @@ async function generateWorkspaceActionPlan(userId: string, message: string, hist
     "Task statuses may be todo, backlog, or in_progress. Project statuses may be active, planning, waiting, or completed. Task completion must use the normal task UI because it awards VP.",
     "A request to message someone may use send_message only when that person is uniquely matched in Current workspace friends. Use the exact friend id as recipientId and include the intended text as body. Messages always require preview confirmation.",
     "For friend activity questions, use only the level and Momentum active-day values supplied in Current workspace friends. Say when other activity is unavailable; never invent it.",
-    `Today is ${formatDate(new Date())}. Current workspace: ${JSON.stringify(context)}. Current user request: ${JSON.stringify(message)}`,
+    `The user's timezone is ${user?.timezone ?? "UTC"}. Today is ${today}. Resolve relative dates from that date. Current workspace: ${JSON.stringify(context)}. Current user request: ${JSON.stringify(message)}`,
   ].join(" ");
 
   try {
@@ -1663,7 +1666,8 @@ router.post("/ai/plans/confirm", async (req, res): Promise<void> => {
 router.post("/ai/actions/confirm", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   if (req.body?.type !== "reschedule-unfinished-tomorrow") { res.status(400).json({ error: "Unknown action." }); return; }
-  const tomorrow = formatDate(addDays(1));
+  const [user] = await db.select({ timezone: usersTable.timezone }).from(usersTable).where(eq(usersTable.id, req.user.id));
+  const tomorrow = addCalendarDays(localDateKey(new Date(), user?.timezone), 1);
   const updated = await db.update(tasksTable).set({ dueDate: tomorrow, calendarDate: tomorrow }).where(and(eq(tasksTable.userId, req.user.id), ne(tasksTable.status, "completed"), isNull(tasksTable.externalSource))).returning({ id: tasksTable.id });
   res.json({ updated: updated.length, date: tomorrow });
 });

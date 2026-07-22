@@ -9,7 +9,6 @@ import {
   Clock3,
   ListChecks,
   Loader2,
-  Plus,
   SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
@@ -23,25 +22,17 @@ import {
   type Task,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@workspace/replit-auth-web";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DailyChecklist } from "@/components/DailyChecklist";
 import { QuickCapture } from "@/components/QuickCapture";
-import {
-  playCompletionSound,
-  primeCompletionSound,
-} from "@/lib/completionSound";
+import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
 import { MomentumIcon } from "@/components/MomentumIcon";
+import { localDateKey } from "@/lib/localDate";
 
 const TaskDetailsModal = lazy(() =>
   import("@/components/TaskDetailsModal").then((module) => ({
     default: module.TaskDetailsModal,
-  })),
-);
-const CreateTaskModal = lazy(() =>
-  import("@/components/CreateTaskModal").then((module) => ({
-    default: module.CreateTaskModal,
   })),
 );
 
@@ -66,20 +57,6 @@ const optionalViews: Array<{ id: OptionalView; label: string }> = [
   { id: "canvas", label: "Canvas" },
 ];
 
-function dateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 function taskDate(task: Task) {
   return task.dueDate || task.calendarDate;
 }
@@ -94,9 +71,9 @@ function viewLabel(view: View) {
 }
 
 export default function Today() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const completeTask = useCompleteTask();
+  const completionFeedback = useCompletionFeedback();
   const { data: stats } = useGetUserStats();
   const { data: tasks = [], isLoading } = useListTasks(
     { sortBy: "dueDate" },
@@ -128,12 +105,11 @@ export default function Today() {
     null,
   );
   const [selectedTask, setSelectedTask] = useState<number | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
   const [highlighted, setHighlighted] = useState<number | null>(() => {
     const value = sessionStorage.getItem("velocity-highlight-task");
     return value ? Number(value) : null;
   });
-  const today = dateKey(new Date());
+  const today = localDateKey(new Date());
 
   useEffect(() => {
     if (!highlighted) return;
@@ -186,7 +162,7 @@ export default function Today() {
     if (view === "week") {
       const end = new Date();
       end.setDate(end.getDate() + 7);
-      const endKey = dateKey(end);
+      const endKey = localDateKey(end);
       return active.filter((task) => {
         const date = taskDate(task);
         return Boolean(date && date >= today && date <= endKey);
@@ -199,13 +175,6 @@ export default function Today() {
     });
   }, [highlighted, tasks, today, view]);
 
-  const dueToday = tasks.filter(
-    (task) => task.status !== "completed" && taskDate(task) === today,
-  ).length;
-  const overdue = tasks.filter((task) => {
-    const date = taskDate(task);
-    return task.status !== "completed" && Boolean(date && date < today);
-  }).length;
 
   async function recommendNext() {
     setRecommendationLoading(true);
@@ -228,17 +197,17 @@ export default function Today() {
     }
   }
 
-  function complete(task: Task) {
+  function complete(task: Task, target?: HTMLElement | null) {
     if (task.externalSource === "canvas") {
       toast("Canvas will complete this after you submit it.");
       return;
     }
-    primeCompletionSound();
+    const preparedFeedback = completionFeedback.prepare(target);
     completeTask.mutate(
       { id: task.id },
       {
         onSuccess: async (result) => {
-          playCompletionSound();
+          completionFeedback.celebrate(preparedFeedback);
           const completion = result as typeof result & {
             firstCompletionToday?: boolean;
             streakDays?: number | null;
@@ -258,27 +227,6 @@ export default function Today() {
 
   return (
     <div className="space-y-5">
-      <header className="border-b border-border/70 pb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs font-black uppercase text-primary">My Day</p>
-          <span className="inline-flex items-center gap-1 rounded-full bg-secondary/10 px-2 py-1 text-[11px] font-black text-secondary">
-            <MomentumIcon className="h-3.5 w-3.5" />
-            {stats?.streakDays ?? 0} momentum days
-          </span>
-        </div>
-        <h1 className="mt-1 text-2xl font-black sm:text-3xl">
-          {greeting()},{" "}
-          {user?.firstName || user?.email?.split("@")[0] || "there"}.
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {overdue
-            ? `${overdue} overdue - ${dueToday} due today`
-            : dueToday
-              ? `${dueToday} task${dueToday === 1 ? "" : "s"} due today`
-              : "Choose one useful thing and begin."}
-        </p>
-      </header>
-
       <section data-tour="quick-capture" className="bento-card p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -287,15 +235,6 @@ export default function Today() {
               Try "Math homework tomorrow #Math high priority".
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            aria-label="Open detailed task form"
-            title="Detailed task"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
         </div>
         <QuickCapture onCreated={() => void refresh()} />
       </section>
@@ -469,7 +408,7 @@ export default function Today() {
                       disabled={isComplete || completeTask.isPending}
                       onClick={(event) => {
                         event.stopPropagation();
-                        complete(task);
+                        complete(task, event.currentTarget);
                       }}
                       aria-label={
                         isComplete ? "Task completed" : "Complete task"
@@ -559,16 +498,6 @@ export default function Today() {
           />
         </Suspense>
       )}
-      {createOpen && (
-        <Suspense fallback={null}>
-          <CreateTaskModal
-            open
-            onOpenChange={setCreateOpen}
-            onSuccess={() => void refresh()}
-          />
-        </Suspense>
-      )}
-
       <AnimatePresence>
         {streakCelebration !== null && (
           <motion.div

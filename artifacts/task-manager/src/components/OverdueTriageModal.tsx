@@ -8,6 +8,7 @@ import { useBulkReschedule, useUpdateTask, getListTasksQueryKey, getGetDashboard
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertTriangle, Calendar, Trash2 } from 'lucide-react';
+import { addLocalDays, localDateKey } from '@/lib/localDate';
 
 interface OverdueTask {
   id: number;
@@ -34,8 +35,8 @@ export function OverdueTriageModal({ open, onOpenChange, overdueTasks }: Overdue
   const bulkReschedule = useBulkReschedule();
   const updateTask = useUpdateTask();
 
-  const today = new Date().toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const today = localDateKey();
+  const tomorrow = localDateKey(addLocalDays(new Date(), 1));
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set(overdueTasks.map((t) => t.id)));
   const [newDate, setNewDate] = useState(tomorrow);

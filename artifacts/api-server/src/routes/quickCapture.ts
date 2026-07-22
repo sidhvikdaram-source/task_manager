@@ -6,8 +6,10 @@ import {
   projectsTable,
   subjectsTable,
   tasksTable,
+  usersTable,
 } from "@workspace/db";
 import { parseQuickCapture } from "../lib/quickCapture";
+import { localDateKey } from "../lib/localDate";
 
 const router: IRouter = Router();
 
@@ -16,7 +18,7 @@ async function parseForUser(
   text: string,
   contextSubject?: string,
 ) {
-  const [projects, subjects] = await Promise.all([
+  const [projects, subjects, user] = await Promise.all([
     db
       .select({ id: projectsTable.id, name: projectsTable.name })
       .from(projectsTable)
@@ -35,8 +37,18 @@ async function parseForUser(
           eq(subjectsTable.archived, false),
         ),
       ),
+    db
+      .select({ timezone: usersTable.timezone })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .then((rows) => rows[0]),
   ]);
-  const parsed = parseQuickCapture(text, projects, subjects);
+  const parsed = parseQuickCapture(
+    text,
+    projects,
+    subjects,
+    localDateKey(new Date(), user?.timezone),
+  );
   const contextualSubject = subjects.find(
     (subject) =>
       subject.name.toLowerCase() === contextSubject?.trim().toLowerCase(),

@@ -16,10 +16,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 import { useLocation } from "wouter";
-import {
-  playCompletionSound,
-  primeCompletionSound,
-} from "@/lib/completionSound";
+import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
 
 interface TaskCardProps {
   task: Task;
@@ -44,6 +41,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const completeTask = useCompleteTask();
+  const completionFeedback = useCompletionFeedback();
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [completionPop, setCompletionPop] = useState(false);
   const isCompleted = task.status === "completed";
@@ -53,12 +51,14 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
     e.stopPropagation();
     if (isCompleted) return;
 
-    primeCompletionSound();
+    const preparedFeedback = completionFeedback.prepare(
+      e.currentTarget as HTMLElement,
+    );
     completeTask.mutate(
       { id: task.id },
       {
         onSuccess: (result) => {
-          playCompletionSound();
+          completionFeedback.celebrate(preparedFeedback);
           setCompletionPop(true);
           window.setTimeout(() => setCompletionPop(false), 1300);
           toast.success(`Task complete. +${result.vpAwarded} VP`, {

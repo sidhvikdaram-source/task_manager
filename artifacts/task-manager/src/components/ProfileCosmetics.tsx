@@ -38,6 +38,10 @@ const frameClasses: Record<string, string> = {
   "honor-frame": "p-1.5 rounded-full border-[3px] border-yellow-400 bg-indigo-950 shadow-[0_0_20px_rgba(250,204,21,.35)]",
   "zen-frame": "p-1 rounded-full border-[4px] border-teal-300 bg-teal-950 shadow-[0_0_0_2px_hsl(var(--background))]",
   "velocity-frame": "p-1.5 rounded-full border-[3px] border-white bg-primary shadow-[0_0_24px_hsl(var(--primary)/.55)]",
+  "aperture-frame": "p-1.5 rounded-full border-[3px] border-cyan-300 bg-zinc-950 shadow-[0_0_0_2px_hsl(var(--background)),0_0_20px_rgba(103,232,249,.45)]",
+  "pulse-grid": "p-1 rounded-full border-[4px] border-blue-500 bg-slate-950 shadow-[0_0_18px_rgba(59,130,246,.5)]",
+  "aurora-edge": "p-1.5 rounded-full border-[3px] border-emerald-300 bg-indigo-950 shadow-[0_0_20px_rgba(110,231,183,.42)]",
+  "carbon-halo": "p-1 rounded-full border-[4px] border-zinc-500 bg-black shadow-[0_0_0_2px_rgb(212,212,216),0_0_22px_rgba(255,255,255,.22)]",
 };
 
 export function ProfilePhoto({
@@ -85,9 +89,13 @@ const petDefinitions = {
   "tempo-dot": { stages: 4, icons: [Music2, AudioWaveform, Music2, AudioWaveform], color: "bg-fuchsia-500 text-white" },
   comet: { stages: 3, icons: [Circle, Rocket, Rocket], color: "bg-blue-600 text-white" },
   pebble: { stages: 2, icons: [Gem, Mountain], color: "bg-stone-400 text-stone-950" },
+  "nova-pod": { stages: 3, icons: [CircleDot, Star, Rocket], color: "bg-cyan-400 text-slate-950" },
+  "lumen-bot": { stages: 4, icons: [Bot, Cpu, Bot, AudioWaveform], color: "bg-yellow-300 text-zinc-950" },
+  "orbit-bud": { stages: 3, icons: [Circle, CircleDot, Orbit], color: "bg-indigo-400 text-white" },
+  "tempo-kite": { stages: 4, icons: [Asterisk, Music2, Star, Rocket], color: "bg-rose-400 text-zinc-950" },
 } as const;
 
-export function PetCompanion({ petId, earnedVp = 0, className }: { petId?: string | null; earnedVp?: number; className?: string }) {
+export function PetPreview({ petId, earnedVp = 0, className }: { petId?: string | null; earnedVp?: number; className?: string }) {
   const reduceMotion = useReducedMotion();
   const [active, setActive] = useState(false);
   const definition = petId && petId !== "none" ? petDefinitions[petId as keyof typeof petDefinitions] : null;
@@ -120,7 +128,7 @@ export function PetCompanion({ petId, earnedVp = 0, className }: { petId?: strin
 
   return (
     <motion.div
-      aria-label={`${petId.replace(/-/g, " ")} companion`}
+      aria-label={`${petId.replace(/-/g, " ")} pet`}
       animate={reduceMotion ? undefined : active ? activeAnimation : { y: [0, -2, 0] }}
       transition={{ duration: active ? 1 : 2.8, repeat: active ? 0 : Infinity, ease: "easeInOut" }}
       className={cn("relative flex items-center justify-center rounded-2xl border-2 border-background shadow-lg", definition.color, className)}

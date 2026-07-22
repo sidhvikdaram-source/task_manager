@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import {
   CalendarDays,
+  ArrowUp,
   FolderKanban,
   ListChecks,
   Loader2,
-  Plus,
   Tag,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -112,7 +112,7 @@ export function QuickCapture({
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Plus className="h-4 w-4" />
+            <ArrowUp className="h-4 w-4" />
           )}
         </button>
       </div>

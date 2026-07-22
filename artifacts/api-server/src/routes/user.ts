@@ -46,6 +46,8 @@ router.get("/user/preferences", async (req, res): Promise<void> => {
       tutorialCompleted: usersTable.tutorialCompleted,
       socialEnabled: usersTable.socialEnabled,
       timezone: usersTable.timezone,
+      calendarView: usersTable.calendarView,
+      completionSoundEnabled: usersTable.completionSoundEnabled,
     })
     .from(usersTable)
     .where(eq(usersTable.id, req.user.id));
@@ -72,6 +74,10 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
     update.tutorialCompleted = req.body.tutorialCompleted;
   if (typeof req.body?.socialEnabled === "boolean")
     update.socialEnabled = req.body.socialEnabled;
+  if (["month", "week", "day", "agenda"].includes(req.body?.calendarView))
+    update.calendarView = req.body.calendarView;
+  if (typeof req.body?.completionSoundEnabled === "boolean")
+    update.completionSoundEnabled = req.body.completionSoundEnabled;
   if (typeof req.body?.timezone === "string") {
     try {
       Intl.DateTimeFormat("en-US", { timeZone: req.body.timezone }).format();
@@ -96,6 +102,8 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
       tutorialCompleted: usersTable.tutorialCompleted,
       socialEnabled: usersTable.socialEnabled,
       timezone: usersTable.timezone,
+      calendarView: usersTable.calendarView,
+      completionSoundEnabled: usersTable.completionSoundEnabled,
     });
   res.json(user);
 });

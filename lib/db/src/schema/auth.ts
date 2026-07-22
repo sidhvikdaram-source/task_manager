@@ -2,10 +2,13 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgTable,
   primaryKey,
+  serial,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -46,6 +49,16 @@ export const usersTable = pgTable("users", {
   tutorialCompleted: boolean("tutorial_completed").notNull().default(false),
   socialEnabled: boolean("social_enabled").notNull().default(false),
   timezone: varchar("timezone").notNull().default("UTC"),
+  calendarView: varchar("calendar_view").notNull().default("month"),
+  completionSoundEnabled: boolean("completion_sound_enabled")
+    .notNull()
+    .default(true),
+  equippedCompletionEffect: varchar("equipped_completion_effect")
+    .notNull()
+    .default("clean-confetti"),
+  equippedTransition: varchar("equipped_transition")
+    .notNull()
+    .default("velocity-slide"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -67,6 +80,32 @@ export const userCosmeticsTable = pgTable(
       .defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.userId, table.itemId] })],
+);
+
+export const userRewardChestsTable = pgTable(
+  "user_reward_chests",
+  {
+    id: serial("id").primaryKey(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    sourceKey: varchar("source_key").notNull(),
+    rarity: varchar("rarity").notNull().default("common"),
+    status: varchar("status").notNull().default("unopened"),
+    rewardItemId: varchar("reward_item_id"),
+    vpFallback: integer("vp_fallback").notNull().default(0),
+    awardedAt: timestamp("awarded_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("user_reward_chests_source_unique").on(
+      table.userId,
+      table.sourceKey,
+    ),
+    index("user_reward_chests_user_status_idx").on(table.userId, table.status),
+  ],
 );
 
 export type UpsertUser = typeof usersTable.$inferInsert;

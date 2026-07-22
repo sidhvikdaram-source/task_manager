@@ -1,51 +1,79 @@
+import confetti from "canvas-confetti";
+
 let completionAudioContext: AudioContext | null = null;
 
 function getCompletionAudioContext() {
   const AudioContextClass =
     window.AudioContext ||
-    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
   if (!AudioContextClass) return null;
   completionAudioContext ??= new AudioContextClass();
   return completionAudioContext;
 }
 
-export function primeCompletionSound() {
-  const ctx = getCompletionAudioContext();
-  if (ctx?.state === 'suspended') {
-    void ctx.resume();
-  }
+export async function primeCompletionSound() {
+  const context = getCompletionAudioContext();
+  if (context?.state === "suspended") await context.resume();
 }
 
-export function playCompletionSound() {
-  const ctx = getCompletionAudioContext();
-  if (!ctx) return;
+export async function playCompletionSound(ready?: Promise<void>) {
+  await ready;
+  const context = getCompletionAudioContext();
+  if (!context) return;
+  if (context.state === "suspended") await context.resume();
 
-  if (ctx.state === 'suspended') {
-    void ctx.resume();
-  }
+  const master = context.createGain();
+  master.gain.setValueAtTime(0.2, context.currentTime);
+  master.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.5);
+  master.connect(context.destination);
 
-  const master = ctx.createGain();
-  master.gain.setValueAtTime(0.16, ctx.currentTime);
-  master.connect(ctx.destination);
-
-  [523.25, 659.25, 783.99].forEach((frequency, index) => {
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.type = 'triangle';
+  [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = index === 0 ? "sine" : "triangle";
     oscillator.frequency.value = frequency;
     oscillator.connect(gain);
     gain.connect(master);
-
-    const start = ctx.currentTime + index * 0.08;
+    const start = context.currentTime + index * 0.055;
     gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.18, start + 0.018);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.22);
+    gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.2 : 0.12, start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
     oscillator.start(start);
-    oscillator.stop(start + 0.24);
+    oscillator.stop(start + 0.26);
   });
 
-  if ('vibrate' in navigator) {
-    navigator.vibrate(30);
+  if ("vibrate" in navigator) navigator.vibrate([18, 25, 24]);
+}
+
+export type CompletionOrigin = { x: number; y: number };
+
+export function completionOrigin(element?: HTMLElement | null): CompletionOrigin {
+  if (!element) return { x: 0.5, y: 0.65 };
+  const rect = element.getBoundingClientRect();
+  return {
+    x: Math.min(0.95, Math.max(0.05, (rect.left + rect.width / 2) / window.innerWidth)),
+    y: Math.min(0.95, Math.max(0.05, (rect.top + rect.height / 2) / window.innerHeight)),
+  };
+}
+
+export function playCompletionEffect(
+  effectId: string,
+  origin: CompletionOrigin,
+) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const base = { origin, disableForReducedMotion: true, zIndex: 120 };
+  if (effectId === "signal-rings") {
+    void confetti({ ...base, particleCount: 34, spread: 360, startVelocity: 18, gravity: 0.7, scalar: 0.72, colors: ["#22d3ee", "#3b82f6", "#ffffff"] });
+    return;
   }
+  if (effectId === "prism-pop") {
+    void confetti({ ...base, particleCount: 48, spread: 76, startVelocity: 28, gravity: 0.9, scalar: 0.82, colors: ["#22d3ee", "#a78bfa", "#fb7185", "#facc15"] });
+    return;
+  }
+  if (effectId === "paper-stream") {
+    void confetti({ ...base, particleCount: 56, spread: 52, startVelocity: 24, gravity: 0.62, scalar: 1.05, drift: 0.4, colors: ["#f8fafc", "#fdba74", "#60a5fa", "#34d399"] });
+    return;
+  }
+  void confetti({ ...base, particleCount: 28, spread: 52, startVelocity: 22, gravity: 0.95, scalar: 0.72, colors: ["#22d3ee", "#fb923c", "#f8fafc"] });
 }

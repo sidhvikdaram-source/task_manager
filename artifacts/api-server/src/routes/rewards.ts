@@ -1,16 +1,19 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { randomInt } from "node:crypto";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   db,
   tasksTable,
   userCosmeticsTable,
+  userRewardChestsTable,
   userStatsTable,
   usersTable,
 } from "@workspace/db";
+import { reconcileRewardChests, type ChestRarity } from "../lib/rewardChests";
 
 const router: IRouter = Router();
 
-type RewardKind = "frame" | "pet" | "title";
+type RewardKind = "frame" | "pet" | "title" | "completion_effect" | "transition";
 type RewardItem = {
   id: string;
   name: string;
@@ -18,10 +21,11 @@ type RewardItem = {
   cost: number;
   style: string;
   requirement?: string;
-  source?: "quest" | "achievement" | "tier";
+  source?: "quest" | "achievement" | "tier" | "chest" | "default";
+  chestRarity?: ChestRarity;
 };
 
-const collectables: RewardItem[] = [
+const storeCollectables: RewardItem[] = [
   { id: "orbit-frame", name: "Orbit Frame", kind: "frame", cost: 80, style: "orbit" },
   { id: "signal-ring", name: "Signal Ring", kind: "frame", cost: 150, style: "signal" },
   { id: "precision-frame", name: "Precision Frame", kind: "frame", cost: 260, style: "precision" },
@@ -43,6 +47,34 @@ const collectables: RewardItem[] = [
   { id: "comet", name: "Comet", kind: "pet", cost: 680, style: "comet" },
   { id: "pebble", name: "Pebble", kind: "pet", cost: 760, style: "pebble" },
 ];
+
+const freeCollectables: RewardItem[] = [
+  { id: "clean-confetti", name: "Clean Confetti", kind: "completion_effect", cost: 0, style: "clean-confetti", source: "default" },
+  { id: "velocity-slide", name: "Velocity Slide", kind: "transition", cost: 0, style: "velocity-slide", source: "default" },
+];
+
+const chestCollectables: RewardItem[] = [
+  { id: "nova-pod", name: "Nova Pod", kind: "pet", cost: 0, style: "nova-pod", source: "chest", chestRarity: "common" },
+  { id: "aperture-frame", name: "Aperture Frame", kind: "frame", cost: 0, style: "aperture", source: "chest", chestRarity: "common" },
+  { id: "clear-intent", name: "Clear Intent", kind: "title", cost: 0, style: "clear-intent", source: "chest", chestRarity: "common" },
+  { id: "prism-pop", name: "Prism Pop", kind: "completion_effect", cost: 0, style: "prism-pop", source: "chest", chestRarity: "common" },
+  { id: "soft-glide", name: "Soft Glide", kind: "transition", cost: 0, style: "soft-glide", source: "chest", chestRarity: "common" },
+  { id: "lumen-bot", name: "Lumen Bot", kind: "pet", cost: 0, style: "lumen-bot", source: "chest", chestRarity: "rare" },
+  { id: "orbit-bud", name: "Orbit Bud", kind: "pet", cost: 0, style: "orbit-bud", source: "chest", chestRarity: "rare" },
+  { id: "pulse-grid", name: "Pulse Grid", kind: "frame", cost: 0, style: "pulse-grid", source: "chest", chestRarity: "rare" },
+  { id: "aurora-edge", name: "Aurora Edge", kind: "frame", cost: 0, style: "aurora-edge", source: "chest", chestRarity: "rare" },
+  { id: "deep-work", name: "Deep Work", kind: "title", cost: 0, style: "deep-work", source: "chest", chestRarity: "rare" },
+  { id: "week-architect", name: "Week Architect", kind: "title", cost: 0, style: "week-architect", source: "chest", chestRarity: "rare" },
+  { id: "signal-rings", name: "Signal Rings", kind: "completion_effect", cost: 0, style: "signal-rings", source: "chest", chestRarity: "rare" },
+  { id: "panel-sweep", name: "Panel Sweep", kind: "transition", cost: 0, style: "panel-sweep", source: "chest", chestRarity: "rare" },
+  { id: "tempo-kite", name: "Tempo Kite", kind: "pet", cost: 0, style: "tempo-kite", source: "chest", chestRarity: "epic" },
+  { id: "carbon-halo", name: "Carbon Halo", kind: "frame", cost: 0, style: "carbon-halo", source: "chest", chestRarity: "epic" },
+  { id: "steady-hand", name: "Steady Hand", kind: "title", cost: 0, style: "steady-hand", source: "chest", chestRarity: "epic" },
+  { id: "paper-stream", name: "Paper Stream", kind: "completion_effect", cost: 0, style: "paper-stream", source: "chest", chestRarity: "epic" },
+  { id: "quick-stack", name: "Quick Stack", kind: "transition", cost: 0, style: "quick-stack", source: "chest", chestRarity: "epic" },
+];
+
+const collectables = [...storeCollectables, ...freeCollectables, ...chestCollectables];
 
 type UnlockContext = {
   tier: number;
@@ -122,11 +154,13 @@ function findItem(itemId: string) {
 
 router.get("/rewards", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const [stats, ownedRows, user, tasks] = await Promise.all([
+  await reconcileRewardChests(req.user.id);
+  const [stats, ownedRows, user, tasks, chests] = await Promise.all([
     db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id)).then((rows) => rows[0]),
     db.select({ itemId: userCosmeticsTable.itemId }).from(userCosmeticsTable).where(eq(userCosmeticsTable.userId, req.user.id)),
-    db.select({ equippedFrame: usersTable.equippedFrame, equippedPet: usersTable.equippedPet, equippedTitle: usersTable.equippedTitle, profileImageUrl: usersTable.profileImageUrl }).from(usersTable).where(eq(usersTable.id, req.user.id)).then((rows) => rows[0]),
+    db.select({ equippedFrame: usersTable.equippedFrame, equippedPet: usersTable.equippedPet, equippedTitle: usersTable.equippedTitle, equippedCompletionEffect: usersTable.equippedCompletionEffect, equippedTransition: usersTable.equippedTransition, profileImageUrl: usersTable.profileImageUrl }).from(usersTable).where(eq(usersTable.id, req.user.id)).then((rows) => rows[0]),
     db.select().from(tasksTable).where(eq(tasksTable.userId, req.user.id)),
+    db.select().from(userRewardChestsTable).where(eq(userRewardChestsTable.userId, req.user.id)).orderBy(desc(userRewardChestsTable.awardedAt)),
   ]);
   const completed = tasks.filter((task) => task.status === "completed");
   const context: UnlockContext = {
@@ -140,6 +174,7 @@ router.get("/rewards", async (req, res): Promise<void> => {
   };
   const unlockedTitles = titles.filter((item) => item.test(context));
   const owned = new Set(ownedRows.map((entry) => entry.itemId));
+  freeCollectables.forEach((item) => owned.add(item.id));
   const newlyUnlocked = unlockedTitles.filter((item) => !owned.has(item.id));
   if (newlyUnlocked.length) {
     await db.insert(userCosmeticsTable).values(newlyUnlocked.map((item) => ({ userId: req.user!.id, itemId: item.id }))).onConflictDoNothing();
@@ -150,17 +185,56 @@ router.get("/rewards", async (req, res): Promise<void> => {
     earnedVp: context.earnedVp,
     owned: [...owned],
     newlyUnlockedTitles: newlyUnlocked.map((item) => item.name),
-    equipped: { frame: user?.equippedFrame ?? "none", pet: user?.equippedPet ?? "none", title: user?.equippedTitle ?? "none" },
+    equipped: { frame: user?.equippedFrame ?? "none", pet: user?.equippedPet ?? "none", title: user?.equippedTitle ?? "none", completion_effect: user?.equippedCompletionEffect ?? "clean-confetti", transition: user?.equippedTransition ?? "velocity-slide" },
     profileImageUrl: user?.profileImageUrl ?? null,
+    chests,
+    unopenedChestCount: chests.filter((chest) => chest.status === "unopened").length,
     items: [...collectables, ...titles.map(({ test: _test, ...item }) => item)],
   });
+});
+
+router.post("/rewards/chests/:id/open", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const chestId = Number(req.params.id);
+  if (!Number.isInteger(chestId)) { res.status(400).json({ error: "Invalid chest." }); return; }
+  try {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${req.user.id}))`);
+      const [chest] = await tx.update(userRewardChestsTable).set({ status: "opening" }).where(and(eq(userRewardChestsTable.id, chestId), eq(userRewardChestsTable.userId, req.user.id), eq(userRewardChestsTable.status, "unopened"))).returning();
+      if (!chest) throw new Error("CHEST_UNAVAILABLE");
+      const ownedRows = await tx.select({ itemId: userCosmeticsTable.itemId }).from(userCosmeticsTable).where(eq(userCosmeticsTable.userId, req.user.id));
+      const owned = new Set(ownedRows.map((entry) => entry.itemId));
+      let candidates = chestCollectables.filter((item) => item.chestRarity === chest.rarity && !owned.has(item.id));
+      if (!candidates.length) candidates = chestCollectables.filter((item) => !owned.has(item.id));
+      const reward = candidates.length ? candidates[randomInt(candidates.length)] : null;
+      const fallbackByRarity: Record<ChestRarity, number> = { common: 50, rare: 100, epic: 180 };
+      const fallback = reward ? 0 : fallbackByRarity[chest.rarity as ChestRarity] ?? 50;
+      if (reward) {
+        await tx.insert(userCosmeticsTable).values({ userId: req.user.id, itemId: reward.id }).onConflictDoNothing();
+      } else {
+        let [stats] = await tx.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id));
+        if (!stats) [stats] = await tx.insert(userStatsTable).values({ userId: req.user.id }).returning();
+        const progress = stats.tierProgress + fallback;
+        await tx.update(userStatsTable).set({ totalVp: stats.totalVp + fallback, lifetimeVp: stats.lifetimeVp + fallback, tier: stats.tier + Math.floor(progress / 100), tierProgress: progress % 100, updatedAt: new Date() }).where(eq(userStatsTable.id, stats.id));
+      }
+      const [opened] = await tx.update(userRewardChestsTable).set({ status: "opened", rewardItemId: reward?.id ?? null, vpFallback: fallback, openedAt: new Date() }).where(eq(userRewardChestsTable.id, chest.id)).returning();
+      return { chest: opened, reward, vpFallback: fallback };
+    });
+    res.json(result);
+  } catch (error) {
+    if (error instanceof Error && error.message === "CHEST_UNAVAILABLE") {
+      res.status(409).json({ error: "This chest was already opened or is unavailable." });
+      return;
+    }
+    throw error;
+  }
 });
 
 router.post("/rewards/:itemId/purchase", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const item = findItem(req.params.itemId);
   if (!item) { res.status(404).json({ error: "Unknown reward." }); return; }
-  if (item.kind === "title") { res.status(400).json({ error: "Titles are earned through achievements and tiers." }); return; }
+  if (item.kind === "title" || item.source === "chest" || item.source === "default" || item.cost <= 0) { res.status(400).json({ error: "This reward must be earned, not purchased." }); return; }
   try {
     const response = await db.transaction(async (tx) => {
       const [existing] = await tx.select().from(userCosmeticsTable).where(and(eq(userCosmeticsTable.userId, req.user.id), eq(userCosmeticsTable.itemId, item.id)));
@@ -183,20 +257,20 @@ router.post("/rewards/:itemId/equip", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const item = findItem(req.params.itemId);
   if (!item) { res.status(404).json({ error: "Unknown reward." }); return; }
-  const owned = await db.select().from(userCosmeticsTable).where(and(eq(userCosmeticsTable.userId, req.user.id), eq(userCosmeticsTable.itemId, item.id))).then((rows) => rows.length > 0);
+  const owned = item.source === "default" || await db.select().from(userCosmeticsTable).where(and(eq(userCosmeticsTable.userId, req.user.id), eq(userCosmeticsTable.itemId, item.id))).then((rows) => rows.length > 0);
   if (!owned) { res.status(403).json({ error: item.kind === "title" ? "Complete its requirement before equipping this title." : "Purchase this item before equipping it." }); return; }
-  const update = item.kind === "frame" ? { equippedFrame: item.id } : item.kind === "pet" ? { equippedPet: item.id } : { equippedTitle: item.id };
+  const update = item.kind === "frame" ? { equippedFrame: item.id } : item.kind === "pet" ? { equippedPet: item.id } : item.kind === "title" ? { equippedTitle: item.id } : item.kind === "completion_effect" ? { equippedCompletionEffect: item.id } : { equippedTransition: item.id };
   await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
   res.json({ equipped: item.id });
 });
 
 router.delete("/rewards/equipped/:kind", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  if (!(["frame", "pet", "title"] as const).includes(req.params.kind as "frame" | "pet" | "title")) {
+  if (!(["frame", "pet", "title", "completion_effect", "transition"] as const).includes(req.params.kind as RewardKind)) {
     res.status(400).json({ error: "Unknown reward type." });
     return;
   }
-  const update = req.params.kind === "frame" ? { equippedFrame: "none" } : req.params.kind === "pet" ? { equippedPet: "none" } : { equippedTitle: "none" };
+  const update = req.params.kind === "frame" ? { equippedFrame: "none" } : req.params.kind === "pet" ? { equippedPet: "none" } : req.params.kind === "title" ? { equippedTitle: "none" } : req.params.kind === "completion_effect" ? { equippedCompletionEffect: "clean-confetti" } : { equippedTransition: "velocity-slide" };
   await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
   res.json({ equipped: "none" });
 });

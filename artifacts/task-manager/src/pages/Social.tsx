@@ -104,6 +104,8 @@ export default function Social() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
+  const [peopleLoading, setPeopleLoading] = useState(true);
+  const [peopleError, setPeopleError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const refreshPeople = async () => {
@@ -112,12 +114,23 @@ export default function Social() {
       api<Request[]>("/api/social/requests"),
       api<Conversation[]>("/api/social/conversations"),
     ]);
-    setFriends(friendData);
-    setRequests(requestData);
-    setConversations(conversationData);
+    setFriends(friendData.filter((item) => typeof item?.id === "string"));
+    setRequests(requestData.filter((item) => typeof item?.id === "string"));
+    setConversations(
+      conversationData.filter(
+        (item) => typeof item?.friend?.id === "string",
+      ),
+    );
+    setPeopleError(null);
   };
   useEffect(() => {
-    void refreshPeople().catch(() => undefined);
+    void refreshPeople()
+      .catch((error) =>
+        setPeopleError(
+          error instanceof Error ? error.message : "Social could not load.",
+        ),
+      )
+      .finally(() => setPeopleLoading(false));
   }, []);
   useEffect(() => {
     const term = query.trim();
@@ -290,6 +303,31 @@ export default function Social() {
           private.
         </p>
       </section>
+      {peopleError && (
+        <section className="bento-card flex flex-wrap items-center justify-between gap-3 border-destructive/35 p-4" role="alert">
+          <div>
+            <p className="text-sm font-black">Social did not finish loading</p>
+            <p className="mt-1 text-xs text-muted-foreground">{peopleError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setPeopleLoading(true);
+              void refreshPeople()
+                .catch((error) => setPeopleError(error instanceof Error ? error.message : "Social could not load."))
+                .finally(() => setPeopleLoading(false));
+            }}
+            className="rounded-lg border px-3 py-2 text-xs font-black hover:bg-muted"
+          >
+            Try again
+          </button>
+        </section>
+      )}
+      {peopleLoading && (
+        <div className="bento-card p-6 text-center text-sm text-muted-foreground" role="status">
+          Loading your Social workspace...
+        </div>
+      )}
       <section className="bento-card overflow-hidden">
         <div className="flex gap-2 overflow-x-auto border-b border-border p-3">
           {(

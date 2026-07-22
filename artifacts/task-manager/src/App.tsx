@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from "react";
-import { Link, Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Link, Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "@/theme";
 import { useCanvasSync } from "@/hooks/useCanvasSync";
 import { ExperienceProvider, useExperience } from "@/experience";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 
 const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
@@ -266,37 +268,60 @@ function SocialRoute() {
   );
 }
 
+function AnimatedRoutes() {
+  const [location] = useLocation();
+  const reduceMotion = useReducedMotion();
+  const { data } = useQuery({
+    queryKey: ["rewards"],
+    queryFn: async () => {
+      const response = await fetch("/api/rewards", { credentials: "include" });
+      return response.ok ? response.json() as Promise<{ equipped?: { transition?: string } }> : null;
+    },
+    staleTime: 60_000,
+  });
+  const style = data?.equipped?.transition ?? "velocity-slide";
+  const variants = style === "quick-stack"
+    ? { initial: { opacity: 0, y: 14, scale: 0.985 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -8, scale: 0.99 } }
+    : style === "panel-sweep"
+      ? { initial: { opacity: 0, x: 42 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -26 } }
+      : style === "soft-glide"
+        ? { initial: { opacity: 0, x: 12 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -8 } }
+        : { initial: { opacity: 0, x: 26 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -16 } };
+  const resolved = reduceMotion
+    ? { initial: { opacity: 1 }, animate: { opacity: 1 }, exit: { opacity: 1 } }
+    : variants;
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div key={location} initial={resolved.initial} animate={resolved.animate} exit={resolved.exit} transition={{ duration: style === "soft-glide" ? 0.28 : 0.2, ease: "easeOut" }}>
+        <PageErrorBoundary>
+          <Suspense fallback={<div className="flex min-h-[45vh] items-center justify-center" role="status" aria-label="Loading page"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}>
+            <Switch>
+              <Route path="/" component={Today} />
+              <Route path="/calendar" component={Calendar} />
+              <Route path="/workspace" component={Workspace} />
+              <Route path="/school" component={SchoolPlanner} />
+              <Route path="/projects" component={Projects} />
+              <Route path="/review" component={WeeklyReview} />
+              <Route path="/focus" component={FocusArena} />
+              <Route path="/social" component={SocialRoute} />
+              <Route path="/analytics" component={Analytics} />
+              <Route path="/profile" component={Profile} />
+              <Route path="/settings" component={Settings} />
+              <Route component={NotFound} />
+            </Switch>
+          </Suspense>
+        </PageErrorBoundary>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 function Router() {
   useCanvasSync(true);
   return (
     <ExperienceProvider>
       <AppLayout>
-        <Suspense
-          fallback={
-            <div
-              className="flex min-h-[45vh] items-center justify-center"
-              role="status"
-              aria-label="Loading page"
-            >
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          }
-        >
-          <Switch>
-            <Route path="/" component={Today} />
-            <Route path="/calendar" component={Calendar} />
-            <Route path="/workspace" component={Workspace} />
-            <Route path="/school" component={SchoolPlanner} />
-            <Route path="/projects" component={Projects} />
-            <Route path="/review" component={WeeklyReview} />
-            <Route path="/focus" component={FocusArena} />
-            <Route path="/social" component={SocialRoute} />
-            <Route path="/analytics" component={Analytics} />
-            <Route path="/profile" component={Profile} />
-            <Route path="/settings" component={Settings} />
-            <Route component={NotFound} />
-          </Switch>
-        </Suspense>
+        <AnimatedRoutes />
       </AppLayout>
     </ExperienceProvider>
   );

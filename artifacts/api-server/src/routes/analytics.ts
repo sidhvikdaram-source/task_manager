@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, gte, desc, and } from "drizzle-orm";
-import { db, tasksTable, userStatsTable, milestonesTable } from "@workspace/db";
+import { db, tasksTable, userStatsTable, milestonesTable, usersTable } from "@workspace/db";
+import { addCalendarDays, localDateKey, localHour } from "../lib/localDate";
 
 const router: IRouter = Router();
 
@@ -9,6 +10,11 @@ async function getOrCreateUserStats(userId: string) {
   if (stats) return stats;
   const [newStats] = await db.insert(userStatsTable).values({ userId }).returning();
   return newStats;
+}
+
+async function userTimeZone(userId: string) {
+  const [user] = await db.select({ timezone: usersTable.timezone }).from(usersTable).where(eq(usersTable.id, userId));
+  return user?.timezone ?? "UTC";
 }
 
 router.get("/analytics/summary", async (req, res): Promise<void> => {
@@ -35,6 +41,7 @@ router.get("/analytics/summary", async (req, res): Promise<void> => {
 router.get("/analytics/velocity", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
+  const timezone = await userTimeZone(userId);
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const completed = await db
@@ -44,14 +51,13 @@ router.get("/analytics/velocity", async (req, res): Promise<void> => {
 
   const dayMap: Record<string, { vp: number; tasksCompleted: number }> = {};
   for (let i = 29; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-    const key = d.toISOString().split("T")[0];
+    const key = addCalendarDays(localDateKey(new Date(), timezone), -i);
     dayMap[key] = { vp: 0, tasksCompleted: 0 };
   }
 
   for (const task of completed) {
     if (!task.completedAt) continue;
-    const key = new Date(task.completedAt).toISOString().split("T")[0];
+    const key = localDateKey(new Date(task.completedAt), timezone);
     if (dayMap[key]) {
       dayMap[key].vp += task.vpValue ?? 10;
       dayMap[key].tasksCompleted += 1;
@@ -76,11 +82,12 @@ router.get("/analytics/milestones", async (req, res): Promise<void> => {
 router.get("/analytics/insights", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const stats = await getOrCreateUserStats(req.user.id);
+  const timezone = await userTimeZone(req.user.id);
   const completed = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), eq(tasksTable.status, "completed")));
   const insights: Array<{ type: string; text: string; sampleSize: number }> = [];
 
   const hourCounts = new Array<number>(24).fill(0);
-  completed.forEach((task) => { if (task.completedAt) hourCounts[new Date(task.completedAt).getHours()] += 1; });
+  completed.forEach((task) => { if (task.completedAt) hourCounts[localHour(new Date(task.completedAt), timezone)] += 1; });
   const peakHour = hourCounts.indexOf(Math.max(...hourCounts));
   if (completed.filter((task) => task.completedAt).length >= 5 && hourCounts[peakHour] > 0) {
     const formatHour = (hour: number) => `${hour % 12 || 12} ${hour >= 12 ? "PM" : "AM"}`;
@@ -103,6 +110,7 @@ router.get("/analytics/insights", async (req, res): Promise<void> => {
 router.get("/dashboard/overview", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const userId = req.user.id;
+  const timezone = await userTimeZone(userId);
 
   const allTasks = await db
     .select()
@@ -110,7 +118,7 @@ router.get("/dashboard/overview", async (req, res): Promise<void> => {
     .where(and(eq(tasksTable.userId, userId), eq(tasksTable.archived, false)))
     .orderBy(desc(tasksTable.createdAt));
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateKey(new Date(), timezone);
   const todayTasks = allTasks.filter((t) => t.calendarDate === today || t.dueDate === today);
   const upcomingTasks = allTasks
     .filter((t) => t.status !== "completed" && t.dueDate && t.dueDate > today)

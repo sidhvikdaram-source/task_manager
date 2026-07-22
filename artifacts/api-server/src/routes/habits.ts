@@ -1,10 +1,15 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { db, dailyHabitsTable, dailyHabitCompletionsTable, userStatsTable } from "@workspace/db";
+import { db, dailyHabitsTable, dailyHabitCompletionsTable, usersTable, userStatsTable } from "@workspace/db";
+import { localDateKey } from "../lib/localDate";
 
 const router: IRouter = Router();
-const todayDate = () => new Date().toISOString().slice(0, 10);
 const allowedIcons = new Set(["target", "book", "brain", "heart", "run", "water", "code", "music"]);
+
+async function todayForUser(userId: string) {
+  const [user] = await db.select({ timezone: usersTable.timezone }).from(usersTable).where(eq(usersTable.id, userId));
+  return localDateKey(new Date(), user?.timezone);
+}
 
 function habitInput(body: unknown) {
   const value = body && typeof body === "object" ? body as Record<string, unknown> : {};
@@ -20,8 +25,9 @@ router.get("/daily-habits", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const habits = await db.select().from(dailyHabitsTable).where(eq(dailyHabitsTable.userId, req.user.id)).orderBy(dailyHabitsTable.sortOrder, dailyHabitsTable.createdAt);
   if (!habits.length) { res.json([]); return; }
+  const today = await todayForUser(req.user.id);
   const completions = await db.select().from(dailyHabitCompletionsTable).where(inArray(dailyHabitCompletionsTable.habitId, habits.map((habit) => habit.id))).orderBy(desc(dailyHabitCompletionsTable.completedDate));
-  res.json(habits.map((habit) => ({ ...habit, daysOfWeek: habit.daysOfWeek.split(",").map(Number), completedToday: completions.some((entry) => entry.habitId === habit.id && entry.completedDate === todayDate() && entry.completed), recentCompletions: completions.filter((entry) => entry.habitId === habit.id && entry.completed).slice(0, 30).map((entry) => entry.completedDate) })));
+  res.json(habits.map((habit) => ({ ...habit, daysOfWeek: habit.daysOfWeek.split(",").map(Number), completedToday: completions.some((entry) => entry.habitId === habit.id && entry.completedDate === today && entry.completed), recentCompletions: completions.filter((entry) => entry.habitId === habit.id && entry.completed).slice(0, 30).map((entry) => entry.completedDate) })));
 });
 
 router.post("/daily-habits", async (req, res): Promise<void> => {
@@ -44,7 +50,7 @@ router.post("/daily-habits/:habitId/toggle", async (req, res): Promise<void> => 
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const id = Number(req.params.habitId); const [habit] = await db.select().from(dailyHabitsTable).where(and(eq(dailyHabitsTable.id, id), eq(dailyHabitsTable.userId, req.user.id)));
   if (!habit || habit.status !== "active") { res.status(404).json({ error: "Active habit not found." }); return; }
-  const today = todayDate(); const [existing] = await db.select().from(dailyHabitCompletionsTable).where(and(eq(dailyHabitCompletionsTable.habitId, id), eq(dailyHabitCompletionsTable.completedDate, today)));
+  const today = await todayForUser(req.user.id); const [existing] = await db.select().from(dailyHabitCompletionsTable).where(and(eq(dailyHabitCompletionsTable.habitId, id), eq(dailyHabitCompletionsTable.completedDate, today)));
   if (existing) {
     const completed = !existing.completed; await db.update(dailyHabitCompletionsTable).set({ completed }).where(eq(dailyHabitCompletionsTable.id, existing.id));
     if (completed && !existing.vpAwarded) { await awardVp(req.user.id, habit.vpReward); await db.update(dailyHabitCompletionsTable).set({ vpAwarded: true }).where(eq(dailyHabitCompletionsTable.id, existing.id)); }

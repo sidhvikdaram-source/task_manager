@@ -16,6 +16,8 @@ export type ExperiencePreferences = {
   tutorialCompleted: boolean;
   socialEnabled: boolean;
   timezone: string;
+  calendarView: "month" | "week" | "day" | "agenda";
+  completionSoundEnabled: boolean;
 };
 
 const defaults: ExperiencePreferences = {
@@ -25,6 +27,8 @@ const defaults: ExperiencePreferences = {
   tutorialCompleted: false,
   socialEnabled: false,
   timezone: "UTC",
+  calendarView: "month",
+  completionSoundEnabled: true,
 };
 
 type ExperienceContextValue = {

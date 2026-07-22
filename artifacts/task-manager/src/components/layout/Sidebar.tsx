@@ -23,6 +23,7 @@ import { useGetUserStats } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
 import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
 
 type SidebarProps = {
   open: boolean;
@@ -79,7 +80,7 @@ function SidebarBody({
     >
       <div
         className={cn(
-          "flex h-14 shrink-0 items-center border-b border-border/70",
+          "flex h-16 shrink-0 items-center border-b border-border/70",
           collapsed ? "justify-center px-2" : "gap-3 px-4",
         )}
       >
@@ -88,8 +89,8 @@ function SidebarBody({
             className="flex cursor-pointer items-center gap-2.5"
             title="Velocity"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.78rem] bg-[#141414] text-white shadow-[0_6px_14px_rgba(0,0,0,0.14)]">
-              <Zap className="h-4 w-4 fill-white text-white" />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-[0_6px_14px_rgba(0,0,0,0.14)]">
+              <Zap className="h-5 w-5 fill-white text-white" />
             </div>
             {!collapsed && (
               <span className="text-lg font-black tracking-tight">
@@ -133,7 +134,7 @@ function SidebarBody({
               <Link key={item.href} href={item.href} onClick={onNavigate}>
                 <div
                   className={cn(
-                    "flex cursor-pointer items-center rounded-lg text-sm font-bold transition-colors",
+                    "relative flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
                     collapsed
                       ? "h-10 justify-center px-2"
                       : "gap-3 px-2.5 py-2.5",
@@ -143,8 +144,9 @@ function SidebarBody({
                   )}
                   title={collapsed ? item.label : undefined}
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!collapsed && <span className="flex-1">{item.label}</span>}
+                  {active && <motion.span layoutId="sidebar-active" className="absolute inset-0 bg-primary" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+                  <Icon className="relative z-10 h-4 w-4 shrink-0" />
+                  {!collapsed && <span className="relative z-10 flex-1">{item.label}</span>}
                 </div>
               </Link>
             );
@@ -173,14 +175,15 @@ function SidebarBody({
                   <Link key={item.href} href={item.href} onClick={onNavigate}>
                     <div
                       className={cn(
-                        "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
+                        "relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
                         active
                           ? "bg-primary text-primary-foreground"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
+                      {active && <motion.span layoutId="sidebar-active" className="absolute inset-0 bg-primary" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+                      <Icon className="relative z-10 h-4 w-4" />
+                      <span className="relative z-10">{item.label}</span>
                     </div>
                   </Link>
                 );
@@ -347,15 +350,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         )}
       </aside>
 
-      {open && (
-        <div className="fixed inset-0 z-[70] hidden md:block lg:hidden">
-          <button
+      <AnimatePresence>
+        {open && (
+        <motion.div className="fixed inset-0 z-[70] hidden md:block lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.button
             type="button"
             aria-label="Close navigation"
             onClick={onClose}
             className="absolute inset-0 bg-black/45 backdrop-blur-sm"
           />
-          <aside className="relative h-full w-[min(82vw,280px)] border-r border-border bg-background shadow-2xl">
+          <motion.aside initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }} transition={{ type: "spring", stiffness: 330, damping: 34 }} className="relative h-full w-[min(82vw,280px)] border-r border-border bg-background shadow-2xl">
             <button
               type="button"
               onClick={onClose}
@@ -365,9 +369,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <X className="h-4 w-4" />
             </button>
             <SidebarBody onNavigate={onClose} />
-          </aside>
-        </div>
-      )}
+          </motion.aside>
+        </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

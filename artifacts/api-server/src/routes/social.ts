@@ -35,6 +35,10 @@ async function isBlocked(userId: string, otherId: string) {
   return Boolean(blocked);
 }
 
+export function isPresent<T>(value: T | null): value is T {
+  return value !== null;
+}
+
 router.get("/social/search", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const query = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 48) : "";
@@ -53,14 +57,21 @@ router.get("/social/search", async (req, res): Promise<void> => {
 router.get("/social/friends", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const rows = await db.select().from(friendshipsTable).where(and(eq(friendshipsTable.status, "accepted"), or(eq(friendshipsTable.requesterId, req.user.id), eq(friendshipsTable.recipientId, req.user.id)))).orderBy(desc(friendshipsTable.updatedAt));
-  const friends = await Promise.all(rows.map(async (row) => ({ friendshipId: row.id, ...(await publicProfile(row.requesterId === req.user.id ? row.recipientId : row.requesterId)) })));
-  res.json(friends);
+  const friends = await Promise.all(rows.map(async (row) => {
+    const profile = await publicProfile(row.requesterId === req.user.id ? row.recipientId : row.requesterId);
+    return profile ? { friendshipId: row.id, ...profile } : null;
+  }));
+  res.json(friends.filter(isPresent));
 });
 
 router.get("/social/requests", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const rows = await db.select().from(friendshipsTable).where(and(eq(friendshipsTable.recipientId, req.user.id), eq(friendshipsTable.status, "pending"))).orderBy(desc(friendshipsTable.createdAt));
-  res.json(await Promise.all(rows.map(async (row) => ({ friendshipId: row.id, ...(await publicProfile(row.requesterId)) }))));
+  const requests = await Promise.all(rows.map(async (row) => {
+    const profile = await publicProfile(row.requesterId);
+    return profile ? { friendshipId: row.id, ...profile } : null;
+  }));
+  res.json(requests.filter(isPresent));
 });
 
 router.post("/social/friends/request", async (req, res): Promise<void> => {
@@ -115,9 +126,11 @@ router.get("/social/conversations", async (req, res): Promise<void> => {
     const otherId = friend.requesterId === req.user.id ? friend.recipientId : friend.requesterId;
     const [last] = await db.select().from(directMessagesTable).where(and(isNull(directMessagesTable.deletedAt), or(and(eq(directMessagesTable.senderId, req.user.id), eq(directMessagesTable.recipientId, otherId)), and(eq(directMessagesTable.senderId, otherId), eq(directMessagesTable.recipientId, req.user.id))))).orderBy(desc(directMessagesTable.createdAt)).limit(1);
     const unread = await db.select({ id: directMessagesTable.id }).from(directMessagesTable).where(and(eq(directMessagesTable.senderId, otherId), eq(directMessagesTable.recipientId, req.user.id), isNull(directMessagesTable.readAt), isNull(directMessagesTable.deletedAt)));
-    return { friendshipId: friend.id, friend: await publicProfile(otherId), lastMessage: last ? { body: last.body, createdAt: last.createdAt, mine: last.senderId === req.user.id } : null, unreadCount: unread.length };
+    const profile = await publicProfile(otherId);
+    if (!profile) return null;
+    return { friendshipId: friend.id, friend: profile, lastMessage: last ? { body: last.body, createdAt: last.createdAt, mine: last.senderId === req.user.id } : null, unreadCount: unread.length };
   }));
-  res.json(conversations.sort((a, b) => new Date(b.lastMessage?.createdAt ?? 0).getTime() - new Date(a.lastMessage?.createdAt ?? 0).getTime()));
+  res.json(conversations.filter(isPresent).sort((a, b) => new Date(b.lastMessage?.createdAt ?? 0).getTime() - new Date(a.lastMessage?.createdAt ?? 0).getTime()));
 });
 
 router.get("/social/messages/:userId", async (req, res): Promise<void> => {
