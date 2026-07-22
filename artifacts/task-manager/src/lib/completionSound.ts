@@ -1,6 +1,7 @@
 import confetti from "canvas-confetti";
 
 let completionAudioContext: AudioContext | null = null;
+let completionAudioPrimed = false;
 
 function getCompletionAudioContext() {
   const AudioContextClass =
@@ -15,7 +16,18 @@ function getCompletionAudioContext() {
 export async function primeCompletionSound() {
   try {
     const context = getCompletionAudioContext();
-    if (context?.state === "suspended") await context.resume();
+    if (!context) return;
+    if (!completionAudioPrimed) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(0.00001, context.currentTime);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(context.currentTime);
+      oscillator.stop(context.currentTime + 0.025);
+      completionAudioPrimed = true;
+    }
+    if (context.state === "suspended") await context.resume();
   } catch {
     // Completion still succeeds when a browser blocks audio initialization.
   }
@@ -26,10 +38,11 @@ export async function playCompletionSound(ready?: Promise<void>) {
   const context = getCompletionAudioContext();
   if (!context) return;
   if (context.state === "suspended") await context.resume();
+  if (context.state !== "running") return;
 
   const master = context.createGain();
-  master.gain.setValueAtTime(0.2, context.currentTime);
-  master.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.5);
+  master.gain.setValueAtTime(0.28, context.currentTime);
+  master.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.58);
   master.connect(context.destination);
 
   [523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
@@ -42,9 +55,9 @@ export async function playCompletionSound(ready?: Promise<void>) {
     const start = context.currentTime + index * 0.055;
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.2 : 0.12, start + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.3);
     oscillator.start(start);
-    oscillator.stop(start + 0.26);
+    oscillator.stop(start + 0.32);
   });
 
   if ("vibrate" in navigator) navigator.vibrate([18, 25, 24]);

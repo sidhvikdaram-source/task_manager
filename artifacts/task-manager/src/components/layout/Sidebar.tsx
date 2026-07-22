@@ -23,7 +23,7 @@ import { useGetUserStats } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 
 type SidebarProps = {
   open: boolean;
@@ -55,6 +55,10 @@ function SidebarBody({
   const [location] = useLocation();
   const { data: stats } = useGetUserStats();
   const { preferences, updatePreferences } = useExperience();
+  const reduceMotion = useReducedMotion();
+  const activeTransition = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 440, damping: 38, mass: 0.7 };
 
   async function setAdvanced(enabled: boolean) {
     try {
@@ -74,6 +78,7 @@ function SidebarBody({
     : coreLinks;
 
   return (
+    <LayoutGroup id="velocity-sidebar-navigation">
     <div
       data-tour="primary-navigation"
       className="flex h-full min-h-0 flex-col bg-background text-foreground"
@@ -131,23 +136,24 @@ function SidebarBody({
             const Icon = item.icon;
             const active = location === item.href;
             return (
-              <Link key={item.href} href={item.href} onClick={onNavigate}>
-                <div
+              <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined}>
+                <motion.div
+                  whileTap={reduceMotion ? undefined : { scale: 0.985 }}
                   className={cn(
                     "relative flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
                     collapsed
                       ? "h-10 justify-center px-2"
                       : "gap-3 px-2.5 py-2.5",
                     active
-                      ? "bg-primary text-primary-foreground shadow-sm"
+                      ? "text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                   title={collapsed ? item.label : undefined}
                 >
-                  {active && <motion.span layoutId="sidebar-active" className="absolute inset-0 bg-primary" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+                  {active && <motion.span layoutId="sidebar-active" className="absolute inset-0 rounded-lg bg-primary shadow-sm" transition={activeTransition} />}
                   <Icon className="relative z-10 h-4 w-4 shrink-0" />
                   {!collapsed && <span className="relative z-10 flex-1">{item.label}</span>}
-                </div>
+                </motion.div>
               </Link>
             );
           })}
@@ -172,19 +178,20 @@ function SidebarBody({
                 const Icon = item.icon;
                 const active = location === item.href;
                 return (
-                  <Link key={item.href} href={item.href} onClick={onNavigate}>
-                    <div
+                  <Link key={item.href} href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined}>
+                    <motion.div
+                      whileTap={reduceMotion ? undefined : { scale: 0.985 }}
                       className={cn(
                         "relative flex cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
                         active
-                          ? "bg-primary text-primary-foreground"
+                          ? "text-primary-foreground"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground",
                       )}
                     >
-                      {active && <motion.span layoutId="sidebar-active" className="absolute inset-0 bg-primary" transition={{ type: "spring", stiffness: 380, damping: 32 }} />}
+                      {active && <motion.span layoutId="sidebar-active" className="absolute inset-0 rounded-lg bg-primary shadow-sm" transition={activeTransition} />}
                       <Icon className="relative z-10 h-4 w-4" />
                       <span className="relative z-10">{item.label}</span>
-                    </div>
+                    </motion.div>
                   </Link>
                 );
               })}
@@ -212,10 +219,11 @@ function SidebarBody({
       </div>
 
       <div className={cn("shrink-0 border-t border-border/70", collapsed ? "p-2" : "px-3 py-2")}>
-        <Link href="/settings" onClick={onNavigate}>
-          <div className={cn("flex cursor-pointer items-center rounded-lg text-sm font-bold text-muted-foreground hover:bg-muted hover:text-foreground", collapsed ? "h-10 justify-center" : "gap-3 px-2.5 py-2")} title={collapsed ? "Settings" : undefined}>
-            <Settings2 className="h-4 w-4" />{!collapsed && <span>Settings</span>}
-          </div>
+        <Link href="/settings" onClick={onNavigate} aria-current={location === "/settings" ? "page" : undefined}>
+          <motion.div whileTap={reduceMotion ? undefined : { scale: 0.985 }} className={cn("relative flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors", location === "/settings" ? "text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground", collapsed ? "h-10 justify-center" : "gap-3 px-2.5 py-2")} title={collapsed ? "Settings" : undefined}>
+            {location === "/settings" && <motion.span layoutId="sidebar-active" className="absolute inset-0 rounded-lg bg-primary shadow-sm" transition={activeTransition} />}
+            <Settings2 className="relative z-10 h-4 w-4" />{!collapsed && <span className="relative z-10">Settings</span>}
+          </motion.div>
         </Link>
       </div>
 
@@ -226,10 +234,12 @@ function SidebarBody({
             collapsed ? "p-2" : "p-3",
           )}
         >
-          <Link href="/profile" onClick={onNavigate}>
-            <div
+          <Link href="/profile" onClick={onNavigate} aria-current={location === "/profile" ? "page" : undefined}>
+            <motion.div
+              whileTap={reduceMotion ? undefined : { scale: 0.985 }}
               className={cn(
-                "flex cursor-pointer items-center rounded-lg hover:bg-muted",
+                "relative flex cursor-pointer items-center overflow-hidden rounded-lg transition-colors",
+                location === "/profile" ? "text-primary-foreground" : "hover:bg-muted",
                 collapsed ? "justify-center p-2" : "gap-3 px-2 py-2.5",
               )}
               title={
@@ -238,12 +248,13 @@ function SidebarBody({
                   : undefined
               }
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Zap className="h-4 w-4 fill-primary" />
+              {location === "/profile" && <motion.span layoutId="sidebar-active" className="absolute inset-0 rounded-lg bg-primary shadow-sm" transition={activeTransition} />}
+              <div className={cn("relative z-10 flex h-8 w-8 items-center justify-center rounded-lg", location === "/profile" ? "bg-primary-foreground/15 text-primary-foreground" : "bg-primary/10 text-primary")}>
+                <Zap className="h-4 w-4 fill-current" />
               </div>
               {!collapsed && (
                 <>
-                  <div className="min-w-0 flex-1">
+                  <div className="relative z-10 min-w-0 flex-1">
                     <p className="text-xs font-black">Tier {stats.tier}</p>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
                       <div
@@ -252,12 +263,12 @@ function SidebarBody({
                       />
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold text-muted-foreground">
+                  <span className={cn("relative z-10 text-[10px] font-bold", location === "/profile" ? "text-primary-foreground/75" : "text-muted-foreground")}>
                     {100 - stats.tierProgress} left
                   </span>
                 </>
               )}
-            </div>
+            </motion.div>
           </Link>
         </div>
       )}
@@ -274,10 +285,12 @@ function SidebarBody({
         </button>
       )}
     </div>
+    </LayoutGroup>
   );
 }
 
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const reduceMotion = useReducedMotion();
   const [width, setWidth] = useState(() => {
     const saved = Number(window.localStorage.getItem("velocity-sidebar-width"));
     return Number.isFinite(saved) ? Math.min(288, Math.max(184, saved)) : 224;
@@ -320,9 +333,11 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   return (
     <>
-      <aside
+      <motion.aside
         className="relative hidden h-[100dvh] shrink-0 border-r border-border/70 lg:block"
-        style={{ width: collapsed ? 64 : width }}
+        initial={false}
+        animate={{ width: collapsed ? 64 : width }}
+        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 42, mass: 0.7 }}
       >
         <SidebarBody
           onNavigate={() => undefined}
@@ -348,7 +363,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize transition-colors hover:bg-primary/20 focus-visible:bg-primary/25 focus-visible:outline-none"
           />
         )}
-      </aside>
+      </motion.aside>
 
       <AnimatePresence>
         {open && (

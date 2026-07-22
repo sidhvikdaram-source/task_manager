@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowUp,
+  AlertCircle,
   CalendarDays,
   FolderKanban,
   ListChecks,
@@ -35,16 +36,28 @@ export function QuickCapture({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [saving, setSaving] = useState(false);
   const [parsing, setParsing] = useState(false);
+  const [parseError, setParseError] = useState(false);
+  const [pageVisible, setPageVisible] = useState(
+    () => document.visibilityState !== "hidden",
+  );
   const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    const syncVisibility = () => setPageVisible(document.visibilityState !== "hidden");
+    document.addEventListener("visibilitychange", syncVisibility);
+    return () => document.removeEventListener("visibilitychange", syncVisibility);
+  }, []);
 
   useEffect(() => {
     if (!text.trim()) {
       setPreview(null);
       setParsing(false);
+      setParseError(false);
       return;
     }
     setPreview(null);
     setParsing(true);
+    setParseError(false);
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
@@ -55,10 +68,12 @@ export function QuickCapture({
           body: JSON.stringify({ text, contextSubject }),
           signal: controller.signal,
         });
-        if (response.ok) setPreview(await response.json());
+        if (!response.ok) throw new Error("Preview unavailable");
+        setPreview(await response.json());
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) {
           setPreview(null);
+          setParseError(true);
         }
       } finally {
         if (!controller.signal.aborted) setParsing(false);
@@ -72,7 +87,7 @@ export function QuickCapture({
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
-    if (!text.trim() || !preview?.title || saving) return;
+    if (!text.trim() || saving) return;
     setSaving(true);
     try {
       const response = await fetch("/api/quick-capture", {
@@ -81,7 +96,7 @@ export function QuickCapture({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, contextSubject }),
       });
-      const data = (await response.json()) as {
+      const data = (await response.json().catch(() => ({}))) as {
         task?: { title: string };
         error?: string;
       };
@@ -109,7 +124,7 @@ export function QuickCapture({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18 }}
     >
-      <div className="quick-capture-shell">
+      <div className="quick-capture-shell" data-page-visible={pageVisible}>
         <div className="relative z-[1] flex items-end gap-2 rounded-[calc(0.9rem-1px)] bg-background p-2">
           <textarea
             aria-label="Quick capture task"
@@ -128,10 +143,10 @@ export function QuickCapture({
           <motion.button
             type="submit"
             aria-label="Create parsed task"
-            disabled={!preview?.title || saving}
+            disabled={!text.trim() || saving}
             title="Create parsed task"
-            whileHover={!reduceMotion && preview?.title ? { y: -1 } : undefined}
-            whileTap={!reduceMotion && preview?.title ? { scale: 0.94 } : undefined}
+            whileHover={!reduceMotion && text.trim() ? { y: -1 } : undefined}
+            whileTap={!reduceMotion && text.trim() ? { scale: 0.94 } : undefined}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm disabled:opacity-40"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
@@ -193,6 +208,12 @@ export function QuickCapture({
           </motion.div>
         ) : null}
       </AnimatePresence>
+      {parseError && text.trim() && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground" role="status">
+          <AlertCircle className="h-3.5 w-3.5 text-secondary" />
+          Preview is unavailable. You can still create this task.
+        </p>
+      )}
     </motion.form>
   );
 }

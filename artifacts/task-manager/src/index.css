@@ -530,9 +530,14 @@
       transparent 360deg
     );
     animation: quick-capture-trace 4.2s linear infinite;
+    animation-play-state: paused;
     opacity: 0.55;
     transform-origin: center;
     transition: opacity 180ms ease;
+  }
+
+  .quick-capture-shell[data-page-visible="true"]::before {
+    animation-play-state: running;
   }
 
   .quick-capture-shell:focus-within {

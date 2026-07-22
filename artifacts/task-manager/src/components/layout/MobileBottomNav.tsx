@@ -15,7 +15,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { useExperience } from "@/experience";
 import { themes, useTheme, type ThemeId } from "@/theme";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ export function MobileBottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   const { preferences, updatePreferences } = useExperience();
   const { theme, setTheme } = useTheme();
+  const reduceMotion = useReducedMotion();
 
   return (
     <>
@@ -47,6 +48,7 @@ export function MobileBottomNav() {
         aria-label="Phone navigation"
         className="fixed inset-x-0 bottom-0 z-[60] border-t border-border/80 bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
       >
+        <LayoutGroup id="velocity-mobile-navigation">
         <div className="mx-auto grid h-16 max-w-lg grid-cols-5 px-2">
           {primary.map((item) => {
             const Icon = item.icon;
@@ -63,7 +65,11 @@ export function MobileBottomNav() {
                   )}
                 >
                   {active && (
-                    <span className="absolute top-1 h-1 w-6 rounded-full bg-primary" />
+                    <motion.span
+                      layoutId="mobile-nav-active"
+                      className="absolute top-1 h-1 w-7 rounded-full bg-primary"
+                      transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 480, damping: 38, mass: 0.65 }}
+                    />
                   )}
                   <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                   <span className="sr-only">{item.label}</span>
@@ -84,6 +90,7 @@ export function MobileBottomNav() {
             <Ellipsis className="h-5 w-5" />
           </button>
         </div>
+        </LayoutGroup>
       </nav>
 
       <AnimatePresence>

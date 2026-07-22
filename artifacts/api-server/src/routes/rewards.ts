@@ -168,25 +168,28 @@ router.get("/rewards", async (req, res): Promise<void> => {
   const owned = new Set(ownedRows.map((entry) => entry.itemId));
   freeCollectables.forEach((item) => owned.add(item.id));
   const newlyUnlocked = unlockedTitles.filter((item) => !owned.has(item.id));
-  if (newlyUnlocked.length) {
-    await db.insert(userCosmeticsTable).values(newlyUnlocked.map((item) => ({ userId: req.user!.id, itemId: item.id }))).onConflictDoNothing();
-    newlyUnlocked.forEach((item) => owned.add(item.id));
-  }
-  const achievementBpAwarded = await db.transaction(async (tx) => {
-    await lockEconomyUser(tx, req.user!.id);
-    let awarded = 0;
-    for (const item of unlockedTitles) {
-      const result = await awardBpInTransaction(
-        tx,
-        req.user!.id,
-        BP_RULES.achievementUnlock,
-        `achievement:${item.id}`,
-        `${item.name} unlocked`,
-      );
-      awarded += result.awarded;
-    }
-    return awarded;
-  });
+  const achievementBpAwarded = newlyUnlocked.length
+    ? await db.transaction(async (tx) => {
+        await lockEconomyUser(tx, req.user!.id);
+        await tx
+          .insert(userCosmeticsTable)
+          .values(newlyUnlocked.map((item) => ({ userId: req.user!.id, itemId: item.id })))
+          .onConflictDoNothing();
+        let awarded = 0;
+        for (const item of newlyUnlocked) {
+          const result = await awardBpInTransaction(
+            tx,
+            req.user!.id,
+            BP_RULES.achievementUnlock,
+            `achievement:${item.id}`,
+            `${item.name} unlocked`,
+          );
+          awarded += result.awarded;
+        }
+        return awarded;
+      })
+    : 0;
+  newlyUnlocked.forEach((item) => owned.add(item.id));
   const [currentStats, transactions] = await Promise.all([
     db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id)).then((rows) => rows[0]),
     db.select().from(bpTransactionsTable).where(eq(bpTransactionsTable.userId, req.user.id)).orderBy(desc(bpTransactionsTable.createdAt)).limit(12),

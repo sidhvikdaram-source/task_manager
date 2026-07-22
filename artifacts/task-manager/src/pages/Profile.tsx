@@ -48,6 +48,16 @@ type ChestOpening = {
   finalRarity: ChestRarity;
   upgraded: boolean;
 };
+type ChestOpenResponse = {
+  chest: RewardChest;
+  reward?: Reward | null;
+  bpReward?: number;
+  chestKeysReward?: number;
+  initialRarity?: ChestRarity;
+  finalRarity?: ChestRarity;
+  upgraded?: boolean;
+  error?: string;
+};
 export type RewardsResponse = {
   bpBalance: number;
   lifetimeBp: number;
@@ -90,16 +100,23 @@ export default function Profile() {
   const [ownership, setOwnership] = useState<"all" | "owned" | "locked">("all");
   const [opening, setOpening] = useState<ChestOpening | null>(null);
   const [reveal, setReveal] = useState<{ reward: Reward | null; bpReward: number; chestKeysReward: number; initialRarity: ChestRarity; rarity: ChestRarity; upgraded: boolean } | null>(null);
+  const [showAllChests, setShowAllChests] = useState(false);
   const [equippedPulse, setEquippedPulse] = useState<RewardKind | null>(null);
   const name = user?.firstName || user?.email?.split("@")[0] || "Velocity member";
 
-  const loadRewards = async () => {
-    const response = await fetch("/api/rewards", { credentials: "include" });
-    if (!response.ok) throw new Error("Customization could not be loaded");
-    const data = (await response.json()) as RewardsResponse;
+  const loadRewards = async (force = false) => {
+    const data = await queryClient.fetchQuery<RewardsResponse>({
+      queryKey: ["rewards"],
+      staleTime: force ? 0 : 30_000,
+      queryFn: async () => {
+        const response = await fetch("/api/rewards", { credentials: "include" });
+        if (!response.ok) throw new Error("Customization could not be loaded");
+        return response.json() as Promise<RewardsResponse>;
+      },
+    });
     setRewards(data);
     setRewardsError(false);
-    queryClient.setQueryData(["rewards"], data);
+    return data;
   };
 
   useEffect(() => {
@@ -116,6 +133,11 @@ export default function Profile() {
     const owned = item.repeatable ? false : rewards?.owned.includes(item.id);
     return ownership === "all" || (ownership === "owned" ? owned : !owned);
   }), [category, ownership, rewards]);
+  const sortedChests = useMemo(() => [...(rewards?.chests ?? [])].sort((a, b) => {
+    if (a.status === "unopened" && b.status !== "unopened") return -1;
+    if (a.status !== "unopened" && b.status === "unopened") return 1;
+    return new Date(b.awardedAt).getTime() - new Date(a.awardedAt).getTime();
+  }), [rewards?.chests]);
   const equippedTitle = rewards?.items.find((item) => item.id === rewards.equipped.title)?.name;
   const profileThemeClass = rewards?.equipped.profile_theme === "carbon-profile"
     ? "border-neutral-700 bg-neutral-950 text-white"
@@ -128,7 +150,7 @@ export default function Profile() {
     try {
       const response = await fetch(`/api/rewards/${item.id}/purchase`, { method: "POST", credentials: "include" });
       const data = (await response.json()) as { error?: string; bpBalance?: number };
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok) throw new Error(data.error || "Purchase failed");
       toast.success(`${item.name} purchased`, { description: `${item.priceBp} BP spent.` });
       await Promise.all([loadRewards(), refetchStats()]);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Purchase failed"); }
@@ -142,7 +164,7 @@ export default function Profile() {
     try {
       const response = await fetch(`/api/rewards/${item.id}/equip`, { method: "POST", credentials: "include" });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok) throw new Error(data.error || "Could not equip item");
       setEquippedPulse(item.kind);
       window.setTimeout(() => setEquippedPulse(null), 1200);
       toast.success(`${item.name} equipped`);
@@ -164,31 +186,70 @@ export default function Profile() {
 
   const openChest = async (chest: RewardChest) => {
     setWorking(`chest-${chest.id}`);
+    setReveal(null);
     setOpening({ stage: "shaking", initialRarity: chest.rarity, finalRarity: chest.rarity, upgraded: false });
     try {
-      const request = fetch(`/api/rewards/chests/${chest.id}/open`, { method: "POST", credentials: "include" });
-      if (!reduceMotion) await new Promise((resolve) => window.setTimeout(resolve, 700));
-      const response = await request;
-      const data = await response.json() as { reward?: Reward | null; bpReward?: number; chestKeysReward?: number; initialRarity?: ChestRarity; finalRarity?: ChestRarity; upgraded?: boolean; error?: string };
+      const startedAt = performance.now();
+      const response = await fetch(`/api/rewards/chests/${chest.id}/open`, { method: "POST", credentials: "include" });
+      const data = await response.json().catch(() => ({})) as ChestOpenResponse;
       if (!response.ok) throw new Error(data.error || "Chest could not be opened");
+      const remainingIntro = reduceMotion ? 0 : Math.max(0, 320 - (performance.now() - startedAt));
+      if (remainingIntro) await new Promise((resolve) => window.setTimeout(resolve, remainingIntro));
       const initialRarity = data.initialRarity ?? chest.rarity;
       const finalRarity = data.finalRarity ?? chest.rarity;
       const upgraded = data.upgraded ?? initialRarity !== finalRarity;
       if (upgraded) {
         setOpening({ stage: "upgrading", initialRarity, finalRarity, upgraded });
-        if (!reduceMotion) await new Promise((resolve) => window.setTimeout(resolve, 950));
+        if (!reduceMotion) await new Promise((resolve) => window.setTimeout(resolve, 520));
       }
       setOpening({ stage: "opening", initialRarity, finalRarity, upgraded });
-      if (!reduceMotion) await new Promise((resolve) => window.setTimeout(resolve, 480));
+      if (!reduceMotion) await new Promise((resolve) => window.setTimeout(resolve, 260));
+      const openedChest = data.chest ?? {
+        ...chest,
+        status: "opened" as const,
+        rarity: finalRarity,
+        rewardItemId: data.reward?.id ?? null,
+        bpReward: data.bpReward ?? 0,
+        chestKeysReward: data.chestKeysReward ?? 0,
+        openedAt: new Date().toISOString(),
+      };
+      const applyResult = (current: RewardsResponse | null | undefined) => {
+        if (!current) return current;
+        const rewardId = data.reward?.id;
+        return {
+          ...current,
+          bpBalance: current.bpBalance + (data.bpReward ?? 0),
+          lifetimeBp: current.lifetimeBp + (data.bpReward ?? 0),
+          chestKeys: current.chestKeys + (data.chestKeysReward ?? 0),
+          owned: rewardId && !current.owned.includes(rewardId)
+            ? [...current.owned, rewardId]
+            : current.owned,
+          chests: current.chests.map((item) => item.id === chest.id ? openedChest : item),
+          unopenedChestCount: Math.max(0, current.unopenedChestCount - 1),
+        };
+      };
+      setRewards((current) => applyResult(current) ?? null);
+      queryClient.setQueryData<RewardsResponse>(["rewards"], (current) => applyResult(current) ?? current);
       setOpening(null);
       setReveal({ reward: data.reward ?? null, bpReward: data.bpReward ?? 0, chestKeysReward: data.chestKeysReward ?? 0, initialRarity, rarity: finalRarity, upgraded });
-      void Promise.all([loadRewards(), refetchStats()]);
+      void Promise.all([loadRewards(true), refetchStats()]).catch(() => undefined);
     } catch (error) {
       setOpening(null);
       toast.error(error instanceof Error ? error.message : "Chest could not be opened");
     } finally {
       setWorking(null);
     }
+  };
+
+  const showChestReward = (chest: RewardChest, reward?: Reward) => {
+    setReveal({
+      reward: reward ?? null,
+      bpReward: chest.bpReward,
+      chestKeysReward: chest.chestKeysReward,
+      initialRarity: chest.rarity,
+      rarity: chest.rarity,
+      upgraded: false,
+    });
   };
 
   const useChestKey = async () => {
@@ -211,7 +272,7 @@ export default function Profile() {
     try {
       const response = await fetch("/api/user/profile", { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profileImageUrl }) });
       const data = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok) throw new Error(data.error || "Photo could not be updated");
       await loadRewards();
       toast.success(profileImageUrl ? "Profile photo updated" : "Profile photo removed");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Photo could not be updated"); }
@@ -281,7 +342,7 @@ export default function Profile() {
         </div>
       </div>
 
-      <section className="bento-card overflow-hidden">
+      <section id="reward-chests" className="bento-card scroll-mt-4 overflow-hidden">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
@@ -294,13 +355,14 @@ export default function Profile() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">{rewards?.unopenedChestCount ?? 0} unopened</span>
+            {sortedChests.length > 6 && <button type="button" onClick={() => setShowAllChests((value) => !value)} className="rounded-lg border px-3 py-1.5 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground">{showAllChests ? "Collapse" : "Show all"}</button>}
             <button type="button" onClick={() => void useChestKey()} disabled={!rewards?.chestKeys || working === "chest-key-use"} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-black disabled:opacity-45"><KeyRound className="h-3.5 w-3.5" /> {rewards?.chestKeys ?? 0} keys</button>
           </div>
         </div>
         <div className="grid gap-2 border-t p-4 sm:grid-cols-2 lg:grid-cols-3">
           {rewardsLoading && [0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-lg bg-muted/70" />)}
           {rewardsError && !rewardsLoading && <button type="button" onClick={() => { setRewardsLoading(true); void loadRewards().catch(() => { setRewardsError(true); toast.error("Customization could not be loaded"); }).finally(() => setRewardsLoading(false)); }} className="rounded-lg border border-dashed p-4 text-left text-sm font-bold text-primary">Retry loading rewards</button>}
-          {!rewardsLoading && (rewards?.chests ?? []).slice(0, 6).map((chest) => {
+          {!rewardsLoading && (showAllChests ? sortedChests : sortedChests.slice(0, 6)).map((chest) => {
             const reward = rewards?.items.find((item) => item.id === chest.rewardItemId);
             return (
               <div key={chest.id} className="flex items-center gap-3 rounded-lg border bg-muted/15 p-3">
@@ -314,6 +376,11 @@ export default function Profile() {
                 {chest.status === "unopened" && (
                   <button type="button" onClick={() => void openChest(chest)} disabled={working === `chest-${chest.id}`} className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-50">
                     Open
+                  </button>
+                )}
+                {chest.status === "opened" && (
+                  <button type="button" onClick={() => showChestReward(chest, reward)} className="rounded-lg border px-2.5 py-2 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground">
+                    View
                   </button>
                 )}
               </div>
@@ -381,9 +448,9 @@ export default function Profile() {
           </motion.button>)}
         </div>
       </motion.section>
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {opening && (
-          <motion.div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div key="chest-opening" className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div role="dialog" aria-modal="true" aria-label="Opening reward chest" className="bento-card w-full max-w-sm overflow-hidden p-7 text-center" initial={{ y: 18, scale: 0.94, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }}>
               <div className="relative mx-auto h-28 w-28">
                 <AnimatePresence mode="wait">
@@ -415,13 +482,13 @@ export default function Profile() {
           </motion.div>
         )}
         {reveal && (
-          <motion.div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setReveal(null)}>
+          <motion.div key="chest-reveal" className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setReveal(null)}>
             <motion.div role="dialog" aria-modal="true" aria-label="Chest reward" onClick={(event) => event.stopPropagation()} initial={{ y: 28, scale: 0.82, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: 16, scale: 0.92, opacity: 0 }} transition={{ type: "spring", stiffness: 290, damping: 19 }} className="bento-card w-full max-w-sm p-7 text-center">
               <motion.div animate={reduceMotion ? undefined : { y: [4, -5, 0], scale: [0.9, 1.12, 1] }} transition={{ duration: 0.58 }} className={`mx-auto flex h-20 w-20 items-center justify-center rounded-xl border ${rarityStyle(reveal.rarity)}`}><PackageOpen className="h-9 w-9" /></motion.div>
               {reveal.upgraded && <p className="mx-auto mt-4 w-fit rounded-full bg-secondary/15 px-3 py-1 text-[10px] font-black uppercase text-secondary">Upgraded from {reveal.initialRarity}</p>}
               <p className="mt-5 text-xs font-black uppercase text-muted-foreground">{reveal.rarity} reward</p>
-              <h2 className="mt-1 text-2xl font-black">{reveal.reward?.name ?? (reveal.bpReward ? `${reveal.bpReward} BP` : `${reveal.chestKeysReward} chest key${reveal.chestKeysReward === 1 ? "" : "s"}`)}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{reveal.reward ? "Added to your collection." : reveal.bpReward ? "Added to your store balance." : "Added to your chest key inventory."}</p>
+              <h2 className="mt-1 text-2xl font-black">{reveal.reward?.name ?? (reveal.bpReward ? `${reveal.bpReward} BP` : reveal.chestKeysReward ? `${reveal.chestKeysReward} chest key${reveal.chestKeysReward === 1 ? "" : "s"}` : "Reward claimed")}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{reveal.reward?.description ?? (reveal.bpReward ? "Added to your store balance." : reveal.chestKeysReward ? "Added to your chest key inventory." : "This reward is already in your collection.")}</p>
               <button type="button" onClick={() => setReveal(null)} className="mt-6 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground">Continue</button>
             </motion.div>
           </motion.div>
