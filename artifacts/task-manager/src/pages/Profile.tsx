@@ -377,28 +377,63 @@ export default function Profile() {
         <div className="grid gap-2 border-t p-4 sm:grid-cols-2 lg:grid-cols-3">
           {rewardsLoading && [0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-lg bg-muted/70" />)}
           {rewardsError && !rewardsLoading && <button type="button" onClick={() => { setRewardsLoading(true); void loadRewards().catch(() => { setRewardsError(true); toast.error("Customization could not be loaded"); }).finally(() => setRewardsLoading(false)); }} className="rounded-lg border border-dashed p-4 text-left text-sm font-bold text-primary">Retry loading rewards</button>}
-          {!rewardsLoading && (showAllChests ? sortedChests : sortedChests.slice(0, 6)).map((chest) => {
+          {!rewardsLoading && (showAllChests ? sortedChests : sortedChests.slice(0, 6)).map((chest, index) => {
             const reward = rewards?.items.find((item) => item.id === chest.rewardItemId);
+            const isOpening = working === `chest-${chest.id}`;
+            const isUnoopened = chest.status === "unopened";
             return (
-              <div key={chest.id} className="flex items-center gap-3 rounded-lg border bg-muted/15 p-3">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${chest.rarity === "legendary" ? "bg-rose-400/15 text-rose-500" : chest.rarity === "epic" ? "bg-amber-400/20 text-amber-500" : chest.rarity === "rare" ? "bg-violet-500/15 text-violet-500" : "bg-sky-500/15 text-sky-500"}`}>
+              <motion.div
+                key={chest.id}
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.04, duration: 0.2 }}
+                whileHover={reduceMotion ? undefined : { y: -2, transition: { type: "spring", stiffness: 400, damping: 28 } }}
+                className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${isUnoopened ? "border-primary/20 bg-primary/5 hover:border-primary/40" : "bg-muted/15"}`}
+              >
+                <motion.div
+                  animate={isOpening && !reduceMotion ? { rotate: [0, -8, 8, -6, 6, 0], scale: [1, 1.1, 1] } : {}}
+                  transition={{ duration: 0.5, repeat: isOpening ? Infinity : 0, repeatDelay: 0.3 }}
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+                    chest.rarity === "legendary" ? "bg-rose-400/15 text-rose-500"
+                    : chest.rarity === "epic" ? "bg-amber-400/20 text-amber-500"
+                    : chest.rarity === "rare" ? "bg-violet-500/15 text-violet-500"
+                    : "bg-sky-500/15 text-sky-500"
+                  }`}
+                >
                   {chest.status === "opened" ? <PackageOpen className="h-5 w-5" /> : <Gift className="h-5 w-5" />}
-                </div>
+                </motion.div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-black capitalize">{chest.rarity} chest</p>
-                  <p className="truncate text-[11px] text-muted-foreground">{chest.status === "opened" ? reward?.name ?? (chest.bpReward ? `${chest.bpReward} BP` : chest.chestKeysReward ? `${chest.chestKeysReward} chest key${chest.chestKeysReward === 1 ? "" : "s"}` : chest.vpFallback ? `${chest.vpFallback} legacy VP` : "Reward claimed") : chest.sourceKey.replace(/[:-]/g, " ")}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {chest.status === "opened"
+                      ? reward?.name ?? (chest.bpReward ? `+${chest.bpReward} BP` : chest.chestKeysReward ? `${chest.chestKeysReward} key${chest.chestKeysReward === 1 ? "" : "s"}` : chest.vpFallback ? `${chest.vpFallback} VP` : "Reward claimed")
+                      : chest.sourceKey.replace(/[:-]/g, " ")}
+                  </p>
                 </div>
-                {chest.status === "unopened" && (
-                  <button type="button" onClick={() => void openChest(chest)} disabled={working === `chest-${chest.id}`} className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-50">
-                    Open
-                  </button>
+                {isUnoopened && (
+                  <motion.button
+                    type="button"
+                    onClick={() => void openChest(chest)}
+                    disabled={isOpening}
+                    whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+                    whileTap={reduceMotion ? undefined : { scale: 0.95 }}
+                    className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/.3)] disabled:opacity-50 disabled:shadow-none"
+                  >
+                    {isOpening ? "..." : "Open"}
+                  </motion.button>
                 )}
                 {chest.status === "opened" && (
-                  <button type="button" onClick={() => showChestReward(chest, reward)} className="rounded-lg border px-2.5 py-2 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground">
+                  <motion.button
+                    type="button"
+                    onClick={() => showChestReward(chest, reward)}
+                    whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+                    whileTap={reduceMotion ? undefined : { scale: 0.95 }}
+                    className="rounded-lg border px-2.5 py-2 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
                     View
-                  </button>
+                  </motion.button>
                 )}
-              </div>
+              </motion.div>
             );
           })}
           {!rewardsLoading && !rewardsError && (rewards?.chests.length ?? 0) === 0 && <p className="p-4 text-sm text-muted-foreground">Your first chest unlocks at Tier 2 or after 10 completed tasks.</p>}
@@ -465,46 +500,200 @@ export default function Profile() {
       </motion.section>
       {createPortal(<AnimatePresence mode="wait">
         {opening && (
-          <motion.div key="chest-opening" className="fixed inset-0 z-[100] flex items-center justify-center bg-background/85 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div role="dialog" aria-modal="true" aria-label="Opening reward chest" className="bento-card w-full max-w-sm overflow-hidden p-7 text-center" initial={{ y: 18, scale: 0.94, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }}>
-              <div className="relative mx-auto h-28 w-28">
+          <motion.div
+            key="chest-opening"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            style={{ backgroundColor: "hsl(var(--background) / 0.88)" }}
+            initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+            animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Opening reward chest"
+              className="bento-card w-full max-w-sm overflow-hidden p-8 text-center"
+              initial={{ y: 24, scale: 0.90, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 340, damping: 26 }}
+            >
+              <div className="relative mx-auto h-36 w-36">
+                {/* Glow ring behind chest */}
+                {!reduceMotion && (
+                  <motion.div
+                    className={`absolute inset-0 rounded-3xl ${rarityStyle(opening.stage === "shaking" ? opening.initialRarity : opening.finalRarity).split(" ").slice(0, 2).join(" ")} opacity-40`}
+                    animate={opening.stage === "shaking"
+                      ? { scale: [1, 1.12, 1], opacity: [0.3, 0.55, 0.3] }
+                      : opening.stage === "upgrading"
+                        ? { scale: [1, 1.3, 1], opacity: [0.4, 0.7, 0.4], rotate: [0, 180, 360] }
+                        : { scale: [1, 1.5], opacity: [0.5, 0] }}
+                    transition={{ duration: opening.stage === "upgrading" ? 0.7 : 0.9, repeat: opening.stage !== "opening" ? Infinity : 0, ease: "easeInOut" }}
+                    style={{ filter: "blur(12px)" }}
+                  />
+                )}
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={`${opening.stage}-${opening.finalRarity}`}
-                    initial={{ opacity: 0, scale: 0.78 }}
+                    initial={{ opacity: 0, scale: 0.72, y: 8 }}
                     animate={opening.stage === "shaking" && !reduceMotion
-                      ? { opacity: 1, scale: 1, rotate: [0, -5, 5, -4, 4, 0], y: [0, -2, 0] }
+                      ? { opacity: 1, scale: 1, y: 0, rotate: [0, -6, 6, -5, 5, -3, 3, 0] }
                       : opening.stage === "upgrading" && !reduceMotion
-                        ? { opacity: 1, scale: [0.92, 1.16, 1], rotate: [0, 0, 360] }
-                        : { opacity: 1, scale: [0.9, 1.08, 1], y: [4, -5, 0] }}
-                    exit={{ opacity: 0, scale: 1.15 }}
-                    transition={{ duration: opening.stage === "upgrading" ? 0.72 : 0.52, ease: "easeOut" }}
-                    className={`absolute inset-2 flex items-center justify-center rounded-2xl border ${rarityStyle(opening.stage === "shaking" ? opening.initialRarity : opening.finalRarity)}`}
+                        ? { opacity: 1, scale: [0.88, 1.22, 1], y: 0, rotate: [0, 180, 360] }
+                        : { opacity: 1, scale: [0.85, 1.15, 1], y: [6, -8, 0] }}
+                    exit={{ opacity: 0, scale: 1.2, y: -10 }}
+                    transition={{ duration: opening.stage === "upgrading" ? 0.68 : 0.55, ease: [0.22, 1, 0.36, 1] }}
+                    className={`absolute inset-3 flex items-center justify-center rounded-2xl border-2 ${rarityStyle(opening.stage === "shaking" ? opening.initialRarity : opening.finalRarity)}`}
                   >
-                    {opening.stage === "opening" ? <PackageOpen className="h-12 w-12" /> : <Gift className="h-12 w-12" />}
+                    <motion.div
+                      animate={opening.stage === "shaking" && !reduceMotion ? { rotate: [0, -3, 3, -3, 3, 0] } : {}}
+                      transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 0.4 }}
+                    >
+                      {opening.stage === "opening" ? <PackageOpen className="h-14 w-14" /> : <Gift className="h-14 w-14" />}
+                    </motion.div>
                   </motion.div>
                 </AnimatePresence>
-                {opening.stage === "upgrading" && !reduceMotion && [0, 1, 2, 3].map((index) => (
-                  <motion.span key={index} className="absolute left-1/2 top-1/2 h-2 w-2 rounded-sm bg-current text-secondary" initial={{ x: 0, y: 0, opacity: 0 }} animate={{ x: Math.cos(index * Math.PI / 2) * 58, y: Math.sin(index * Math.PI / 2) * 58, opacity: [0, 1, 0], rotate: 90 }} transition={{ duration: 0.75, delay: index * 0.05 }} />
+                {/* Upgrade particles */}
+                {opening.stage === "upgrading" && !reduceMotion && [0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
+                  <motion.span
+                    key={index}
+                    className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full"
+                    style={{ backgroundColor: index % 2 === 0 ? "hsl(var(--secondary))" : "hsl(var(--primary))" }}
+                    initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+                    animate={{
+                      x: Math.cos((index * Math.PI * 2) / 8) * 70,
+                      y: Math.sin((index * Math.PI * 2) / 8) * 70,
+                      opacity: [0, 1, 1, 0],
+                      scale: [0, 1.2, 0.8, 0],
+                    }}
+                    transition={{ duration: 0.8, delay: index * 0.03, ease: "easeOut" }}
+                  />
+                ))}
+                {/* Opening burst particles */}
+                {opening.stage === "opening" && !reduceMotion && [0, 1, 2, 3, 4, 5].map((index) => (
+                  <motion.span
+                    key={index}
+                    className="absolute left-1/2 top-1/2 h-1.5 w-1.5 rounded-full bg-primary"
+                    initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+                    animate={{
+                      x: Math.cos((index * Math.PI * 2) / 6) * 55,
+                      y: Math.sin((index * Math.PI * 2) / 6) * 55,
+                      opacity: [0, 1, 0],
+                      scale: [0, 1, 0],
+                    }}
+                    transition={{ duration: 0.55, delay: index * 0.04, ease: "easeOut" }}
+                  />
                 ))}
               </div>
-              <div aria-live="polite" className="mt-4 min-h-16">
-                {opening.stage === "shaking" && <><p className="text-xs font-black uppercase text-muted-foreground">{opening.initialRarity} chest</p><h2 className="mt-1 text-xl font-black">Checking rarity...</h2></>}
-                {opening.stage === "upgrading" && <><p className="text-xs font-black uppercase text-secondary">Rarity upgrade</p><h2 className="mt-1 text-2xl font-black capitalize">{opening.initialRarity} to {opening.finalRarity}</h2></>}
-                {opening.stage === "opening" && <><p className="text-xs font-black uppercase text-muted-foreground">{opening.finalRarity} chest</p><h2 className="mt-1 text-xl font-black">{opening.upgraded ? "Opening upgraded chest..." : `${opening.finalRarity.charAt(0).toUpperCase()}${opening.finalRarity.slice(1)} rarity held - opening...`}</h2></>}
+              <div aria-live="polite" className="mt-5 min-h-16">
+                <AnimatePresence mode="wait">
+                  {opening.stage === "shaking" && (
+                    <motion.div key="shaking-text" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+                      <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">{opening.initialRarity} chest</p>
+                      <h2 className="mt-1 text-xl font-black">Checking rarity…</h2>
+                    </motion.div>
+                  )}
+                  {opening.stage === "upgrading" && (
+                    <motion.div key="upgrading-text" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+                      <p className="text-xs font-black uppercase tracking-widest text-secondary">Rarity upgrade!</p>
+                      <h2 className="mt-1 text-2xl font-black capitalize">{opening.initialRarity} → {opening.finalRarity}</h2>
+                    </motion.div>
+                  )}
+                  {opening.stage === "opening" && (
+                    <motion.div key="opening-text" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}>
+                      <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">{opening.finalRarity} chest</p>
+                      <h2 className="mt-1 text-xl font-black">Opening…</h2>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           </motion.div>
         )}
         {reveal && (
-          <motion.div key="chest-reveal" className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setReveal(null)}>
-            <motion.div role="dialog" aria-modal="true" aria-label="Chest reward" onClick={(event) => event.stopPropagation()} initial={{ y: 28, scale: 0.82, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: 16, scale: 0.92, opacity: 0 }} transition={{ type: "spring", stiffness: 290, damping: 19 }} className="bento-card w-full max-w-sm p-7 text-center">
-              <motion.div animate={reduceMotion ? undefined : { y: [4, -5, 0], scale: [0.9, 1.12, 1] }} transition={{ duration: 0.58 }} className={`mx-auto flex h-20 w-20 items-center justify-center rounded-xl border ${rarityStyle(reveal.rarity)}`}><PackageOpen className="h-9 w-9" /></motion.div>
-              {reveal.upgraded && <p className="mx-auto mt-4 w-fit rounded-full bg-secondary/15 px-3 py-1 text-[10px] font-black uppercase text-secondary">Upgraded from {reveal.initialRarity}</p>}
-              <p className="mt-5 text-xs font-black uppercase text-muted-foreground">{reveal.rarity} reward</p>
-              <h2 className="mt-1 text-2xl font-black">{reveal.reward?.name ?? (reveal.bpReward ? `${reveal.bpReward} BP` : reveal.chestKeysReward ? `${reveal.chestKeysReward} chest key${reveal.chestKeysReward === 1 ? "" : "s"}` : "Reward claimed")}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">{reveal.reward?.description ?? (reveal.bpReward ? "Added to your store balance." : reveal.chestKeysReward ? "Added to your chest key inventory." : "This reward is already in your collection.")}</p>
-              <button type="button" onClick={() => setReveal(null)} className="mt-6 w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground">Continue</button>
+          <motion.div
+            key="chest-reveal"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            style={{ backgroundColor: "hsl(var(--background) / 0.85)" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
+            exit={{ opacity: 0 }}
+            onClick={() => setReveal(null)}
+          >
+            {/* Scattered sparkle particles on reveal */}
+            {!reduceMotion && Array.from({ length: 12 }).map((_, index) => (
+              <motion.span
+                key={index}
+                className="pointer-events-none absolute rounded-full"
+                style={{
+                  width: Math.random() * 6 + 4,
+                  height: Math.random() * 6 + 4,
+                  left: `${20 + Math.random() * 60}%`,
+                  top: `${20 + Math.random() * 60}%`,
+                  backgroundColor: index % 3 === 0 ? "hsl(var(--secondary))" : index % 3 === 1 ? "hsl(var(--primary))" : "hsl(var(--foreground) / 0.6)",
+                }}
+                initial={{ opacity: 0, scale: 0, y: 0 }}
+                animate={{ opacity: [0, 1, 1, 0], scale: [0, 1.3, 1, 0], y: -60 - Math.random() * 60 }}
+                transition={{ duration: 1 + Math.random() * 0.5, delay: Math.random() * 0.4, ease: "easeOut" }}
+              />
+            ))}
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Chest reward"
+              onClick={(event) => event.stopPropagation()}
+              initial={{ y: 40, scale: 0.78, opacity: 0 }}
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={{ y: 20, scale: 0.92, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 22 }}
+              className="bento-card relative w-full max-w-sm overflow-hidden p-8 text-center"
+            >
+              {/* Rarity glow backdrop */}
+              {!reduceMotion && (
+                <motion.div
+                  className={`pointer-events-none absolute inset-0 ${rarityStyle(reveal.rarity).split(" ").slice(0, 2).join(" ")} opacity-10`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.12 }}
+                  transition={{ duration: 0.4 }}
+                />
+              )}
+              <motion.div
+                animate={reduceMotion ? undefined : { y: [6, -8, 0], scale: [0.82, 1.18, 1], rotate: [-5, 5, 0] }}
+                transition={{ duration: 0.65, type: "spring", stiffness: 260, damping: 18 }}
+                className={`relative mx-auto flex h-24 w-24 items-center justify-center rounded-2xl border-2 ${rarityStyle(reveal.rarity)}`}
+              >
+                <PackageOpen className="h-11 w-11" />
+              </motion.div>
+              {reveal.upgraded && (
+                <motion.p
+                  initial={{ opacity: 0, scale: 0.8, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ delay: 0.2, type: "spring" }}
+                  className="mx-auto mt-4 w-fit rounded-full bg-secondary/15 px-3 py-1 text-[10px] font-black uppercase text-secondary"
+                >
+                  ↑ Upgraded from {reveal.initialRarity}
+                </motion.p>
+              )}
+              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+                <p className="mt-5 text-xs font-black uppercase tracking-widest text-muted-foreground">{reveal.rarity} reward</p>
+                <h2 className="mt-1 text-2xl font-black">
+                  {reveal.reward?.name ?? (reveal.bpReward ? `+${reveal.bpReward} BP` : reveal.chestKeysReward ? `${reveal.chestKeysReward} chest key${reveal.chestKeysReward === 1 ? "" : "s"}` : "Reward claimed")}
+                </h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {reveal.reward?.description ?? (reveal.bpReward ? "Added to your store balance." : reveal.chestKeysReward ? "Added to your chest key inventory." : "This reward is already in your collection.")}
+                </p>
+              </motion.div>
+              <motion.button
+                type="button"
+                onClick={() => setReveal(null)}
+                whileHover={reduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+                className="relative mt-6 w-full rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/.25)]"
+              >
+                Continue
+              </motion.button>
             </motion.div>
           </motion.div>
         )}
@@ -514,5 +703,24 @@ export default function Profile() {
 }
 
 function Metric({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
-  return <div className="bento-card p-4 text-primary"><div>{icon}</div><p className="mt-2 text-2xl font-black text-foreground">{value}</p><p className="text-xs font-bold uppercase text-muted-foreground">{label}</p></div>;
+  const reduceMotion = useReducedMotion();
+  return (
+    <motion.div
+      className="bento-card bento-card-lift p-4 text-primary"
+      whileHover={reduceMotion ? undefined : { y: -3, transition: { type: "spring", stiffness: 380, damping: 28 } }}
+      whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+    >
+      <div>{icon}</div>
+      <motion.p
+        className="mt-2 text-2xl font-black text-foreground"
+        key={value}
+        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+      >
+        {value}
+      </motion.p>
+      <p className="text-xs font-bold uppercase text-muted-foreground">{label}</p>
+    </motion.div>
+  );
 }

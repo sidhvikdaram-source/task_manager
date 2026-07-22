@@ -146,6 +146,12 @@ const equipUpdates: Partial<Record<RewardKind, (itemId: string) => Partial<typeo
 
 router.get("/rewards", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  // Reset any chests stuck in "opening" state (from crashed/timed-out requests).
+  // The transaction inside openChest sets status→"opening" then →"opened" atomically,
+  // so "opening" only persists when the process died mid-request.
+  await db.update(userRewardChestsTable)
+    .set({ status: "unopened" })
+    .where(and(eq(userRewardChestsTable.userId, req.user.id), eq(userRewardChestsTable.status, "opening")));
   await reconcileRewardChests(req.user.id);
   const [stats, ownedRows, user, tasks, chests] = await Promise.all([
     db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id)).then((rows) => rows[0]),

@@ -2,7 +2,7 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
-  "packageManager": "pnpm@9.8.0",
+  "packageManager": "pnpm@10.26.1",
   "scripts": {
     "preinstall": "node -e \"const fs = require('fs'); ['package-lock.json','yarn.lock'].forEach(f => { try { fs.rmSync(f); } catch {} });\"",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
