@@ -10,6 +10,7 @@ import { MomentumIcon } from "@/components/MomentumIcon";
 import { FramePreview, PetPreview, ProfilePhoto } from "@/components/ProfileCosmetics";
 import { useQueryClient } from "@tanstack/react-query";
 import { sortRewardChests } from "@/lib/rewardUi";
+import { playCompletionEffect, completionOrigin } from "@/lib/completionSound";
 
 type RewardKind = "frame" | "pet" | "title" | "completion_effect" | "transition" | "profile_theme" | "focus_sound" | "badge_display" | "momentum_cosmetic" | "chest_key";
 type StoreCategory = "profile_customization" | "pet_cosmetics" | "focus_items" | "chest_items" | "reward_effects" | "limited_items" | "momentum_cosmetics";
@@ -153,6 +154,7 @@ export default function Profile() {
       const data = (await response.json()) as { error?: string; bpBalance?: number };
       if (!response.ok) throw new Error(data.error || "Purchase failed");
       toast.success(`${item.name} purchased`, { description: `${item.priceBp} BP spent.` });
+      playCompletionEffect("aurora-finish", completionOrigin());
       await Promise.all([loadRewards(), refetchStats()]);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Purchase failed"); }
     finally { setWorking(null); }
@@ -169,6 +171,7 @@ export default function Profile() {
       setEquippedPulse(item.kind);
       window.setTimeout(() => setEquippedPulse(null), 1200);
       toast.success(`${item.name} equipped`);
+      playCompletionEffect("prism-pop", completionOrigin());
       await loadRewards();
     } catch (error) { setRewards(previous); toast.error(error instanceof Error ? error.message : "Could not equip item"); }
     finally { setWorking(null); }

@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@workspace/replit-auth-web";
-import { Loader2, Lock, Mail, User, Users, Zap } from "lucide-react";
+import { Loader as Loader2, Lock, Mail, User, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "@/theme";
 import { useCanvasSync } from "@/hooks/useCanvasSync";
@@ -307,8 +307,15 @@ function AnimatedRoutes() {
     ? { initial: { opacity: 1 }, animate: { opacity: 1 }, exit: { opacity: 1 } }
     : variants;
   return (
-    <AnimatePresence mode="popLayout" initial={false}>
-      <motion.div key={location} initial={resolved.initial} animate={resolved.animate} exit={resolved.exit} transition={{ duration: style === "soft-glide" ? 0.2 : 0.16, ease: [0.22, 1, 0.36, 1] }} className="min-h-full will-change-transform">
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location}
+        initial={resolved.initial}
+        animate={resolved.animate}
+        exit={resolved.exit}
+        transition={{ duration: style === "soft-glide" ? 0.2 : 0.16, ease: [0.22, 1, 0.36, 1] }}
+        className="min-h-[60vh] will-change-transform"
+      >
         <PageErrorBoundary>
           <Suspense fallback={<PageLoadingSkeleton />}>
             <Switch>
