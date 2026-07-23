@@ -55,10 +55,12 @@ export function MobileBottomNav() {
             const active = location === item.href;
             return (
               <Link key={item.href} href={item.href}>
-                <button
+                <motion.button
                   type="button"
                   aria-label={item.label}
                   aria-current={active ? "page" : undefined}
+                  whileTap={reduceMotion ? undefined : { scale: 0.88 }}
+                  transition={{ type: "spring", stiffness: 480, damping: 30 }}
                   className={cn(
                     "relative flex h-16 w-full items-center justify-center text-muted-foreground transition-colors",
                     active && "text-primary",
@@ -73,7 +75,7 @@ export function MobileBottomNav() {
                   )}
                   <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                   <span className="sr-only">{item.label}</span>
-                </button>
+                </motion.button>
               </Link>
             );
           })}
@@ -108,8 +110,8 @@ export function MobileBottomNav() {
             <motion.section
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", stiffness: 330, damping: 32 }}
+              exit={{ y: "105%" }}
+              transition={{ type: "spring", stiffness: 380, damping: 34, mass: 0.85 }}
               className="absolute inset-x-0 bottom-0 max-h-[82dvh] overflow-y-auto rounded-t-2xl border-t bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl"
             >
               <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/30" />

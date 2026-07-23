@@ -145,9 +145,17 @@ export function QuickCapture({
             aria-label="Create parsed task"
             disabled={!text.trim() || saving}
             title="Create parsed task"
-            whileHover={!reduceMotion && text.trim() ? { y: -1 } : undefined}
-            whileTap={!reduceMotion && text.trim() ? { scale: 0.94 } : undefined}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm disabled:opacity-40"
+            whileHover={!reduceMotion && text.trim() ? { y: -2, scale: 1.06 } : undefined}
+            whileTap={!reduceMotion && text.trim() ? { scale: 0.93 } : undefined}
+            animate={!reduceMotion && text.trim() && !saving ? {
+              boxShadow: [
+                "0 0 8px hsl(var(--primary) / 0.22)",
+                "0 0 18px hsl(var(--primary) / 0.48)",
+                "0 0 8px hsl(var(--primary) / 0.22)",
+              ],
+            } : { boxShadow: "none" }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-40"
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
           </motion.button>
@@ -164,8 +172,9 @@ export function QuickCapture({
             key={label}
             type="button"
             onClick={() => append(value)}
-            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
-            className="rounded-md border px-2 py-1 transition-colors hover:bg-muted"
+            whileHover={reduceMotion ? undefined : { y: -1, transition: { type: "spring", stiffness: 460, damping: 28 } }}
+            whileTap={reduceMotion ? undefined : { scale: 0.95 }}
+            className="rounded-md border px-2 py-1 transition-colors hover:bg-muted hover:border-primary/30"
           >
             {label}
           </motion.button>
