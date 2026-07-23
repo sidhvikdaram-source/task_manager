@@ -134,7 +134,7 @@ function SidebarBody({
     <LayoutGroup id={`sidebar-navigation-${indicatorId}`}>
       <div
         data-tour="primary-navigation"
-        className="relative flex h-full min-h-0 flex-col bg-background text-foreground"
+        className="relative flex h-full min-w-0 flex-col overflow-x-hidden bg-background text-foreground"
       >
       {/* Logo header */}
       <div
@@ -317,6 +317,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(
     () => window.localStorage.getItem("velocity-sidebar-collapsed") === "true",
   );
+  const [resizing, setResizing] = useState(false);
 
   useEffect(() => {
     window.localStorage.setItem("velocity-sidebar-width", String(width));
@@ -328,12 +329,14 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
     event.preventDefault();
+    setResizing(true);
     const startX = event.clientX;
     const startWidth = width;
     const move = (moveEvent: PointerEvent) => {
       setWidth(Math.min(288, Math.max(184, startWidth + moveEvent.clientX - startX)));
     };
     const stop = () => {
+      setResizing(false);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       window.removeEventListener("pointermove", move);
@@ -351,7 +354,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         className="relative hidden h-[100dvh] shrink-0 border-r border-border/70 lg:block"
         initial={false}
         animate={{ width: collapsed ? 64 : width }}
-        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 42, mass: 0.7 }}
+        transition={reduceMotion || resizing ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
       >
         <SidebarBody
           onNavigate={() => undefined}
@@ -384,6 +387,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
           >
             <motion.button
               type="button"
@@ -395,7 +399,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 330, damping: 34 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
               className="relative h-full w-[min(82vw,280px)] border-r border-border bg-background shadow-2xl"
             >
               <button
