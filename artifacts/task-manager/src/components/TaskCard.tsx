@@ -73,19 +73,20 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
         layoutId={layoutId}
         initial={reduceMotion ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        whileHover={reduceMotion ? undefined : { y: -2 }}
-        whileTap={reduceMotion ? undefined : { scale: 0.995 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        whileHover={reduceMotion ? undefined : { y: -3, transition: { type: "spring", stiffness: 360, damping: 24 } }}
+        whileTap={reduceMotion ? undefined : { scale: 0.99 }}
         onClick={() => setDetailsOpen(true)}
-        className={`group relative cursor-pointer rounded-xl border bg-card p-4 shadow-sm transition-shadow hover:shadow-md ${isCompleted ? "opacity-60 grayscale-[0.5]" : ""}`}
+        className={`group relative cursor-pointer rounded-xl border bg-card p-4 shadow-sm transition-all hover:border-primary/25 hover:shadow-[0_6px_20px_hsl(var(--foreground)/.09)] ${isCompleted ? "opacity-60 grayscale-[0.5]" : ""}`}
       >
         <AnimatePresence>
         {completionPop && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 8 }}
+            initial={{ opacity: 0, scale: 0.84, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: -4 }}
-            className="pointer-events-none absolute inset-x-4 top-3 z-10 rounded-xl border border-primary/30 bg-primary px-3 py-2 text-center text-xs font-black text-primary-foreground shadow-lg"
+            exit={{ opacity: 0, scale: 1.04, y: -6 }}
+            transition={{ type: "spring", stiffness: 380, damping: 22 }}
+            className="pointer-events-none absolute inset-x-4 top-3 z-10 rounded-xl border border-primary/30 bg-primary px-3 py-2 text-center text-xs font-black text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/.4)]"
           >
             Complete +VP
           </motion.div>

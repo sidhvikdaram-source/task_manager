@@ -285,10 +285,16 @@ export default function Today() {
                     key={item}
                     type="button"
                     onClick={() => setView(item)}
-                    whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-                    className={`relative shrink-0 rounded-md px-2.5 py-1.5 text-xs font-bold ${view === item ? "text-foreground" : "text-muted-foreground"}`}
+                    whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+                    className={`relative shrink-0 rounded-md px-2.5 py-1.5 text-xs font-bold transition-colors ${view === item ? "text-foreground" : "text-muted-foreground hover:text-foreground/70"}`}
                   >
-                    {view === item && <motion.span layoutId="today-view-active" className="absolute inset-0 rounded-md bg-background shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                    {view === item && (
+                      <motion.span
+                        layoutId="today-view-active"
+                        className="absolute inset-0 rounded-md bg-background shadow-sm"
+                        transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 460, damping: 36, mass: 0.65 }}
+                      />
+                    )}
                     <span className="relative">{viewLabel(item)}</span>
                   </motion.button>
                 ),
@@ -368,10 +374,10 @@ export default function Today() {
                     key={task.id}
                     initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    whileHover={reduceMotion ? undefined : { x: 2 }}
+                    exit={{ opacity: 0, x: 12 }}
+                    whileHover={reduceMotion ? undefined : { x: 3, transition: { type: "spring", stiffness: 400, damping: 30 } }}
                     onClick={() => setSelectedTask(task.id)}
-                    className={`flex cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/35 ${isHighlighted ? "bg-primary/10 ring-2 ring-inset ring-primary/45" : ""}`}
+                    className={`group/row flex cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/40 ${isHighlighted ? "bg-primary/10 ring-2 ring-inset ring-primary/45" : ""}`}
                   >
                     <button
                       type="button"
@@ -384,7 +390,7 @@ export default function Today() {
                         isComplete ? "Task completed" : "Complete task"
                       }
                       aria-busy={taskCompletion.isPending(task.id)}
-                      className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-70"
+                      className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-all hover:scale-110 hover:bg-primary/10 hover:text-primary disabled:opacity-70"
                     >
                       <AnimatePresence mode="wait" initial={false}>
                         <motion.span key={taskCompletion.isPending(task.id) ? "pending" : isComplete ? "complete" : "open"} initial={reduceMotion ? false : { opacity: 0, scale: 0.72, rotate: -10 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} exit={reduceMotion ? undefined : { opacity: 0, scale: 0.72 }} transition={{ duration: 0.14 }}>
@@ -433,14 +439,23 @@ export default function Today() {
             </AnimatePresence>
             {isLoading && [0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 px-4 py-3.5"><Skeleton className="h-7 w-7 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-3.5 w-2/5" /><Skeleton className="h-3 w-1/4" /></div></div>)}
             {!isLoading && visibleTasks.length === 0 && (
-              <motion.div initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="px-5 py-12 text-center">
-                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <p className="mt-3 font-black">
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="px-5 py-14 text-center"
+              >
+                <motion.div
+                  animate={reduceMotion ? {} : { scale: [1, 1.06, 1] }}
+                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-[0_0_18px_hsl(var(--primary)/.15)]"
+                >
+                  <CheckCircle2 className="h-6 w-6" />
+                </motion.div>
+                <p className="mt-4 font-black">
                   {view === "completed" ? "Nothing completed yet" : "All clear"}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                   {view === "today"
                     ? "Capture something above or take a real break."
                     : "Tasks in this view will appear here."}

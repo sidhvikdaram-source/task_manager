@@ -59,13 +59,13 @@ function NavItem({
   return (
     <Link href={href} onClick={onClick} aria-current={active ? "page" : undefined}>
       <motion.div
-        whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 3, transition: { type: "spring", stiffness: 400, damping: 28 } }}
-        whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+        whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 4, transition: { type: "spring", stiffness: 420, damping: 28 } }}
+        whileTap={reduceMotion ? undefined : { scale: 0.96 }}
         initial={reduceMotion ? false : { opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay, duration: 0.18, ease: "easeOut" }}
         className={cn(
-          "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
+          "relative flex cursor-pointer items-center rounded-lg text-sm font-bold transition-colors",
           collapsed ? "h-10 justify-center px-2" : "gap-3 px-2.5 py-2.5",
           active
             ? "text-primary-foreground"
@@ -78,16 +78,16 @@ function NavItem({
           <motion.span
             layoutId={`sidebar-active-${indicatorId}`}
             aria-hidden="true"
-            className="absolute inset-0 rounded-lg bg-primary shadow-sm"
+            className="absolute inset-0 rounded-lg bg-primary shadow-[0_2px_10px_hsl(var(--primary)/.4)]"
             initial={false}
             transition={
               reduceMotion
                 ? { duration: 0 }
                 : {
                     type: "spring",
-                    stiffness: 390,
-                    damping: 31,
-                    mass: 0.72,
+                    stiffness: 480,
+                    damping: 38,
+                    mass: 0.6,
                   }
             }
           />
@@ -125,9 +125,9 @@ function SidebarBody({
     ? { duration: 0 }
     : {
         type: "spring" as const,
-        stiffness: 390,
-        damping: 31,
-        mass: 0.72,
+        stiffness: 480,
+        damping: 38,
+        mass: 0.6,
       };
 
   return (
@@ -209,11 +209,11 @@ function SidebarBody({
       <div className={cn("shrink-0 border-t border-border/70", collapsed ? "p-2" : "px-3 py-2")}>
         <Link href="/settings" onClick={onNavigate} aria-current={location === "/settings" ? "page" : undefined}>
           <motion.div
-            whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 3, transition: { type: "spring", stiffness: 400, damping: 28 } }}
-            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+            whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 4, transition: { type: "spring", stiffness: 420, damping: 28 } }}
+            whileTap={reduceMotion ? undefined : { scale: 0.96 }}
             data-sidebar-active={location === "/settings"}
             className={cn(
-              "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
+              "relative flex cursor-pointer items-center rounded-lg text-sm font-bold transition-colors",
               location === "/settings" ? "text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
               collapsed ? "h-10 justify-center" : "gap-3 px-2.5 py-2",
             )}
@@ -223,7 +223,7 @@ function SidebarBody({
               <motion.span
                 layoutId={`sidebar-active-${indicatorId}`}
                 aria-hidden="true"
-                className="absolute inset-0 rounded-lg bg-primary shadow-sm"
+                className="absolute inset-0 rounded-lg bg-primary shadow-[0_2px_10px_hsl(var(--primary)/.4)]"
                 initial={false}
                 transition={activeTransition}
               />
@@ -239,11 +239,11 @@ function SidebarBody({
         <div className={cn("shrink-0 border-t border-border/70", collapsed ? "p-2" : "p-3")}>
           <Link href="/profile" onClick={onNavigate} aria-current={location === "/profile" ? "page" : undefined}>
             <motion.div
-              whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 3, transition: { type: "spring", stiffness: 400, damping: 28 } }}
-              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 4, transition: { type: "spring", stiffness: 420, damping: 28 } }}
+              whileTap={reduceMotion ? undefined : { scale: 0.96 }}
               data-sidebar-active={location === "/profile"}
               className={cn(
-                "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg transition-colors",
+                "relative flex cursor-pointer items-center rounded-lg transition-colors",
                 location === "/profile" ? "text-primary-foreground" : "hover:bg-muted",
                 collapsed ? "justify-center p-2" : "gap-3 px-2 py-2.5",
               )}
@@ -253,7 +253,7 @@ function SidebarBody({
                 <motion.span
                   layoutId={`sidebar-active-${indicatorId}`}
                   aria-hidden="true"
-                  className="absolute inset-0 rounded-lg bg-primary shadow-sm"
+                  className="absolute inset-0 rounded-lg bg-primary shadow-[0_2px_10px_hsl(var(--primary)/.4)]"
                   initial={false}
                   transition={activeTransition}
                 />

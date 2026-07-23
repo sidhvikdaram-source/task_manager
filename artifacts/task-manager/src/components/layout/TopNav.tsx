@@ -160,14 +160,19 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
             <Menu className="h-4 w-4" />
           </button>
           <Link href="/" className="lg:hidden">
-            <div className="flex cursor-pointer items-center gap-2.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-sm">
+            <motion.div
+              className="flex cursor-pointer items-center gap-2.5"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: "spring", stiffness: 400, damping: 22 }}
+            >
+              <div className="logo-mark flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white">
                 <Zap className="h-5 w-5 fill-white text-white" />
               </div>
               <span className="hidden text-lg font-black tracking-tight text-foreground sm:inline">
                 Velocity
               </span>
-            </div>
+            </motion.div>
           </Link>
           {location === "/" ? (
             <div className="hidden min-w-0 sm:block">

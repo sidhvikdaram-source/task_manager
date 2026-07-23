@@ -479,9 +479,13 @@ export default function Profile() {
       <section id="reward-chests" className="bento-card scroll-mt-4 overflow-hidden">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary/15 text-secondary">
+            <motion.div
+              whileHover={reduceMotion ? undefined : { scale: 1.08, rotate: -6 }}
+              transition={{ type: "spring", stiffness: 380, damping: 20 }}
+              className="flex h-11 w-11 items-center justify-center rounded-lg bg-secondary/15 text-secondary shadow-[0_0_14px_hsl(var(--secondary)/.2)]"
+            >
               <Gift className="h-5 w-5" />
-            </div>
+            </motion.div>
             <div>
               <h2 className="font-black">Reward chests</h2>
               <p className="text-xs text-muted-foreground">Earned from meaningful task, focus, tier, and weekly-review milestones.</p>
@@ -506,12 +510,18 @@ export default function Profile() {
                 initial={reduceMotion ? false : { opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.04, duration: 0.2 }}
-                whileHover={reduceMotion ? undefined : { y: -2, transition: { type: "spring", stiffness: 400, damping: 28 } }}
-                className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${isUnoopened ? "border-primary/20 bg-primary/5 hover:border-primary/40" : "bg-muted/15"}`}
+                whileHover={!reduceMotion && isUnoopened ? { y: -3, transition: { type: "spring", stiffness: 400, damping: 26 } } : undefined}
+                className={`flex items-center gap-3 rounded-lg border p-3 transition-all ${isUnoopened ? "border-primary/20 bg-primary/5 hover:border-primary/45 hover:shadow-[0_4px_14px_hsl(var(--primary)/.1)]" : "bg-muted/15"}`}
               >
                 <motion.div
-                  animate={isOpening && !reduceMotion ? { rotate: [0, -8, 8, -6, 6, 0], scale: [1, 1.1, 1] } : {}}
-                  transition={{ duration: 0.5, repeat: isOpening ? Infinity : 0, repeatDelay: 0.3 }}
+                  animate={isOpening && !reduceMotion
+                    ? { rotate: [0, -8, 8, -6, 6, -4, 4, 0], scale: [1, 1.12, 1] }
+                    : isUnoopened && !reduceMotion
+                      ? { scale: [1, 1.04, 1] }
+                      : {}}
+                  transition={isOpening
+                    ? { duration: 0.55, repeat: Infinity, repeatDelay: 0.25 }
+                    : { duration: 2.5, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.5 }}
                   className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
                     chest.rarity === "legendary" ? "bg-rose-400/15 text-rose-500"
                     : chest.rarity === "epic" ? "bg-amber-400/20 text-amber-500"
@@ -534,9 +544,17 @@ export default function Profile() {
                     type="button"
                     onClick={() => void openChest(chest)}
                     disabled={working !== null}
-                    whileHover={reduceMotion ? undefined : { scale: 1.05 }}
-                    whileTap={reduceMotion ? undefined : { scale: 0.95 }}
-                    className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/.3)] disabled:opacity-50 disabled:shadow-none"
+                    whileHover={reduceMotion ? undefined : { scale: 1.06 }}
+                    whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                    animate={!reduceMotion && !working ? {
+                      boxShadow: [
+                        "0 0 12px hsl(var(--primary) / 0.28)",
+                        "0 0 24px hsl(var(--primary) / 0.52)",
+                        "0 0 12px hsl(var(--primary) / 0.28)",
+                      ],
+                    } : {}}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-50 disabled:shadow-none"
                   >
                     {isOpening ? "..." : "Open"}
                   </motion.button>
@@ -561,7 +579,7 @@ export default function Profile() {
 
       <section className="bento-card p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div><div className="flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-primary" /><h2 className="text-lg font-black">Velocity Store</h2></div><p className="mt-1 text-sm text-muted-foreground">Spend BP on optional customization. VP always stays with your progress.</p></div>
+          <div><div className="flex items-center gap-2.5"><div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><ShoppingBag className="h-4 w-4" /></div><h2 className="text-lg font-black">Velocity Store</h2></div><p className="mt-1 text-sm text-muted-foreground">Spend BP on optional customization. VP always stays with your progress.</p></div>
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-secondary/15 px-3 text-xs font-black text-secondary"><CircleDollarSign className="h-4 w-4" /> {rewards?.bpBalance ?? 0} BP</span>
             <select aria-label="Store category" value={category} onChange={(event) => setCategory(event.target.value as typeof category)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">All categories</option><option value="profile_customization">Profile customization</option><option value="pet_cosmetics">Pet cosmetics</option><option value="focus_items">Focus items</option><option value="chest_items">Chest items</option><option value="reward_effects">Reward effects</option><option value="limited_items">Limited items</option><option value="momentum_cosmetics">Momentum cosmetics</option></select>
@@ -576,8 +594,16 @@ export default function Profile() {
             const previewable = owned && (
               item.kind === "completion_effect" || item.kind === "transition"
             );
-            return <motion.article key={item.id} layout whileHover={reduceMotion ? undefined : { y: -3 }} whileTap={reduceMotion ? undefined : { scale: 0.985 }} className={`relative overflow-hidden rounded-lg border p-3 transition-colors ${equipped ? "border-primary bg-primary/10 shadow-[0_0_22px_hsl(var(--primary)/.12)]" : "bg-muted/15 hover:border-primary/40"}`}>
-              {equipped && <motion.div layoutId={`equipped-${item.kind}`} className="pointer-events-none absolute inset-0 rounded-lg border-2 border-primary" transition={{ type: "spring", stiffness: 320, damping: 26 }} />}
+            return <motion.article key={item.id} layout whileHover={reduceMotion ? undefined : { y: -5, scale: 1.018, transition: { type: "spring", stiffness: 340, damping: 22 } }} whileTap={reduceMotion ? undefined : { scale: 0.975 }} className={`relative overflow-hidden rounded-lg border p-3 transition-colors ${equipped ? "border-primary bg-primary/10 shadow-[0_0_22px_hsl(var(--primary)/.18)]" : "bg-muted/15 hover:border-primary/40 hover:shadow-[0_4px_16px_hsl(var(--foreground)/.08)]"}`}>
+              {equipped && (
+                <motion.div
+                  layoutId={`equipped-${item.kind}`}
+                  className="pointer-events-none absolute inset-0 rounded-lg border-2 border-primary"
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 360, damping: 24 }}
+                />
+              )}
               <div className="flex h-14 items-center justify-between">
                 {item.kind === "frame" && <FramePreview frameId={item.id} className="w-14" />}
                 {item.kind === "pet" && <PetPreview petId={item.id} earnedVp={rewards?.earnedVp} className="h-12 w-12" />}
@@ -804,10 +830,10 @@ export default function Profile() {
               aria-modal="true"
               aria-label="Chest reward"
               onClick={(event) => event.stopPropagation()}
-              initial={{ y: 40, scale: 0.78, opacity: 0 }}
+              initial={{ y: 50, scale: 0.75, opacity: 0 }}
               animate={{ y: 0, scale: 1, opacity: 1 }}
-              exit={{ y: 20, scale: 0.92, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 320, damping: 22 }}
+              exit={{ y: 24, scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 340, damping: 20, mass: 0.85 }}
               className="bento-card relative w-full max-w-sm overflow-hidden p-8 text-center"
             >
               {/* Rarity glow backdrop */}
@@ -820,8 +846,8 @@ export default function Profile() {
                 />
               )}
               <motion.div
-                animate={reduceMotion ? undefined : { y: [6, -8, 0], scale: [0.82, 1.18, 1], rotate: [-5, 5, 0] }}
-                transition={{ duration: 0.65, type: "spring", stiffness: 260, damping: 18 }}
+                animate={reduceMotion ? undefined : { y: [8, -12, 2, -5, 0], scale: [0.78, 1.22, 0.96, 1.04, 1], rotate: [-8, 6, -2, 1, 0] }}
+                transition={{ duration: 0.75, type: "spring", stiffness: 280, damping: 16 }}
                 className={`relative mx-auto flex h-24 w-24 items-center justify-center rounded-2xl border-2 ${rarityStyle(reveal.rarity)}`}
               >
                 <PackageOpen className="h-11 w-11" />
