@@ -44,7 +44,6 @@ function NavItem({
   collapsed,
   onClick,
   indicatorId,
-  delay = 0,
 }: {
   href: string;
   label: string;
@@ -53,17 +52,11 @@ function NavItem({
   collapsed: boolean;
   onClick: () => void;
   indicatorId: string;
-  delay?: number;
 }) {
   const reduceMotion = useReducedMotion();
   return (
     <Link href={href} onClick={onClick} aria-current={active ? "page" : undefined}>
-      <motion.div
-        whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 3, transition: { type: "spring", stiffness: 400, damping: 28 } }}
-        whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-        initial={reduceMotion ? false : { opacity: 0, x: -8 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay, duration: 0.18, ease: "easeOut" }}
+      <div
         className={cn(
           "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
           collapsed ? "h-10 justify-center px-2" : "gap-3 px-2.5 py-2.5",
@@ -94,16 +87,9 @@ function NavItem({
         )}
         <Icon className="relative z-10 h-4 w-4 shrink-0" />
         {!collapsed && (
-          <motion.span
-            className="relative z-10 flex-1"
-            initial={reduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: delay + 0.05 }}
-          >
-            {label}
-          </motion.span>
+          <span className="relative z-10 flex-1">{label}</span>
         )}
-      </motion.div>
+      </div>
     </Link>
   );
 }
@@ -189,7 +175,7 @@ function SidebarBody({
           </p>
         )}
         <nav className="space-y-0.5" aria-label="Primary navigation">
-          {navLinks.map((item, index) => (
+          {navLinks.map((item) => (
             <NavItem
               key={item.href}
               href={item.href}
@@ -199,7 +185,6 @@ function SidebarBody({
               collapsed={collapsed}
               onClick={onNavigate}
               indicatorId={indicatorId}
-              delay={index * 0.04}
             />
           ))}
         </nav>
