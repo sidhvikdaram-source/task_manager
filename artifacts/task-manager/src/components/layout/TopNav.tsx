@@ -1,4 +1,11 @@
-import React, { lazy, Suspense } from "react";
+import React, {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -24,7 +31,6 @@ import {
   useListTasks,
   type Task,
 } from "@workspace/api-client-react";
-import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { themes, useTheme, type ThemeId } from "@/theme";
 import { useExperience } from "@/experience";
@@ -80,7 +86,11 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [themesOpen, setThemesOpen] = useState(false);
-  const equippedTitle = rewards?.items.find((item) => item.id === rewards.equipped.title)?.name;
+  const equippedTitle = useMemo(
+    () =>
+      rewards?.items.find((item) => item.id === rewards.equipped.title)?.name,
+    [rewards],
+  );
   const accountRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const themesRef = useRef<HTMLDivElement>(null);
@@ -117,17 +127,21 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
     }
   }, [rewards?.newlyUnlockedTitles]);
 
-  const upcomingNotifications = (tasks ?? [])
-    .filter((task) => task.status !== "completed")
-    .map((task) => ({
-      task,
-      days: daysUntil(task.dueDate || task.calendarDate),
-    }))
-    .filter(
-      (item): item is { task: Task; days: number } =>
-        item.days !== null && item.days >= 0 && item.days <= 2,
-    )
-    .slice(0, 8);
+  const upcomingNotifications = useMemo(
+    () =>
+      (tasks ?? [])
+        .filter((task) => task.status !== "completed")
+        .map((task) => ({
+          task,
+          days: daysUntil(task.dueDate || task.calendarDate),
+        }))
+        .filter(
+          (item): item is { task: Task; days: number } =>
+            item.days !== null && item.days >= 0 && item.days <= 2,
+        )
+        .slice(0, 8),
+    [tasks],
+  );
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const pageTitles: Record<string, string> = { "/calendar": "Calendar", "/school": "Academics", "/projects": "Projects", "/focus": "Focus", "/analytics": "Insights", "/social": "Social", "/profile": "Profile", "/settings": "Settings", "/review": "Weekly review", "/workspace": "Workspace" };

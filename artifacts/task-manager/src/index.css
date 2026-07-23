@@ -517,7 +517,7 @@
     isolation: isolate;
     overflow: hidden;
     border-radius: 0.9rem;
-    padding: 1.5px;
+    padding: 2px;
     background: hsl(var(--border));
     box-shadow: 0 8px 22px hsl(var(--foreground) / 0.04);
     transition: box-shadow 200ms ease, padding 200ms ease;
@@ -526,72 +526,36 @@
   .quick-capture-shell::before {
     content: "";
     position: absolute;
-    inset: -120%;
+    inset: -150%;
     z-index: 0;
     background: conic-gradient(
       from 0deg,
-      transparent 0deg 210deg,
-      hsl(var(--primary) / 0.35) 250deg,
-      hsl(var(--primary) / 1) 300deg,
-      hsl(var(--secondary) / 0.95) 335deg,
-      hsl(var(--primary) / 0.4) 360deg,
-      transparent 370deg
+      transparent 0deg 285deg,
+      hsl(var(--primary) / 0.2) 300deg,
+      hsl(var(--primary)) 326deg,
+      hsl(var(--primary) / 0.95) 344deg,
+      transparent 360deg
     );
-    animation: quick-capture-trace 3.2s linear infinite;
+    animation: quick-capture-trace 3.2s linear infinite normal;
     animation-play-state: paused;
-    opacity: 1;
+    opacity: 0.96;
     transform-origin: center;
     will-change: transform;
-    filter: blur(1.5px);
-    transition: opacity 200ms ease, filter 200ms ease;
-  }
-
-  .quick-capture-shell::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    border-radius: 0.9rem;
-    box-shadow: 0 0 22px hsl(var(--primary) / 0.18) inset;
-    opacity: 0.6;
-    pointer-events: none;
-    transition: opacity 200ms ease, box-shadow 200ms ease;
+    transition: opacity 180ms ease;
   }
 
   .quick-capture-shell[data-page-visible="true"]::before {
     animation-play-state: running;
   }
 
-  .quick-capture-shell:hover::before {
-    opacity: 1;
-    filter: blur(2px);
-  }
-
-  .quick-capture-shell:hover::after {
-    opacity: 0.8;
-    box-shadow: 0 0 28px hsl(var(--primary) / 0.22) inset;
-  }
-
   .quick-capture-shell:focus-within {
-    padding: 2px;
     box-shadow:
-      0 12px 32px hsl(var(--primary) / 0.14),
-      0 0 0 3px hsl(var(--primary) / 0.12);
+      0 10px 28px hsl(var(--primary) / 0.1),
+      0 0 0 3px hsl(var(--primary) / 0.08);
   }
 
   .quick-capture-shell:focus-within::before {
-    animation-duration: 2.4s;
     opacity: 1;
-    filter: blur(2px);
-  }
-
-  .quick-capture-shell:focus-within::after {
-    opacity: 0.9;
-    box-shadow: 0 0 32px hsl(var(--primary) / 0.28) inset;
-  }
-
-  @keyframes quick-capture-trace {
-    to { transform: rotate(360deg); }
   }
 
   .velocity-skeleton {
@@ -608,6 +572,10 @@
     transform: translateX(-100%);
     animation: velocity-shimmer 1.45s ease-in-out infinite;
   }
+}
+
+@keyframes quick-capture-trace {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes velocity-shimmer {

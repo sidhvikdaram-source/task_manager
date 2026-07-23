@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect } from "react";
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+  type QueryKey,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export type CanvasSummary = {
@@ -51,9 +56,30 @@ async function json<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json();
 }
 
+const canvasAffectedQueryRoots = new Set([
+  "/api/tasks",
+  "/api/dashboard/overview",
+  "/api/user/stats",
+  "/api/projects",
+  "/api/subjects",
+  "canvas-events",
+  "rewards",
+]);
+const handledCanvasRuns = new Map<number, number>();
+
+export function isCanvasAffectedQuery(queryKey: QueryKey) {
+  return canvasAffectedQueryRoots.has(String(queryKey[0] ?? ""));
+}
+
+export function invalidateCanvasData(queryClient: QueryClient) {
+  return queryClient.invalidateQueries({
+    predicate: (query) => isCanvasAffectedQuery(query.queryKey),
+    refetchType: "active",
+  });
+}
+
 export function useCanvasSync(autoSync = false) {
   const queryClient = useQueryClient();
-  const announced = useRef<number | null>(null);
   const statusQuery = useQuery({
     queryKey: ["canvas-status"],
     queryFn: () => json<CanvasStatus>("/api/canvas/status"),
@@ -81,20 +107,22 @@ export function useCanvasSync(autoSync = false) {
   }, [status?.connected, running, statusQuery.refetch]);
   useEffect(() => {
     const run = status?.latestRun;
+    const integrationId = status?.integration?.id;
     if (
       !run ||
-      run.id === announced.current ||
+      !integrationId ||
+      handledCanvasRuns.get(integrationId) === run.id ||
       !["completed", "failed"].includes(run.status)
     )
       return;
-    announced.current = run.id;
+    handledCanvasRuns.set(integrationId, run.id);
     if (run.status === "failed") toast.error(run.error || "Canvas sync failed");
     else {
       const s = run.summary ?? {};
       toast.success(
         `Canvas synced: ${s.newTasks ?? 0} new, ${s.updatedTasks ?? 0} updated, ${s.completedTasks ?? 0} completed`,
       );
-      void queryClient.invalidateQueries();
+      void invalidateCanvasData(queryClient);
     }
   }, [status?.latestRun, queryClient]);
   useEffect(() => {

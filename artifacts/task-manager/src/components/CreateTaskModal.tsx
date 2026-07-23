@@ -13,8 +13,6 @@ import {
   useListProjects,
   getListTasksQueryKey,
   getGetDashboardOverviewQueryKey,
-  getGetUserStatsQueryKey,
-  getListDailyHabitsQueryKey,
   type ListTasksParams,
   type Task,
 } from '@workspace/api-client-react';
@@ -151,14 +149,10 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
         onSuccess: (createdTask) => {
           toast.success('Task created');
           seedCreatedTask(queryClient, createdTask);
-          // Invalidate AND refetch all API queries immediately
-          queryClient.invalidateQueries({ queryKey: getListTasksQueryKey(), refetchType: 'all' });
-          queryClient.invalidateQueries({ queryKey: ['/api/tasks'], refetchType: 'all' });
-          queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey(), refetchType: 'all' });
-          queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey(), refetchType: 'all' });
-          queryClient.invalidateQueries({ queryKey: getListDailyHabitsQueryKey(), refetchType: 'all' });
-          // Also refetch by partial key for any sorted/filtered variants
-          queryClient.refetchQueries({ queryKey: ['/api/tasks'] });
+          void queryClient.invalidateQueries({
+            queryKey: getGetDashboardOverviewQueryKey(),
+            refetchType: 'active',
+          });
           form.reset();
           onOpenChange(false);
           onSuccess?.();

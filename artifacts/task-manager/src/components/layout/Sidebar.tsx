@@ -1,7 +1,6 @@
 import {
   useEffect,
-  useLayoutEffect,
-  useRef,
+  useId,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
@@ -21,7 +20,6 @@ import {
 } from "lucide-react";
 import { useGetUserStats } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
-import { boundsWithin } from "@/lib/motionGeometry";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 type SidebarProps = {
@@ -45,6 +43,7 @@ function NavItem({
   active,
   collapsed,
   onClick,
+  indicatorId,
   delay = 0,
 }: {
   href: string;
@@ -53,6 +52,7 @@ function NavItem({
   active: boolean;
   collapsed: boolean;
   onClick: () => void;
+  indicatorId: string;
   delay?: number;
 }) {
   const reduceMotion = useReducedMotion();
@@ -74,6 +74,19 @@ function NavItem({
         data-sidebar-active={active}
         title={collapsed ? label : undefined}
       >
+        {active && (
+          <motion.span
+            layoutId={`sidebar-active-${indicatorId}`}
+            aria-hidden="true"
+            className="absolute inset-0 rounded-lg bg-primary shadow-sm"
+            initial={false}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 0.16, ease: [0.22, 1, 0.36, 1] }
+            }
+          />
+        )}
         <Icon className="relative z-10 h-4 w-4 shrink-0" />
         {!collapsed && (
           <motion.span
@@ -102,63 +115,16 @@ function SidebarBody({
   const [location] = useLocation();
   const { data: stats } = useGetUserStats();
   const reduceMotion = useReducedMotion();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [activeBounds, setActiveBounds] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  const indicatorId = useId();
   const activeTransition = reduceMotion
     ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 440, damping: 38, mass: 0.7 };
-
-  useLayoutEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    let frame = 0;
-    const update = () => {
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => {
-        const active = root.querySelector<HTMLElement>("[data-sidebar-active='true']");
-        if (!active) {
-          setActiveBounds(null);
-          return;
-        }
-        const rootRect = root.getBoundingClientRect();
-        const activeRect = active.getBoundingClientRect();
-        setActiveBounds(boundsWithin(rootRect, activeRect));
-      });
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(root);
-    root.addEventListener("scroll", update, true);
-    window.addEventListener("resize", update);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      observer.disconnect();
-      root.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
-    };
-  }, [collapsed, location]);
+    : { duration: 0.16, ease: [0.22, 1, 0.36, 1] as const };
 
   return (
     <div
-      ref={rootRef}
       data-tour="primary-navigation"
-      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground"
+      className="relative flex h-full min-h-0 flex-col bg-background text-foreground"
     >
-      {activeBounds && (
-        <motion.div
-          aria-hidden="true"
-          className="pointer-events-none absolute z-[1] rounded-lg bg-primary shadow-sm"
-          initial={false}
-          animate={activeBounds}
-          transition={activeTransition}
-        />
-      )}
-
       {/* Logo header */}
       <div
         className={cn(
@@ -221,6 +187,7 @@ function SidebarBody({
               active={location === item.href}
               collapsed={collapsed}
               onClick={onNavigate}
+              indicatorId={indicatorId}
               delay={index * 0.04}
             />
           ))}
@@ -241,6 +208,15 @@ function SidebarBody({
             )}
             title={collapsed ? "Settings" : undefined}
           >
+            {location === "/settings" && (
+              <motion.span
+                layoutId={`sidebar-active-${indicatorId}`}
+                aria-hidden="true"
+                className="absolute inset-0 rounded-lg bg-primary shadow-sm"
+                initial={false}
+                transition={activeTransition}
+              />
+            )}
             <Settings2 className="relative z-10 h-4 w-4" />
             {!collapsed && <span className="relative z-10">Settings</span>}
           </motion.div>
@@ -262,6 +238,15 @@ function SidebarBody({
               )}
               title={collapsed ? `Tier ${stats.tier} · ${100 - stats.tierProgress} VP to next` : undefined}
             >
+              {location === "/profile" && (
+                <motion.span
+                  layoutId={`sidebar-active-${indicatorId}`}
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-lg bg-primary shadow-sm"
+                  initial={false}
+                  transition={activeTransition}
+                />
+              )}
               <div className={cn(
                 "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
                 location === "/profile" ? "bg-primary-foreground/15 text-primary-foreground" : "bg-primary/10 text-primary",

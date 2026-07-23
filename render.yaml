@@ -9,7 +9,7 @@ services:
     branch: main
     plan: free
     region: oregon
-    buildCommand: pnpm install --prod=false && pnpm run render-build
+    buildCommand: corepack pnpm install --frozen-lockfile --prod=false && corepack pnpm run render-build
     startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
     envVars:
       - key: NODE_ENV

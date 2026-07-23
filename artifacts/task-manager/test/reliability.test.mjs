@@ -1,17 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
-import { boundsWithin } from "../src/lib/motionGeometry.ts";
 import { sortRewardChests } from "../src/lib/rewardUi.ts";
-
-test("sidebar indicator bounds remain relative to the persistent sidebar", () => {
-  assert.deepEqual(
-    boundsWithin(
-      { left: 12, top: 20, width: 224, height: 800 },
-      { left: 24, top: 310, width: 200, height: 40 },
-    ),
-    { x: 12, y: 290, width: 200, height: 40 },
-  );
-});
 
 test("unopened chests stay reachable ahead of opened reward history", () => {
   const ordered = sortRewardChests([
@@ -31,4 +21,45 @@ test("sorting chest history never mutates cached API data", () => {
   ];
   sortRewardChests(source);
   assert.deepEqual(source.map((chest) => chest.id), [1, 2]);
+});
+
+test("Quick Capture uses one visible, forward-only trace and pauses off-page", () => {
+  const css = readFileSync(
+    new URL("../src/index.css", import.meta.url),
+    "utf8",
+  );
+  const quickCapture = css.slice(
+    css.indexOf(".quick-capture-shell"),
+    css.indexOf(".velocity-skeleton"),
+  );
+
+  assert.match(quickCapture, /animation:\s*quick-capture-trace[^;]*normal/);
+  assert.match(quickCapture, /data-page-visible="true"/);
+  assert.doesNotMatch(quickCapture, /animation-direction|alternate|secondary/);
+  assert.match(
+    css,
+    /@keyframes quick-capture-trace\s*\{\s*to\s*\{\s*transform:\s*rotate\(360deg\)/,
+  );
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test("navigation and writes avoid persistent observers and global refetch storms", () => {
+  const sidebar = readFileSync(
+    new URL("../src/components/layout/Sidebar.tsx", import.meta.url),
+    "utf8",
+  );
+  const routes = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const canvas = readFileSync(
+    new URL("../src/hooks/useCanvasSync.ts", import.meta.url),
+    "utf8",
+  );
+  const createTask = readFileSync(
+    new URL("../src/components/CreateTaskModal.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.doesNotMatch(sidebar, /ResizeObserver|requestAnimationFrame/);
+  assert.doesNotMatch(routes, /mode="popLayout"|will-change-transform/);
+  assert.doesNotMatch(canvas, /queryClient\.invalidateQueries\(\)/);
+  assert.doesNotMatch(createTask, /refetchQueries|refetchType:\s*['"]all['"]/);
 });

@@ -10,6 +10,9 @@ out-tsc
 
 # dependencies
 node_modules
+# pnpm is the only supported package manager.
+package-lock.json
+yarn.lock
 
 # IDEs and editors
 /.idea

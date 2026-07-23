@@ -52,6 +52,18 @@ type Message = {
   mine: boolean;
 };
 
+function messagesMatch(current: Message[], next: Message[]) {
+  if (current.length !== next.length) return false;
+  return current.every((message, index) => {
+    const candidate = next[index];
+    return (
+      candidate?.id === message.id &&
+      candidate.body === message.body &&
+      candidate.readAt === message.readAt
+    );
+  });
+}
+
 function titleLabel(id: string) {
   if (!id || id === "none") return null;
   const special: Record<string, string> = {
@@ -156,26 +168,70 @@ export default function Social() {
   }, [query]);
   useEffect(() => {
     if (!selected) return;
+    let stopped = false;
+    let loadingConversation = false;
+    let timer = 0;
+    let lastPeopleRefresh = 0;
+    let errorShown = false;
+
+    const schedule = () => {
+      if (!stopped) timer = window.setTimeout(() => void load(), 5000);
+    };
     const load = async () => {
+      if (stopped || loadingConversation) return;
+      if (document.visibilityState === "hidden") {
+        schedule();
+        return;
+      }
+      loadingConversation = true;
       try {
-        setMessages(
-          await api<Message[]>(`/api/social/messages/${selected.id}`),
+        const next = await api<Message[]>(
+          `/api/social/messages/${selected.id}`,
         );
-        void refreshPeople();
+        if (stopped) return;
+        const valid = next.filter(
+          (message) =>
+            Number.isInteger(message?.id) && typeof message?.body === "string",
+        );
+        setMessages((current) =>
+          messagesMatch(current, valid) ? current : valid,
+        );
+        if (Date.now() - lastPeopleRefresh >= 15_000) {
+          lastPeopleRefresh = Date.now();
+          void refreshPeople().catch(() => undefined);
+        }
+        errorShown = false;
       } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Could not load conversation",
-        );
+        if (!stopped && !errorShown) {
+          errorShown = true;
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Could not load conversation",
+          );
+        }
+      } finally {
+        loadingConversation = false;
+        schedule();
       }
     };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      window.clearTimeout(timer);
+      void load();
+    };
+
     void load();
-    const timer = window.setInterval(load, 5000);
-    return () => window.clearInterval(timer);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [selected?.id]);
   useEffect(
-    () => endRef.current?.scrollIntoView({ behavior: "smooth" }),
+    () => endRef.current?.scrollIntoView({ behavior: "auto" }),
     [messages],
   );
 

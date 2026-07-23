@@ -46,6 +46,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
+import { invalidateCanvasData } from "@/hooks/useCanvasSync";
 
 interface TaskLink {
   url: string;
@@ -99,7 +100,12 @@ export function TaskDetailsModal({
 
   const handleUpdate = (field: string, value: unknown) => {
     if (field === "status" && value === "completed" && task && task.status !== "completed") {
-      void taskCompletion.complete(task, null, { onSuccess: invalidate });
+      void taskCompletion.complete(task, null, {
+        onSuccess: () =>
+          queryClient.invalidateQueries({
+            queryKey: getGetTaskQueryKey(taskId),
+          }),
+      });
       return;
     }
     updateTask.mutate(
@@ -249,7 +255,7 @@ export function TaskDetailsModal({
       return;
     }
     toast.success("Removed from Velocity. Canvas was not changed.");
-    await queryClient.invalidateQueries();
+    await invalidateCanvasData(queryClient);
     onOpenChange(false);
   };
 

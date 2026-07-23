@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "@/theme";
 import { useCanvasSync } from "@/hooks/useCanvasSync";
 import { ExperienceProvider, useExperience } from "@/experience";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -297,25 +297,26 @@ function AnimatedRoutes() {
   });
   const style = data?.equipped?.transition ?? "velocity-slide";
   const variants = style === "quick-stack"
-    ? { initial: { opacity: 0, y: 8, scale: 0.995 }, animate: { opacity: 1, y: 0, scale: 1 }, exit: { opacity: 0, y: -4, scale: 0.997 } }
+    ? { initial: { opacity: 0, y: 8, scale: 0.995 }, animate: { opacity: 1, y: 0, scale: 1 } }
     : style === "panel-sweep"
-      ? { initial: { opacity: 0, x: 14 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -8 } }
+      ? { initial: { opacity: 0, x: 14 }, animate: { opacity: 1, x: 0 } }
       : style === "soft-glide"
-        ? { initial: { opacity: 0, y: 6 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -3 } }
-        : { initial: { opacity: 0, x: 10 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -6 } };
+        ? { initial: { opacity: 0, y: 6 }, animate: { opacity: 1, y: 0 } }
+        : { initial: { opacity: 0, x: 10 }, animate: { opacity: 1, x: 0 } };
   const resolved = reduceMotion
-    ? { initial: { opacity: 1 }, animate: { opacity: 1 }, exit: { opacity: 1 } }
+    ? { initial: { opacity: 1 }, animate: { opacity: 1 } }
     : variants;
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location}
-        initial={resolved.initial}
-        animate={resolved.animate}
-        exit={resolved.exit}
-        transition={{ duration: style === "soft-glide" ? 0.2 : 0.16, ease: [0.22, 1, 0.36, 1] }}
-        className="min-h-[60vh] will-change-transform"
-      >
+    <motion.div
+      key={location}
+      initial={resolved.initial}
+      animate={resolved.animate}
+      transition={{
+        duration: style === "soft-glide" ? 0.2 : 0.16,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="min-h-full"
+    >
         <PageErrorBoundary>
           <Suspense fallback={<PageLoadingSkeleton />}>
             <Switch>
@@ -334,8 +335,7 @@ function AnimatedRoutes() {
             </Switch>
           </Suspense>
         </PageErrorBoundary>
-      </motion.div>
-    </AnimatePresence>
+    </motion.div>
   );
 }
 

@@ -123,7 +123,6 @@ export default function Today() {
   async function refresh() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] }),
-      queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() }),
       queryClient.invalidateQueries({
         queryKey: getGetDashboardOverviewQueryKey(),
       }),
@@ -188,11 +187,7 @@ export default function Today() {
   }
 
   function complete(task: Task, target?: HTMLElement | null) {
-    void taskCompletion.complete(task, target, {
-        onSuccess: async (result) => {
-          await refresh();
-        },
-      });
+    void taskCompletion.complete(task, target);
   }
 
   return (

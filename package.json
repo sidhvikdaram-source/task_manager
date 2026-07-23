@@ -3,12 +3,16 @@
   "version": "0.0.0",
   "license": "MIT",
   "packageManager": "pnpm@10.26.1",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": "10.26.1"
+  },
   "scripts": {
-    "preinstall": "node -e \"const fs = require('fs'); ['package-lock.json','yarn.lock'].forEach(f => { try { fs.rmSync(f); } catch {} });\"",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "render-build": "pnpm --filter @workspace/task-manager run build && pnpm --filter @workspace/api-server run build",
+    "preinstall": "node scripts/ensure-pnpm.mjs",
+    "build": "corepack pnpm run typecheck && corepack pnpm -r --if-present run build",
+    "render-build": "corepack pnpm --filter @workspace/task-manager run build && corepack pnpm --filter @workspace/api-server run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "corepack pnpm run typecheck:libs && corepack pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {

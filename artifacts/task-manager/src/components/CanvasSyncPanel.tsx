@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCanvasSync } from "@/hooks/useCanvasSync";
+import { invalidateCanvasData, useCanvasSync } from "@/hooks/useCanvasSync";
 
 type Subject = { id: number; name: string; color: string };
 type Suggestion = { id: number; name: string; externalTaskIds: string[] };
@@ -164,7 +164,7 @@ export function CanvasSyncPanel({
         statusQuery.refetch(),
         loadDetails(),
         onChanged(),
-        queryClient.invalidateQueries(),
+        invalidateCanvasData(queryClient),
       ]);
       toast.success(
         `Restored ${result.restoredTasks} tasks and ${result.restoredEvents} calendar items${result.reopenedCompletedTasks ? `; reopened ${result.reopenedCompletedTasks} completed` : ""}`,

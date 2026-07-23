@@ -1,6 +1,6 @@
 import { RefreshCw, Undo2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCanvasSync } from "@/hooks/useCanvasSync";
+import { invalidateCanvasData, useCanvasSync } from "@/hooks/useCanvasSync";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -30,7 +30,7 @@ export function CanvasSyncButton({ className }: { className?: string }) {
       });
       await Promise.all([
         statusQuery.refetch(),
-        queryClient.invalidateQueries(),
+        invalidateCanvasData(queryClient),
       ]);
       toast.success(
         `Restored ${result.restoredTasks} tasks and ${result.restoredEvents} calendar items${result.reopenedCompletedTasks ? `; reopened ${result.reopenedCompletedTasks} completed` : ""}`,

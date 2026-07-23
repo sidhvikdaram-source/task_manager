@@ -97,7 +97,17 @@ const petDefinitions = {
   "vector-pet": { stages: 5, icons: [Gem, Boxes, Orbit, Cpu, Sparkles], color: "bg-zinc-950 text-rose-300" },
 } as const;
 
-export function PetPreview({ petId, earnedVp = 0, className }: { petId?: string | null; earnedVp?: number; className?: string }) {
+export function PetPreview({
+  petId,
+  earnedVp = 0,
+  className,
+  animated = false,
+}: {
+  petId?: string | null;
+  earnedVp?: number;
+  className?: string;
+  animated?: boolean;
+}) {
   const reduceMotion = useReducedMotion();
   const [active, setActive] = useState(false);
   const definition = petId && petId !== "none" ? petDefinitions[petId as keyof typeof petDefinitions] : null;
@@ -107,14 +117,19 @@ export function PetPreview({ petId, earnedVp = 0, className }: { petId?: string 
   }, [definition, earnedVp]);
 
   useEffect(() => {
-    if (!definition || reduceMotion) return;
+    if (!animated || !definition || reduceMotion) return;
     const delay = 4300 + stage * 650;
+    let timeout = 0;
     const interval = window.setInterval(() => {
       setActive(true);
-      window.setTimeout(() => setActive(false), 1100);
+      window.clearTimeout(timeout);
+      timeout = window.setTimeout(() => setActive(false), 1100);
     }, delay);
-    return () => window.clearInterval(interval);
-  }, [definition, petId, reduceMotion, stage]);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, [animated, definition, petId, reduceMotion, stage]);
 
   if (!definition || !petId) return null;
   const Icon = definition.icons[stage] ?? definition.icons[0];
@@ -131,8 +146,22 @@ export function PetPreview({ petId, earnedVp = 0, className }: { petId?: string 
   return (
     <motion.div
       aria-label={`${petId.replace(/-/g, " ")} pet`}
-      animate={reduceMotion ? undefined : active ? activeAnimation : { y: [0, -2, 0] }}
-      transition={{ duration: active ? 1 : 2.8, repeat: active ? 0 : Infinity, ease: "easeInOut" }}
+      animate={
+        !animated || reduceMotion
+          ? undefined
+          : active
+            ? activeAnimation
+            : { y: [0, -2, 0] }
+      }
+      transition={
+        animated
+          ? {
+              duration: active ? 1 : 2.8,
+              repeat: active ? 0 : Infinity,
+              ease: "easeInOut",
+            }
+          : undefined
+      }
       className={cn("relative flex items-center justify-center rounded-2xl border-2 border-background shadow-lg", definition.color, className)}
     >
       <Icon className="h-[55%] w-[55%]" />

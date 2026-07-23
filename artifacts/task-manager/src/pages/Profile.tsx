@@ -329,7 +329,7 @@ export default function Profile() {
             className="relative w-fit"
           >
             <ProfilePhoto frameId={rewards?.equipped.frame} profileImageUrl={rewards?.profileImageUrl ?? user?.profileImageUrl} name={name} className="w-24" />
-            <PetPreview petId={rewards?.equipped.pet} earnedVp={rewards?.earnedVp} className="absolute -bottom-2 -right-4 h-11 w-11" />
+            <PetPreview petId={rewards?.equipped.pet} earnedVp={rewards?.earnedVp} className="absolute -bottom-2 -right-4 h-11 w-11" animated />
           </motion.div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-black uppercase text-primary">Velocity profile</p>
