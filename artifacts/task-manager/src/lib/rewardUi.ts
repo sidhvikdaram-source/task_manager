@@ -10,3 +10,15 @@ export function sortRewardChests<T extends DisplayChest>(chests: readonly T[]) {
     return new Date(b.awardedAt).getTime() - new Date(a.awardedAt).getTime();
   });
 }
+
+export function withEquippedReward<
+  T extends { equipped: Record<string, string> },
+>(rewards: T, kind: string, itemId: string): T {
+  return {
+    ...rewards,
+    equipped: {
+      ...rewards.equipped,
+      [kind]: itemId,
+    },
+  };
+}

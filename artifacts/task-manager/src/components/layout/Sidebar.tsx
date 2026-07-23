@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useGetUserStats } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 
 type SidebarProps = {
   open: boolean;
@@ -83,7 +83,12 @@ function NavItem({
             transition={
               reduceMotion
                 ? { duration: 0 }
-                : { duration: 0.16, ease: [0.22, 1, 0.36, 1] }
+                : {
+                    type: "spring",
+                    stiffness: 390,
+                    damping: 31,
+                    mass: 0.72,
+                  }
             }
           />
         )}
@@ -118,13 +123,19 @@ function SidebarBody({
   const indicatorId = useId();
   const activeTransition = reduceMotion
     ? { duration: 0 }
-    : { duration: 0.16, ease: [0.22, 1, 0.36, 1] as const };
+    : {
+        type: "spring" as const,
+        stiffness: 390,
+        damping: 31,
+        mass: 0.72,
+      };
 
   return (
-    <div
-      data-tour="primary-navigation"
-      className="relative flex h-full min-h-0 flex-col bg-background text-foreground"
-    >
+    <LayoutGroup id={`sidebar-navigation-${indicatorId}`}>
+      <div
+        data-tour="primary-navigation"
+        className="relative flex h-full min-h-0 flex-col bg-background text-foreground"
+      >
       {/* Logo header */}
       <div
         className={cn(
@@ -292,7 +303,8 @@ function SidebarBody({
           <PanelLeftOpen className="h-4 w-4" />
         </motion.button>
       )}
-    </div>
+      </div>
+    </LayoutGroup>
   );
 }
 

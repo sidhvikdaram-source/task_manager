@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { sortRewardChests } from "../src/lib/rewardUi.ts";
+import {
+  sortRewardChests,
+  withEquippedReward,
+} from "../src/lib/rewardUi.ts";
+import {
+  routeDirection,
+  transitionMotion,
+} from "../src/lib/transitionMotion.ts";
 
 test("unopened chests stay reachable ahead of opened reward history", () => {
   const ordered = sortRewardChests([
@@ -23,6 +30,43 @@ test("sorting chest history never mutates cached API data", () => {
   assert.deepEqual(source.map((chest) => chest.id), [1, 2]);
 });
 
+test("equipping a reward updates shared state without mutating the cache snapshot", () => {
+  const original = {
+    equipped: {
+      completion_effect: "clean-confetti",
+      transition: "velocity-slide",
+    },
+    owned: ["prism-pop"],
+  };
+  const updated = withEquippedReward(
+    original,
+    "completion_effect",
+    "prism-pop",
+  );
+
+  assert.equal(updated.equipped.completion_effect, "prism-pop");
+  assert.equal(original.equipped.completion_effect, "clean-confetti");
+  assert.notEqual(updated.equipped, original.equipped);
+});
+
+test("route transitions slide in the actual navigation direction", () => {
+  assert.equal(routeDirection("/", "/calendar"), 1);
+  assert.equal(routeDirection("/calendar", "/"), -1);
+
+  for (const style of [
+    "velocity-slide",
+    "soft-glide",
+    "panel-sweep",
+    "quick-stack",
+  ]) {
+    const forward = transitionMotion(style, 1);
+    const backward = transitionMotion(style, -1);
+    assert.ok(forward.initial.x > 0, `${style} should enter from the right`);
+    assert.ok(backward.initial.x < 0, `${style} should enter from the left`);
+    assert.equal(forward.animate.x, 0);
+  }
+});
+
 test("Quick Capture uses one visible, forward-only trace and pauses off-page", () => {
   const css = readFileSync(
     new URL("../src/index.css", import.meta.url),
@@ -33,12 +77,14 @@ test("Quick Capture uses one visible, forward-only trace and pauses off-page", (
     css.indexOf(".velocity-skeleton"),
   );
 
-  assert.match(quickCapture, /animation:\s*quick-capture-trace[^;]*normal/);
+  assert.match(quickCapture, /animation:\s*quick-capture-trace\s+3\.8s\s+linear\s+infinite/);
   assert.match(quickCapture, /data-page-visible="true"/);
-  assert.doesNotMatch(quickCapture, /animation-direction|alternate|secondary/);
+  assert.match(quickCapture, /conic-gradient/);
+  assert.match(quickCapture, /var\(--secondary\)/);
+  assert.doesNotMatch(quickCapture, /::before|animation-direction|alternate|rotate\(/);
   assert.match(
     css,
-    /@keyframes quick-capture-trace\s*\{\s*to\s*\{\s*transform:\s*rotate\(360deg\)/,
+    /@property --quick-capture-angle[\s\S]*@keyframes quick-capture-trace\s*\{\s*to\s*\{\s*--quick-capture-angle:\s*360deg/,
   );
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });

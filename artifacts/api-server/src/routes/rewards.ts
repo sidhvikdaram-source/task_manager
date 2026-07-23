@@ -334,7 +334,7 @@ router.post("/rewards/:itemId/equip", async (req, res): Promise<void> => {
   if (!owned) { res.status(403).json({ error: item.kind === "title" ? "Complete its requirement before equipping this title." : "Purchase this item before equipping it." }); return; }
   const update = makeUpdate(item.id);
   await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
-  res.json({ equipped: item.id });
+  res.json({ kind: item.kind, equipped: item.id });
 });
 
 router.delete("/rewards/equipped/:kind", async (req, res): Promise<void> => {
@@ -351,7 +351,7 @@ router.delete("/rewards/equipped/:kind", async (req, res): Promise<void> => {
       : "none";
   const update = makeUpdate(defaultItem);
   await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
-  res.json({ equipped: "none" });
+  res.json({ kind: req.params.kind, equipped: defaultItem });
 });
 
 export default router;

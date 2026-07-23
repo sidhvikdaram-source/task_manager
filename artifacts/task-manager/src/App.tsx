@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -12,6 +12,7 @@ import { useCanvasSync } from "@/hooks/useCanvasSync";
 import { ExperienceProvider, useExperience } from "@/experience";
 import { motion, useReducedMotion } from "framer-motion";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
+import { routeDirection, transitionMotion } from "@/lib/transitionMotion";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Today = lazy(() => import("@/pages/Today"));
@@ -287,6 +288,7 @@ function PageLoadingSkeleton() {
 function AnimatedRoutes() {
   const [location] = useLocation();
   const reduceMotion = useReducedMotion();
+  const previousLocation = useRef(location);
   const { data } = useQuery({
     queryKey: ["rewards"],
     queryFn: async () => {
@@ -296,25 +298,19 @@ function AnimatedRoutes() {
     staleTime: 60_000,
   });
   const style = data?.equipped?.transition ?? "velocity-slide";
-  const variants = style === "quick-stack"
-    ? { initial: { opacity: 0, y: 8, scale: 0.995 }, animate: { opacity: 1, y: 0, scale: 1 } }
-    : style === "panel-sweep"
-      ? { initial: { opacity: 0, x: 14 }, animate: { opacity: 1, x: 0 } }
-      : style === "soft-glide"
-        ? { initial: { opacity: 0, y: 6 }, animate: { opacity: 1, y: 0 } }
-        : { initial: { opacity: 0, x: 10 }, animate: { opacity: 1, x: 0 } };
-  const resolved = reduceMotion
-    ? { initial: { opacity: 1 }, animate: { opacity: 1 } }
-    : variants;
+  const direction = routeDirection(previousLocation.current, location);
+  const pageMotion = transitionMotion(style, direction);
+
+  useEffect(() => {
+    previousLocation.current = location;
+  }, [location]);
+
   return (
     <motion.div
       key={location}
-      initial={resolved.initial}
-      animate={resolved.animate}
-      transition={{
-        duration: style === "soft-glide" ? 0.2 : 0.16,
-        ease: [0.22, 1, 0.36, 1],
-      }}
+      initial={reduceMotion ? false : pageMotion.initial}
+      animate={pageMotion.animate}
+      transition={reduceMotion ? { duration: 0 } : pageMotion.transition}
       className="min-h-full"
     >
         <PageErrorBoundary>

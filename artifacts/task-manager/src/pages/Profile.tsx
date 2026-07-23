@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Award, BadgeCheck, Check, CircleDollarSign, Gift, Headphones, ImagePlus, KeyRound, Lock, Navigation2, PackageOpen, Palette, PartyPopper, ShoppingBag, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
+import { Award, BadgeCheck, Check, CircleDollarSign, Gift, Headphones, ImagePlus, KeyRound, Lock, Navigation2, PackageOpen, Palette, PartyPopper, Play, ShoppingBag, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useGetUserStats } from "@workspace/api-client-react";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -9,8 +9,9 @@ import { toast } from "sonner";
 import { MomentumIcon } from "@/components/MomentumIcon";
 import { FramePreview, PetPreview, ProfilePhoto } from "@/components/ProfileCosmetics";
 import { useQueryClient } from "@tanstack/react-query";
-import { sortRewardChests } from "@/lib/rewardUi";
+import { sortRewardChests, withEquippedReward } from "@/lib/rewardUi";
 import { playCompletionEffect, completionOrigin } from "@/lib/completionSound";
+import { transitionMotion } from "@/lib/transitionMotion";
 
 type RewardKind = "frame" | "pet" | "title" | "completion_effect" | "transition" | "profile_theme" | "focus_sound" | "badge_display" | "momentum_cosmetic" | "chest_key";
 type StoreCategory = "profile_customization" | "pet_cosmetics" | "focus_items" | "chest_items" | "reward_effects" | "limited_items" | "momentum_cosmetics";
@@ -105,6 +106,13 @@ export default function Profile() {
   const [reveal, setReveal] = useState<{ reward: Reward | null; bpReward: number; chestKeysReward: number; initialRarity: ChestRarity; rarity: ChestRarity; upgraded: boolean } | null>(null);
   const [showAllChests, setShowAllChests] = useState(false);
   const [equippedPulse, setEquippedPulse] = useState<RewardKind | null>(null);
+  const [transitionPreview, setTransitionPreview] = useState<{
+    id: string;
+    name: string;
+    sequence: number;
+  } | null>(null);
+  const equippedPulseTimer = useRef<number | null>(null);
+  const transitionPreviewTimer = useRef<number | null>(null);
   const name = user?.firstName || user?.email?.split("@")[0] || "Velocity member";
 
   const loadRewards = async (force = false) => {
@@ -131,6 +139,11 @@ export default function Profile() {
       .finally(() => setRewardsLoading(false));
   }, []);
 
+  useEffect(() => () => {
+    if (equippedPulseTimer.current) window.clearTimeout(equippedPulseTimer.current);
+    if (transitionPreviewTimer.current) window.clearTimeout(transitionPreviewTimer.current);
+  }, []);
+
   const visibleItems = useMemo(() => (rewards?.items ?? []).filter((item) => {
     if (category !== "all" && item.category !== category) return false;
     const owned = item.repeatable ? false : rewards?.owned.includes(item.id);
@@ -147,48 +160,130 @@ export default function Profile() {
       ? "border-primary/40 bg-primary/5"
       : "";
 
+  const previewReward = (item: Reward, target?: HTMLElement | null) => {
+    if (item.kind === "completion_effect") {
+      playCompletionEffect(item.id, completionOrigin(target));
+      return;
+    }
+    if (item.kind !== "transition") return;
+    if (transitionPreviewTimer.current) {
+      window.clearTimeout(transitionPreviewTimer.current);
+    }
+    setTransitionPreview({
+      id: item.id,
+      name: item.name,
+      sequence: Date.now(),
+    });
+    transitionPreviewTimer.current = window.setTimeout(
+      () => setTransitionPreview(null),
+      1_250,
+    );
+  };
+
   const purchase = async (item: Reward) => {
+    if (working) return;
     setWorking(item.id);
     try {
       const response = await fetch(`/api/rewards/${item.id}/purchase`, { method: "POST", credentials: "include" });
-      const data = (await response.json()) as { error?: string; bpBalance?: number };
+      const data = (await response.json()) as {
+        error?: string;
+        bpBalance?: number;
+        chestKeys?: number;
+      };
       if (!response.ok) throw new Error(data.error || "Purchase failed");
+      const applyPurchase = (current: RewardsResponse | null | undefined) => {
+        if (!current) return current;
+        return {
+          ...current,
+          bpBalance: data.bpBalance ?? current.bpBalance,
+          chestKeys: data.chestKeys ?? current.chestKeys,
+          owned: item.repeatable || current.owned.includes(item.id)
+            ? current.owned
+            : [...current.owned, item.id],
+        };
+      };
+      setRewards((current) => applyPurchase(current) ?? null);
+      queryClient.setQueryData<RewardsResponse>(["rewards"], (current) =>
+        applyPurchase(current) ?? current,
+      );
       toast.success(`${item.name} purchased`, { description: `${item.priceBp} BP spent.` });
       playCompletionEffect("aurora-finish", completionOrigin());
-      await Promise.all([loadRewards(), refetchStats()]);
+      void Promise.all([loadRewards(true), refetchStats()]).catch(() => undefined);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Purchase failed"); }
     finally { setWorking(null); }
   };
 
   const equip = async (item: Reward) => {
+    if (working) return;
     setWorking(item.id);
     const previous = rewards;
-    setRewards((current) => current ? { ...current, equipped: { ...current.equipped, [item.kind]: item.id } } : current);
+    const previousCache = queryClient.getQueryData<RewardsResponse>(["rewards"]);
+    const applyEquipped = (current: RewardsResponse | null | undefined) =>
+      current ? withEquippedReward(current, item.kind, item.id) : current;
     try {
+      await queryClient.cancelQueries({ queryKey: ["rewards"] });
+      setRewards((current) => applyEquipped(current) ?? null);
+      queryClient.setQueryData<RewardsResponse>(["rewards"], (current) =>
+        applyEquipped(current) ?? current,
+      );
       const response = await fetch(`/api/rewards/${item.id}/equip`, { method: "POST", credentials: "include" });
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error || "Could not equip item");
       setEquippedPulse(item.kind);
-      window.setTimeout(() => setEquippedPulse(null), 1200);
+      if (equippedPulseTimer.current) window.clearTimeout(equippedPulseTimer.current);
+      equippedPulseTimer.current = window.setTimeout(() => setEquippedPulse(null), 1200);
       toast.success(`${item.name} equipped`);
-      playCompletionEffect("prism-pop", completionOrigin());
-      await loadRewards();
-    } catch (error) { setRewards(previous); toast.error(error instanceof Error ? error.message : "Could not equip item"); }
+      previewReward(item);
+      try {
+        await loadRewards(true);
+      } catch {
+        queryClient.setQueryData(["rewards"], applyEquipped(previousCache));
+      }
+    } catch (error) {
+      setRewards(previous);
+      queryClient.setQueryData(["rewards"], previousCache);
+      toast.error(error instanceof Error ? error.message : "Could not equip item");
+    }
     finally { setWorking(null); }
   };
 
   const unequip = async (kind: RewardKind) => {
+    if (working) return;
     setWorking(`none-${kind}`);
+    const previous = rewards;
+    const previousCache = queryClient.getQueryData<RewardsResponse>(["rewards"]);
+    const defaultItem = kind === "completion_effect"
+      ? "clean-confetti"
+      : kind === "transition"
+        ? "velocity-slide"
+        : "none";
+    const applyDefault = (current: RewardsResponse | null | undefined) =>
+      current ? withEquippedReward(current, kind, defaultItem) : current;
     try {
+      await queryClient.cancelQueries({ queryKey: ["rewards"] });
+      setRewards((current) => applyDefault(current) ?? null);
+      queryClient.setQueryData<RewardsResponse>(["rewards"], (current) =>
+        applyDefault(current) ?? current,
+      );
       const response = await fetch(`/api/rewards/equipped/${kind}`, { method: "DELETE", credentials: "include" });
-      if (!response.ok) throw new Error("Could not remove item");
-      await loadRewards();
+      const data = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(data.error || "Could not remove item");
+      try {
+        await loadRewards(true);
+      } catch {
+        queryClient.setQueryData(["rewards"], applyDefault(previousCache));
+      }
       toast.success(`${kind === "pet" ? "Pet" : kind.replace("_", " ")} reset`);
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not remove item"); }
+    } catch (error) {
+      setRewards(previous);
+      queryClient.setQueryData(["rewards"], previousCache);
+      toast.error(error instanceof Error ? error.message : "Could not remove item");
+    }
     finally { setWorking(null); }
   };
 
   const openChest = async (chest: RewardChest) => {
+    if (working) return;
     setWorking(`chest-${chest.id}`);
     setReveal(null);
     setOpening({ stage: "shaking", initialRarity: chest.rarity, finalRarity: chest.rarity, upgraded: false });
@@ -271,12 +366,32 @@ export default function Profile() {
   };
 
   const useChestKey = async () => {
+    if (working) return;
     setWorking("chest-key-use");
     try {
       const response = await fetch("/api/rewards/chests/key/use", { method: "POST", credentials: "include" });
-      const data = await response.json() as { error?: string };
+      const data = await response.json() as {
+        error?: string;
+        chest?: RewardChest;
+        chestKeys?: number;
+      };
       if (!response.ok) throw new Error(data.error || "Chest key could not be used");
-      await loadRewards();
+      if (data.chest) {
+        const applyKeyUse = (current: RewardsResponse | null | undefined) => {
+          if (!current) return current;
+          return {
+            ...current,
+            chestKeys: data.chestKeys ?? Math.max(0, current.chestKeys - 1),
+            chests: [data.chest!, ...current.chests],
+            unopenedChestCount: current.unopenedChestCount + 1,
+          };
+        };
+        setRewards((current) => applyKeyUse(current) ?? null);
+        queryClient.setQueryData<RewardsResponse>(["rewards"], (current) =>
+          applyKeyUse(current) ?? current,
+        );
+      }
+      void loadRewards(true).catch(() => undefined);
       toast.success("Chest key used", { description: "A new Common chest is ready to open." });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Chest key could not be used");
@@ -286,12 +401,13 @@ export default function Profile() {
   };
 
   const updatePhoto = async (profileImageUrl: string | null) => {
+    if (working) return;
     setWorking("profile-photo");
     try {
       const response = await fetch("/api/user/profile", { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profileImageUrl }) });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || "Photo could not be updated");
-      await loadRewards();
+      await loadRewards(true);
       toast.success(profileImageUrl ? "Profile photo updated" : "Profile photo removed");
     } catch (error) { toast.error(error instanceof Error ? error.message : "Photo could not be updated"); }
     finally { setWorking(null); }
@@ -374,7 +490,7 @@ export default function Profile() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-black text-primary">{rewards?.unopenedChestCount ?? 0} unopened</span>
             {sortedChests.length > 6 && <button type="button" onClick={() => setShowAllChests((value) => !value)} className="rounded-lg border px-3 py-1.5 text-xs font-black text-muted-foreground hover:bg-muted hover:text-foreground">{showAllChests ? "Collapse" : "Show all"}</button>}
-            <button type="button" onClick={() => void useChestKey()} disabled={!rewards?.chestKeys || working === "chest-key-use"} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-black disabled:opacity-45"><KeyRound className="h-3.5 w-3.5" /> {rewards?.chestKeys ?? 0} keys</button>
+            <button type="button" onClick={() => void useChestKey()} disabled={!rewards?.chestKeys || working !== null} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-black disabled:opacity-45"><KeyRound className="h-3.5 w-3.5" /> {rewards?.chestKeys ?? 0} keys</button>
           </div>
         </div>
         <div className="grid gap-2 border-t p-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -417,7 +533,7 @@ export default function Profile() {
                   <motion.button
                     type="button"
                     onClick={() => void openChest(chest)}
-                    disabled={isOpening}
+                    disabled={working !== null}
                     whileHover={reduceMotion ? undefined : { scale: 1.05 }}
                     whileTap={reduceMotion ? undefined : { scale: 0.95 }}
                     className="rounded-lg bg-primary px-3 py-2 text-xs font-black text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/.3)] disabled:opacity-50 disabled:shadow-none"
@@ -457,6 +573,9 @@ export default function Profile() {
           {visibleItems.map((item) => {
             const owned = !item.repeatable && (rewards?.owned.includes(item.id) ?? false);
             const equipped = item.equipable && rewards?.equipped[item.kind] === item.id;
+            const previewable = owned && (
+              item.kind === "completion_effect" || item.kind === "transition"
+            );
             return <motion.article key={item.id} layout whileHover={reduceMotion ? undefined : { y: -3 }} whileTap={reduceMotion ? undefined : { scale: 0.985 }} className={`relative overflow-hidden rounded-lg border p-3 transition-colors ${equipped ? "border-primary bg-primary/10 shadow-[0_0_22px_hsl(var(--primary)/.12)]" : "bg-muted/15 hover:border-primary/40"}`}>
               {equipped && <motion.div layoutId={`equipped-${item.kind}`} className="pointer-events-none absolute inset-0 rounded-lg border-2 border-primary" transition={{ type: "spring", stiffness: 320, damping: 26 }} />}
               <div className="flex h-14 items-center justify-between">
@@ -474,12 +593,26 @@ export default function Profile() {
               </div>
               <div className="mt-3 flex items-start justify-between gap-2"><p className="min-h-10 text-sm font-black leading-tight">{item.name}</p><span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${rarityStyle(item.rarity).split(" ").slice(0, 3).join(" ")}`}>{item.rarity}</span></div>
               <p className="min-h-12 text-[11px] leading-4 text-muted-foreground">{item.description || item.requirement}</p>
-              {item.lockReason ? <div className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Lock className="h-3.5 w-3.5" /> {item.lockReason}</div> : owned && item.equipable ? <button disabled={working === item.id || equipped} onClick={() => void equip(item)} className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-2 text-xs font-black text-primary-foreground disabled:opacity-55">{equipped ? <><Check className="h-3.5 w-3.5" /> Equipped</> : "Equip"}</button> : owned ? <div className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-primary"><Check className="h-3.5 w-3.5" /> Owned</div> : item.source === "chest" ? <div className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Gift className="h-3.5 w-3.5" /> Chest reward</div> : item.source === "quest" || item.source === "achievement" || item.source === "tier" ? <div className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Lock className="h-3.5 w-3.5" /> {item.requirement ?? "Earn to unlock"}</div> : <button disabled={working === item.id || (rewards?.bpBalance ?? 0) < item.priceBp} onClick={() => void purchase(item)} className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-secondary px-2 text-xs font-black text-secondary-foreground disabled:opacity-55"><CircleDollarSign className="h-3.5 w-3.5" /> {item.priceBp} BP</button>}
+              <div className="mt-3 flex gap-2">
+                {previewable && (
+                  <button
+                    type="button"
+                    aria-label={`Preview ${item.name}`}
+                    title={`Preview ${item.name}`}
+                    disabled={working !== null}
+                    onClick={(event) => previewReward(item, event.currentTarget)}
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary disabled:opacity-45"
+                  >
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                  </button>
+                )}
+                {item.lockReason ? <div className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Lock className="h-3.5 w-3.5" /> {item.lockReason}</div> : owned && item.equipable ? <button disabled={working !== null || equipped} onClick={() => void equip(item)} className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-2 text-xs font-black text-primary-foreground disabled:opacity-55">{equipped ? <><Check className="h-3.5 w-3.5" /> Equipped</> : "Equip"}</button> : owned ? <div className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-primary"><Check className="h-3.5 w-3.5" /> Owned</div> : item.source === "chest" ? <div className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Gift className="h-3.5 w-3.5" /> Chest reward</div> : item.source === "quest" || item.source === "achievement" || item.source === "tier" ? <div className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Lock className="h-3.5 w-3.5" /> {item.requirement ?? "Earn to unlock"}</div> : <button disabled={working !== null || (rewards?.bpBalance ?? 0) < item.priceBp} onClick={() => void purchase(item)} className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-secondary px-2 text-xs font-black text-secondary-foreground disabled:opacity-55"><CircleDollarSign className="h-3.5 w-3.5" /> {item.priceBp} BP</button>}
+              </div>
             </motion.article>;
           })}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {(["frame", "pet", "title", "completion_effect", "transition", "profile_theme", "focus_sound", "badge_display", "momentum_cosmetic"] as const).map((kind) => rewards?.equipped[kind] !== "none" && <button key={kind} onClick={() => void unequip(kind)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold hover:bg-muted"><X className="h-3.5 w-3.5" /> Remove {kind === "pet" ? "pet" : kind.replace("_", " ")}</button>)}
+          {(["frame", "pet", "title", "completion_effect", "transition", "profile_theme", "focus_sound", "badge_display", "momentum_cosmetic"] as const).map((kind) => rewards?.equipped[kind] !== "none" && <button key={kind} disabled={working !== null} onClick={() => void unequip(kind)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold hover:bg-muted disabled:opacity-45"><X className="h-3.5 w-3.5" /> Remove {kind === "pet" ? "pet" : kind.replace("_", " ")}</button>)}
         </div>
       </section>
 
@@ -501,6 +634,33 @@ export default function Profile() {
           </motion.button>)}
         </div>
       </motion.section>
+      {createPortal(
+        <AnimatePresence>
+          {transitionPreview && (() => {
+            const preview = transitionMotion(transitionPreview.id);
+            return (
+              <motion.div
+                key={transitionPreview.sequence}
+                role="status"
+                initial={reduceMotion ? false : preview.initial}
+                animate={preview.animate}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -24 }}
+                transition={reduceMotion ? { duration: 0 } : preview.transition}
+                className="pointer-events-none fixed bottom-20 right-4 z-[110] flex w-[min(20rem,calc(100vw-2rem))] items-center gap-3 rounded-lg border border-primary/30 bg-background/95 px-4 py-3 shadow-xl backdrop-blur-md md:bottom-5"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Navigation2 className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[10px] font-black uppercase text-muted-foreground">Transition preview</span>
+                  <span className="block truncate text-sm font-black">{transitionPreview.name}</span>
+                </span>
+              </motion.div>
+            );
+          })()}
+        </AnimatePresence>,
+        document.body,
+      )}
       {createPortal(<AnimatePresence mode="wait">
         {opening && (
           <motion.div
