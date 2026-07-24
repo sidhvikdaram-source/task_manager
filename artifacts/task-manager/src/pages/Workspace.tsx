@@ -87,6 +87,15 @@ export default function Workspace() {
   const [recommendation, setRecommendation] = useState<{
     recommendation: WorkTask | null;
     reason: string;
+    fit: {
+      requestedMinutes: number;
+      estimatedMinutes: number;
+      energy: string;
+      workload: string;
+      canFinish: boolean;
+      priority: string;
+      dueInDays: number;
+    } | null;
   } | null>(null);
   const [recommending, setRecommending] = useState(false);
   const load = async () => {
@@ -189,7 +198,20 @@ export default function Workspace() {
         `/api/recommendations/next?minutes=${minutes}&energy=${energy}`,
         { credentials: "include" },
       );
-      const data = await response.json();
+      const data = await response.json() as {
+        error?: string;
+        recommendation: WorkTask | null;
+        reason: string;
+        fit: {
+          requestedMinutes: number;
+          estimatedMinutes: number;
+          energy: string;
+          workload: string;
+          canFinish: boolean;
+          priority: string;
+          dueInDays: number;
+        } | null;
+      };
       if (!response.ok)
         throw new Error(data.error || "Could not create a recommendation.");
       setRecommendation(data);
@@ -204,7 +226,7 @@ export default function Workspace() {
     }
   };
   return (
-    <div className="space-y-5">
+    <div className="page-stack space-y-5">
       <section className="bento-card p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -269,9 +291,9 @@ export default function Workspace() {
           </form>
         </div>
       </section>
-      <div className="grid gap-5 lg:grid-cols-[230px_minmax(0,1fr)_300px]">
-        <aside className="bento-card self-start overflow-hidden">
-          <div className="border-b p-3 text-xs font-black uppercase text-muted-foreground">
+      <div className="grid grid-flow-dense gap-5 xl:grid-cols-[230px_minmax(0,1fr)_320px]">
+        <aside className="bento-card order-2 grid grid-cols-2 self-start overflow-hidden sm:grid-cols-3 xl:order-none xl:block">
+          <div className="col-span-2 border-b p-3 text-xs font-black uppercase tracking-[0.14em] text-muted-foreground sm:col-span-3 xl:col-span-1">
             Smart views
           </div>
           {views.map((item) => {
@@ -280,7 +302,7 @@ export default function Workspace() {
               <button
                 key={item.id}
                 onClick={() => setView(item.id)}
-                className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm ${view === item.id ? "bg-primary text-primary-foreground font-bold" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
+                className={`flex w-full items-center justify-between border-b border-border/50 px-3 py-2.5 text-left text-sm transition-colors last:border-b-0 ${view === item.id ? "bg-primary text-primary-foreground font-bold" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
               >
                 <span>{item.label}</span>
                 <span
@@ -292,7 +314,7 @@ export default function Workspace() {
             );
           })}
         </aside>
-        <section className="bento-card overflow-hidden">
+        <section className="bento-card order-3 overflow-hidden xl:order-none">
           <header className="flex items-center justify-between border-b p-4">
             <div>
               <h2 className="text-lg font-black">
@@ -401,7 +423,7 @@ export default function Workspace() {
             )}
           </div>
         </section>
-        <aside className="bento-card self-start p-4">
+        <aside className="bento-card order-1 self-start p-5 xl:order-none xl:sticky xl:top-5">
           <div className="flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-primary" />
             <h2 className="font-black">What should I do next?</h2>
@@ -414,11 +436,16 @@ export default function Workspace() {
             <p className="mb-2 text-xs font-bold text-muted-foreground">
               Available time
             </p>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-5 gap-1.5">
               {[10, 20, 30, 45, 60].map((value) => (
                 <button
                   key={value}
-                  onClick={() => setMinutes(value)}
+                  type="button"
+                  aria-pressed={minutes === value}
+                  onClick={() => {
+                    setMinutes(value);
+                    setRecommendation(null);
+                  }}
                   className={`rounded-lg border px-2 py-2 text-xs font-bold ${minutes === value ? "border-foreground/35 bg-muted text-foreground" : "border-transparent bg-muted/55 text-muted-foreground"}`}
                 >
                   {value}m
@@ -434,7 +461,12 @@ export default function Workspace() {
               {["low", "medium", "high"].map((value) => (
                 <button
                   key={value}
-                  onClick={() => setEnergy(value)}
+                  type="button"
+                  aria-pressed={energy === value}
+                  onClick={() => {
+                    setEnergy(value);
+                    setRecommendation(null);
+                  }}
                   className={`rounded-lg border px-2 py-2 text-xs font-bold capitalize ${energy === value ? "border-foreground/35 bg-muted text-foreground" : "border-transparent bg-muted/55 text-muted-foreground"}`}
                 >
                   {value}
@@ -452,17 +484,26 @@ export default function Workspace() {
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            {recommending ? "Ranking tasks" : "Recommend"}
+            {recommending ? "Ranking tasks" : "Recommend next"}
           </button>
           {recommendation && (
-            <div className="mt-4 rounded-xl border border-primary/30 bg-primary/8 p-3">
-              <p className="text-sm font-semibold leading-relaxed">
-                {recommendation.reason}
-              </p>
+            <div className="mt-4 rounded-xl border border-primary/30 bg-primary/8 p-4" aria-live="polite">
+              {recommendation.recommendation && (
+                <p className="text-base font-black">{recommendation.recommendation.title}</p>
+              )}
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{recommendation.reason}</p>
+              {recommendation.fit && (
+                <div className="mt-3 flex flex-wrap gap-1.5 text-[10px] font-black uppercase tracking-[0.08em]">
+                  <span className="rounded-md bg-background/70 px-2 py-1">{recommendation.fit.estimatedMinutes} min</span>
+                  <span className="rounded-md bg-background/70 px-2 py-1 capitalize">{recommendation.fit.energy} energy</span>
+                  <span className="rounded-md bg-background/70 px-2 py-1 capitalize">{recommendation.fit.priority}</span>
+                </div>
+              )}
               {recommendation.recommendation && (
                 <button
+                  type="button"
                   onClick={() => setSelected(recommendation.recommendation!.id)}
-                  className="mt-3 text-xs font-black text-primary"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-lg border border-primary/30 bg-background/65 px-3 py-2 text-xs font-black text-primary hover:bg-background"
                 >
                   Open task
                 </button>

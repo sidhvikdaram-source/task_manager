@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -10,9 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeProvider } from "@/theme";
 import { useCanvasSync } from "@/hooks/useCanvasSync";
 import { ExperienceProvider, useExperience } from "@/experience";
-import { motion, useReducedMotion } from "framer-motion";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
-import { routeDirection, transitionMotion } from "@/lib/transitionMotion";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Today = lazy(() => import("@/pages/Today"));
@@ -287,32 +285,13 @@ function PageLoadingSkeleton() {
 
 function AnimatedRoutes() {
   const [location] = useLocation();
-  const reduceMotion = useReducedMotion();
-  const previousLocation = useRef(location);
-  const { data } = useQuery({
-    queryKey: ["rewards"],
-    queryFn: async () => {
-      const response = await fetch("/api/rewards", { credentials: "include" });
-      return response.ok ? response.json() as Promise<{ equipped?: { transition?: string } }> : null;
-    },
-    staleTime: 60_000,
-  });
-  const style = data?.equipped?.transition ?? "velocity-slide";
-  const direction = routeDirection(previousLocation.current, location);
-  const pageMotion = transitionMotion(style, direction);
 
   useEffect(() => {
-    previousLocation.current = location;
+    document.getElementById("main-content")?.scrollTo({ top: 0, left: 0 });
   }, [location]);
 
   return (
-    <motion.div
-      key={location}
-      initial={reduceMotion ? false : pageMotion.initial}
-      animate={pageMotion.animate}
-      transition={reduceMotion ? { duration: 0 } : pageMotion.transition}
-      className="min-h-full"
-    >
+    <div className="app-page min-h-full">
         <PageErrorBoundary>
           <Suspense fallback={<PageLoadingSkeleton />}>
             <Switch>
@@ -331,7 +310,7 @@ function AnimatedRoutes() {
             </Switch>
           </Suspense>
         </PageErrorBoundary>
-    </motion.div>
+    </div>
   );
 }
 

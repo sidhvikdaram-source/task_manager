@@ -133,7 +133,7 @@ export default function WeeklyReview() {
     );
 
   return (
-    <div className="space-y-4">
+    <div className="page-stack space-y-4">
       <header className="flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-black uppercase text-primary">

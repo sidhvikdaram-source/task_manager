@@ -46,9 +46,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 overflow-x-hidden overflow-y-auto scroll-smooth pb-[calc(4rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
+          className="app-main relative flex-1 overflow-x-hidden overflow-y-auto scroll-smooth pb-[calc(4rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
         >
-          <div className="container mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-6">
+          <div className="relative z-10 mx-auto w-full max-w-[1500px] px-3 py-3 sm:px-5 sm:py-5 lg:px-7 lg:py-6">
             {children}
           </div>
         </main>

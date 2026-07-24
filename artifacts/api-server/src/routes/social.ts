@@ -90,8 +90,8 @@ router.post("/social/requests/:id/:action", async (req, res): Promise<void> => {
   const id = Number(req.params.id); const action = req.params.action;
   const [request] = await db.select().from(friendshipsTable).where(and(eq(friendshipsTable.id, id), eq(friendshipsTable.recipientId, req.user.id), eq(friendshipsTable.status, "pending")));
   if (!request) { res.status(404).json({ error: "Request not found." }); return; }
-  if (action === "accept") { const [updated] = await db.update(friendshipsTable).set({ status: "accepted", updatedAt: new Date() }).where(eq(friendshipsTable.id, id)).returning(); res.json(updated); return; }
-  if (action === "decline") { await db.delete(friendshipsTable).where(eq(friendshipsTable.id, id)); res.json({ ok: true }); return; }
+  if (action === "accept") { const [updated] = await db.update(friendshipsTable).set({ status: "accepted", updatedAt: new Date() }).where(and(eq(friendshipsTable.id, id), eq(friendshipsTable.recipientId, req.user.id))).returning(); res.json(updated); return; }
+  if (action === "decline") { await db.delete(friendshipsTable).where(and(eq(friendshipsTable.id, id), eq(friendshipsTable.recipientId, req.user.id))); res.json({ ok: true }); return; }
   res.status(400).json({ error: "Unknown action." });
 });
 

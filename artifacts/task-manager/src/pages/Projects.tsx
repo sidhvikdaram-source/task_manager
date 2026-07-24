@@ -201,7 +201,7 @@ export default function Projects() {
     await load();
   };
   return (
-    <div className="space-y-5">
+    <div className="page-stack space-y-5">
       <section className="bento-card p-5 sm:p-6">
         <div className="flex items-end justify-between gap-4">
           <div>

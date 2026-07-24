@@ -21,7 +21,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="page-stack mx-auto max-w-4xl space-y-5">
       <header className="border-b pb-4">
         <p className="text-xs font-black uppercase text-primary">Preferences</p>
         <h1 className="mt-1 text-2xl font-black sm:text-3xl">Settings</h1>

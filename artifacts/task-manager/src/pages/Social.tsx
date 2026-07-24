@@ -348,7 +348,7 @@ export default function Social() {
     .slice(0, 5);
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack space-y-5">
       <section className="bento-card p-5 sm:p-6">
         <div className="flex items-center gap-2 text-xs font-black uppercase text-primary">
           <Users className="h-4 w-4" /> Social

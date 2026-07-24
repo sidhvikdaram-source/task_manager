@@ -95,6 +95,101 @@ export function completionOrigin(element?: HTMLElement | null): CompletionOrigin
   };
 }
 
+function effectLayer(effectId: string, origin: CompletionOrigin) {
+  const layer = document.createElement("div");
+  layer.dataset.completionEffect = effectId;
+  Object.assign(layer.style, {
+    position: "fixed",
+    inset: "0",
+    pointerEvents: "none",
+    zIndex: "120",
+    overflow: "hidden",
+    "--effect-x": `${origin.x * 100}%`,
+    "--effect-y": `${origin.y * 100}%`,
+  });
+  document.body.append(layer);
+  window.setTimeout(() => layer.remove(), 1800);
+  return layer;
+}
+
+function ring(
+  layer: HTMLElement,
+  origin: CompletionOrigin,
+  options: { size: number; color: string; delay?: number; width?: number },
+) {
+  const element = document.createElement("span");
+  Object.assign(element.style, {
+    position: "absolute",
+    left: `${origin.x * 100}%`,
+    top: `${origin.y * 100}%`,
+    width: `${options.size}px`,
+    height: `${options.size}px`,
+    marginLeft: `${-options.size / 2}px`,
+    marginTop: `${-options.size / 2}px`,
+    border: `${options.width ?? 2}px solid ${options.color}`,
+    borderRadius: "999px",
+    boxShadow: `0 0 22px ${options.color}`,
+  });
+  layer.append(element);
+  element.animate(
+    [
+      { opacity: 0, transform: "scale(.24)" },
+      { opacity: 1, offset: 0.22, transform: "scale(.55)" },
+      { opacity: 0, transform: "scale(1.35)" },
+    ],
+    {
+      duration: 780,
+      delay: options.delay ?? 0,
+      easing: "cubic-bezier(.2,.8,.2,1)",
+      fill: "forwards",
+    },
+  );
+}
+
+function drawCheck(layer: HTMLElement, origin: CompletionOrigin, color: string) {
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(namespace, "svg");
+  svg.setAttribute("viewBox", "0 0 64 64");
+  const path = document.createElementNS(namespace, "path");
+  path.setAttribute("d", "M14 34 27 47 51 18");
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", color);
+  path.setAttribute("stroke-width", "6");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  path.setAttribute("pathLength", "1");
+  path.style.strokeDasharray = "1";
+  path.style.strokeDashoffset = "1";
+  svg.append(path);
+  Object.assign(svg.style, {
+    position: "absolute",
+    left: `${origin.x * 100}%`,
+    top: `${origin.y * 100}%`,
+    width: "72px",
+    height: "72px",
+    marginLeft: "-36px",
+    marginTop: "-36px",
+    filter: `drop-shadow(0 0 10px ${color})`,
+  });
+  layer.append(svg);
+  path.animate(
+    [
+      { strokeDashoffset: 1 },
+      { strokeDashoffset: 0, offset: 0.55 },
+      { strokeDashoffset: 0 },
+    ],
+    { duration: 920, easing: "cubic-bezier(.22,1,.36,1)", fill: "forwards" },
+  );
+  svg.animate(
+    [
+      { opacity: 0, transform: "scale(.7) rotate(-6deg)" },
+      { opacity: 1, offset: 0.24, transform: "scale(1.08) rotate(0)" },
+      { opacity: 0, transform: "scale(1)" },
+    ],
+    { duration: 1100, easing: "cubic-bezier(.22,1,.36,1)", fill: "forwards" },
+  );
+}
+
 export function playCompletionEffect(
   effectId: string,
   origin: CompletionOrigin,
@@ -102,32 +197,72 @@ export function playCompletionEffect(
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const base = { origin, disableForReducedMotion: true, zIndex: 120 };
   if (effectId === "signal-finish") {
-    void confetti({ ...base, particleCount: 30, spread: 360, startVelocity: 17, gravity: 0.72, scalar: 0.68, colors: ["#22d3ee", "#3b82f6", "#ffffff"] });
+    const layer = effectLayer(effectId, origin);
+    ring(layer, origin, { size: 76, color: "#22d3ee", width: 3 });
+    drawCheck(layer, origin, "#e0f2fe");
     return;
   }
   if (effectId === "signal-rings") {
-    void confetti({ ...base, particleCount: 22, spread: 360, startVelocity: 14, gravity: 0.45, scalar: 0.58, colors: ["#67e8f9", "#60a5fa", "#ffffff"] });
-    window.setTimeout(() => {
-      void confetti({ ...base, particleCount: 34, spread: 360, startVelocity: 22, gravity: 0.72, scalar: 0.72, colors: ["#22d3ee", "#2563eb", "#ffffff"] });
-    }, 90);
+    const layer = effectLayer(effectId, origin);
+    ring(layer, origin, { size: 62, color: "#67e8f9", delay: 0 });
+    ring(layer, origin, { size: 94, color: "#38bdf8", delay: 90 });
+    ring(layer, origin, { size: 128, color: "#2563eb", delay: 180 });
     return;
   }
   if (effectId === "prism-pop") {
-    void confetti({ ...base, particleCount: 50, spread: 82, startVelocity: 29, gravity: 0.92, scalar: 0.84, colors: ["#22d3ee", "#a78bfa", "#fb7185", "#facc15"] });
+    void confetti({ ...base, particleCount: 72, spread: 112, startVelocity: 36, gravity: 1.08, scalar: 0.92, ticks: 150, colors: ["#22d3ee", "#a78bfa", "#fb7185", "#facc15"] });
     return;
   }
   if (effectId === "prism-check") {
-    const colors = ["#22d3ee", "#a78bfa", "#fb7185", "#facc15"];
-    void confetti({ ...base, particleCount: 28, angle: 52, spread: 46, startVelocity: 26, gravity: 0.86, scalar: 0.8, colors });
-    void confetti({ ...base, particleCount: 28, angle: 128, spread: 46, startVelocity: 26, gravity: 0.86, scalar: 0.8, colors });
+    const layer = effectLayer(effectId, origin);
+    const glow = document.createElement("span");
+    Object.assign(glow.style, {
+      position: "absolute",
+      left: `${origin.x * 100}%`,
+      top: `${origin.y * 100}%`,
+      width: "132px",
+      height: "132px",
+      margin: "-66px",
+      borderRadius: "28px",
+      background: "conic-gradient(from 45deg, #22d3ee, #a78bfa, #fb7185, #facc15, #22d3ee)",
+      filter: "blur(18px)",
+    });
+    layer.append(glow);
+    glow.animate(
+      [
+        { opacity: 0, transform: "scale(.4) rotate(-35deg)" },
+        { opacity: 0.72, offset: 0.3, transform: "scale(1) rotate(15deg)" },
+        { opacity: 0, transform: "scale(1.3) rotate(55deg)" },
+      ],
+      { duration: 1150, easing: "cubic-bezier(.22,1,.36,1)", fill: "forwards" },
+    );
+    drawCheck(layer, origin, "#ffffff");
     return;
   }
   if (effectId === "paper-stream") {
-    void confetti({ ...base, particleCount: 56, spread: 52, startVelocity: 24, gravity: 0.62, scalar: 1.05, drift: 0.4, colors: ["#f8fafc", "#fdba74", "#60a5fa", "#34d399"] });
+    const paperOrigin = { x: origin.x, y: Math.max(0, origin.y - 0.32) };
+    void confetti({ ...base, origin: paperOrigin, particleCount: 72, angle: 270, spread: 74, startVelocity: 14, gravity: 0.48, scalar: 1.28, drift: 0.65, ticks: 260, shapes: ["square"], colors: ["#f8fafc", "#fdba74", "#60a5fa", "#34d399"] });
     return;
   }
   if (effectId === "aurora-finish") {
-    void confetti({ ...base, particleCount: 64, spread: 92, startVelocity: 26, gravity: 0.7, scalar: 0.88, colors: ["#67e8f9", "#c4b5fd", "#fda4af", "#ffffff"] });
+    const layer = effectLayer(effectId, origin);
+    const aurora = document.createElement("span");
+    Object.assign(aurora.style, {
+      position: "absolute",
+      inset: "-20%",
+      background: "radial-gradient(circle at var(--effect-x) var(--effect-y), rgba(255,255,255,.75) 0 2%, transparent 16%), conic-gradient(from 190deg at var(--effect-x) var(--effect-y), transparent 0 18%, rgba(103,232,249,.55) 26%, rgba(196,181,253,.58) 36%, rgba(253,164,175,.4) 44%, transparent 58%)",
+      filter: "blur(22px) saturate(1.25)",
+      mixBlendMode: "screen",
+    });
+    layer.append(aurora);
+    aurora.animate(
+      [
+        { opacity: 0, transform: "scale(.72) rotate(-8deg)" },
+        { opacity: 0.9, offset: 0.34, transform: "scale(1.02) rotate(0)" },
+        { opacity: 0, transform: "scale(1.22) rotate(7deg)" },
+      ],
+      { duration: 1450, easing: "cubic-bezier(.22,1,.36,1)", fill: "forwards" },
+    );
     return;
   }
   void confetti({ ...base, particleCount: 28, spread: 52, startVelocity: 22, gravity: 0.95, scalar: 0.72, colors: ["#22d3ee", "#fb923c", "#f8fafc"] });

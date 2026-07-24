@@ -5,10 +5,6 @@ import {
   sortRewardChests,
   withEquippedReward,
 } from "../src/lib/rewardUi.ts";
-import {
-  routeDirection,
-  transitionMotion,
-} from "../src/lib/transitionMotion.ts";
 
 test("unopened chests stay reachable ahead of opened reward history", () => {
   const ordered = sortRewardChests([
@@ -49,33 +45,10 @@ test("equipping a reward updates shared state without mutating the cache snapsho
   assert.notEqual(updated.equipped, original.equipped);
 });
 
-test("route transitions slide in the actual navigation direction", () => {
-  assert.equal(routeDirection("/", "/calendar"), 1);
-  assert.equal(routeDirection("/calendar", "/"), -1);
-
-  const styles = [
-    "velocity-slide",
-    "soft-glide",
-    "panel-sweep",
-    "quick-stack",
-  ];
-  const signatures = [];
-  for (const style of styles) {
-    const forward = transitionMotion(style, 1);
-    const backward = transitionMotion(style, -1);
-    assert.ok(forward.initial.x > 0, `${style} should enter from the right`);
-    assert.ok(backward.initial.x < 0, `${style} should enter from the left`);
-    assert.equal(forward.animate.x, 0);
-    signatures.push(JSON.stringify({
-      initial: forward.initial,
-      transition: forward.transition,
-    }));
-  }
-  assert.equal(
-    new Set(signatures).size,
-    styles.length,
-    "every equipped transition should produce distinct website motion",
-  );
+test("page navigation renders without reward-driven route animation", () => {
+  const routes = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(routes, /transitionMotion|routeDirection|equipped\?\.transition/);
+  assert.doesNotMatch(routes, /key=\{location\}/);
 });
 
 test("Quick Capture uses one visible, forward-only trace and pauses off-page", () => {

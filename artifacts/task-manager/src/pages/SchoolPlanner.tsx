@@ -127,7 +127,7 @@ export default function SchoolPlanner() {
       !["completed"].includes(project.status),
   );
   return (
-    <div className="space-y-5">
+    <div className="page-stack space-y-5">
       <section className="bento-card p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>

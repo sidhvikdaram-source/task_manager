@@ -17,6 +17,12 @@ import canvasRouter from "./canvas";
 
 const router: IRouter = Router();
 
+router.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("Vary", "Cookie");
+  next();
+});
+
 router.use(healthRouter);
 router.use(authRouter);
 router.use(tasksRouter);

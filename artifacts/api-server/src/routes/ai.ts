@@ -1628,7 +1628,7 @@ router.post("/ai/plans/confirm", async (req, res): Promise<void> => {
           priority: "medium",
         }).returning();
       } else if (plan.project.subject && project.subject !== plan.project.subject) {
-        [project] = await tx.update(projectsTable).set({ subject: plan.project.subject }).where(eq(projectsTable.id, project.id)).returning();
+        [project] = await tx.update(projectsTable).set({ subject: plan.project.subject }).where(and(eq(projectsTable.id, project.id), eq(projectsTable.userId, req.user.id))).returning();
       }
     }
     const existingProjectTasks = project

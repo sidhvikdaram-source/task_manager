@@ -247,7 +247,7 @@ router.post("/rewards/chests/:id/open", async (req, res): Promise<void> => {
       }
       if (bpReward) await awardBpInTransaction(tx, req.user.id, bpReward, `chest:${chest.id}:bp`, `${finalRarity} chest reward`);
       if (chestKeysReward) await grantChestKeysInTransaction(tx, req.user.id, chestKeysReward);
-      const [opened] = await tx.update(userRewardChestsTable).set({ rarity: finalRarity, status: "opened", rewardItemId: reward?.id ?? null, vpFallback: 0, bpReward, chestKeysReward, openedAt: new Date() }).where(eq(userRewardChestsTable.id, chest.id)).returning();
+      const [opened] = await tx.update(userRewardChestsTable).set({ rarity: finalRarity, status: "opened", rewardItemId: reward?.id ?? null, vpFallback: 0, bpReward, chestKeysReward, openedAt: new Date() }).where(and(eq(userRewardChestsTable.id, chest.id), eq(userRewardChestsTable.userId, req.user.id))).returning();
       return {
         chest: opened,
         reward,

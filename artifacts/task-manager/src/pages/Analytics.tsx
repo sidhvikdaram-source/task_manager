@@ -64,7 +64,7 @@ export default function Analytics() {
 
   if (view === "review")
     return (
-      <div className="space-y-5">
+      <div className="page-stack space-y-5">
         {viewTabs}
         <WeeklyReview />
       </div>
@@ -72,7 +72,7 @@ export default function Analytics() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="page-stack space-y-6">
         {viewTabs}
         <Skeleton className="h-10 w-48" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -88,7 +88,7 @@ export default function Analytics() {
   if (!summary || !chartData) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="page-stack space-y-8">
       {viewTabs}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">

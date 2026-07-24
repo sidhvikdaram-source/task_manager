@@ -12,18 +12,35 @@ export interface RecommendationTask {
   dueDate?: string | null;
 }
 
-const deepWorkPattern = /\b(study|prepare|research|analy[sz]e|write|draft|essay|report|project|exam|test|quiz|practice|homework|assignment|presentation|design|build|code|debug|chapter|problem set|review|memorize|learn)\b/i;
-const quickWorkPattern = /\b(call|email|text|message|reply|confirm|schedule|book|buy|pick up|drop off|submit|print|upload|download|rename|organize|check|clean up)\b/i;
+const deepWorkPattern = /\b(study|prepare|research|analy[sz]e|write|draft|essay|report|project|exam|test|quiz|practice|homework|assignment|presentation|design|build|code|debug|chapter|problem set|worksheet|review|memorize|learn|deep[\s-]*work|amc\s*\d*)\b/i;
+const quickWorkPattern = /\b(call|email|text|message|reply|confirm|schedule|book|buy|pick up|drop off|submit|print|upload|download|rename|organize|check|clean up|play|ping pong|stretch|walk|meditate|breathe|water|feed|tidy|pack|shower|snack)\b/i;
 const intensiveKindPattern = /\b(project|test|quiz|practice|reading)\b/i;
+
+function durationFromText(text: string) {
+  const hours = text.match(/\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr)\b/i);
+  if (hours) return Math.max(5, Math.round(Number(hours[1]) * 60));
+  const minutes = text.match(/\b(\d+)\s*(?:minutes?|mins?|min)\b/i);
+  return minutes ? Math.max(5, Number(minutes[1])) : null;
+}
 
 export function inferTaskWorkload(task: RecommendationTask) {
   const semanticText = [task.title, task.description, task.notes, task.subject].filter(Boolean).join(" ");
   const deep = deepWorkPattern.test(semanticText) || intensiveKindPattern.test(task.taskKind ?? "");
   const quick = quickWorkPattern.test(semanticText) && !deep;
   const difficulty = deep ? 3 : quick ? 1 : Math.min(3, Math.max(1, task.difficulty || 2));
-  const duration = task.estimatedMinutes ?? (difficulty === 3 ? 45 : difficulty === 1 ? 15 : 30);
+  const explicitDuration = durationFromText(semanticText);
+  const storedDuration = typeof task.estimatedMinutes === "number" && task.estimatedMinutes > 0
+    ? task.estimatedMinutes
+    : null;
+  const duration = storedDuration ?? explicitDuration ?? (difficulty === 3 ? 45 : difficulty === 1 ? 10 : 30);
   const workload = deep ? "deep work" : quick ? "quick action" : difficulty === 3 ? "focused work" : difficulty === 1 ? "light work" : "regular work";
-  return { difficulty, duration, workload, splittable: deep };
+  return {
+    difficulty,
+    duration,
+    workload,
+    splittable: deep,
+    durationSource: storedDuration ? "estimate" : explicitDuration ? "title" : "inferred",
+  };
 }
 
 export function scoreTaskRecommendation(task: RecommendationTask, options: { minutes: number; energy: RecommendationEnergy; today: string }) {

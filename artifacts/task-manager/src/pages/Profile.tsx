@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Award, BadgeCheck, Check, CircleDollarSign, Gift, Headphones, ImagePlus, KeyRound, Lock, Navigation2, PackageOpen, Palette, PartyPopper, Play, ShoppingBag, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
+import { Award, BadgeCheck, Check, CircleDollarSign, Gift, Headphones, ImagePlus, KeyRound, Lock, PackageOpen, Palette, PartyPopper, Play, ShoppingBag, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useGetUserStats } from "@workspace/api-client-react";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -11,7 +11,6 @@ import { FramePreview, PetPreview, ProfilePhoto } from "@/components/ProfileCosm
 import { useQueryClient } from "@tanstack/react-query";
 import { sortRewardChests, withEquippedReward } from "@/lib/rewardUi";
 import { playCompletionEffect, completionOrigin } from "@/lib/completionSound";
-import { transitionMotion } from "@/lib/transitionMotion";
 
 type RewardKind = "frame" | "pet" | "title" | "completion_effect" | "transition" | "profile_theme" | "focus_sound" | "badge_display" | "momentum_cosmetic" | "chest_key";
 type StoreCategory = "profile_customization" | "pet_cosmetics" | "focus_items" | "chest_items" | "reward_effects" | "limited_items" | "momentum_cosmetics";
@@ -90,7 +89,6 @@ function rarityStyle(rarity: ChestRarity) {
 }
 
 function animationScope(item: Pick<Reward, "kind">) {
-  if (item.kind === "transition") return "Page navigation";
   if (item.kind === "completion_effect") return "Task completion";
   return null;
 }
@@ -112,13 +110,7 @@ export default function Profile() {
   const [reveal, setReveal] = useState<{ reward: Reward | null; bpReward: number; chestKeysReward: number; initialRarity: ChestRarity; rarity: ChestRarity; upgraded: boolean } | null>(null);
   const [showAllChests, setShowAllChests] = useState(false);
   const [equippedPulse, setEquippedPulse] = useState<RewardKind | null>(null);
-  const [transitionPreview, setTransitionPreview] = useState<{
-    id: string;
-    name: string;
-    sequence: number;
-  } | null>(null);
   const equippedPulseTimer = useRef<number | null>(null);
-  const transitionPreviewTimer = useRef<number | null>(null);
   const name = user?.firstName || user?.email?.split("@")[0] || "Velocity member";
 
   const loadRewards = async (force = false) => {
@@ -147,7 +139,6 @@ export default function Profile() {
 
   useEffect(() => () => {
     if (equippedPulseTimer.current) window.clearTimeout(equippedPulseTimer.current);
-    if (transitionPreviewTimer.current) window.clearTimeout(transitionPreviewTimer.current);
   }, []);
 
   const visibleItems = useMemo(() => (rewards?.items ?? []).filter((item) => {
@@ -167,23 +158,8 @@ export default function Profile() {
       : "";
 
   const previewReward = (item: Reward, target?: HTMLElement | null) => {
-    if (item.kind === "completion_effect") {
-      playCompletionEffect(item.id, completionOrigin(target));
-      return;
-    }
-    if (item.kind !== "transition") return;
-    if (transitionPreviewTimer.current) {
-      window.clearTimeout(transitionPreviewTimer.current);
-    }
-    setTransitionPreview({
-      id: item.id,
-      name: item.name,
-      sequence: Date.now(),
-    });
-    transitionPreviewTimer.current = window.setTimeout(
-      () => setTransitionPreview(null),
-      1_250,
-    );
+    if (item.kind !== "completion_effect") return;
+    playCompletionEffect(item.id, completionOrigin(target));
   };
 
   const purchase = async (item: Reward) => {
@@ -260,9 +236,7 @@ export default function Profile() {
     const previousCache = queryClient.getQueryData<RewardsResponse>(["rewards"]);
     const defaultItem = kind === "completion_effect"
       ? "clean-confetti"
-      : kind === "transition"
-        ? "velocity-slide"
-        : "none";
+      : "none";
     const applyDefault = (current: RewardsResponse | null | undefined) =>
       current ? withEquippedReward(current, kind, defaultItem) : current;
     try {
@@ -440,7 +414,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack space-y-5">
       <section className={`bento-card p-5 transition-colors sm:p-7 ${profileThemeClass}`}>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <motion.div
@@ -580,9 +554,7 @@ export default function Profile() {
             const owned = !item.repeatable && (rewards?.owned.includes(item.id) ?? false);
             const equipped = item.equipable && rewards?.equipped[item.kind] === item.id;
             const scope = animationScope(item);
-            const previewable = owned && (
-              item.kind === "completion_effect" || item.kind === "transition"
-            );
+            const previewable = owned && item.kind === "completion_effect";
             return <motion.article key={item.id} layout whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.985 }} transition={{ type: "spring", stiffness: 380, damping: 28 }} className={`group relative flex min-h-64 flex-col overflow-hidden rounded-xl border p-4 transition-colors ${equipped ? "border-primary bg-primary/10 shadow-[0_0_22px_hsl(var(--primary)/.12)]" : "bg-muted/15 hover:border-primary/40 hover:bg-muted/25"}`}>
               {equipped && <motion.div layoutId={`equipped-${item.kind}`} className="pointer-events-none absolute inset-0 rounded-lg border-2 border-primary" transition={{ type: "spring", stiffness: 320, damping: 26 }} />}
               <div className="flex h-14 items-center justify-between">
@@ -590,7 +562,6 @@ export default function Profile() {
                 {item.kind === "pet" && <PetPreview petId={item.id} earnedVp={rewards?.earnedVp} className="h-12 w-12" />}
                 {item.kind === "title" && <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Tag className="h-5 w-5" /></div>}
                 {item.kind === "completion_effect" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/15 text-secondary"><PartyPopper className="h-5 w-5" /></div>}
-                {item.kind === "transition" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><Navigation2 className="h-5 w-5" /></div>}
                 {item.kind === "profile_theme" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><Palette className="h-5 w-5" /></div>}
                 {item.kind === "focus_sound" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/15 text-secondary"><Headphones className="h-5 w-5" /></div>}
                 {item.kind === "badge_display" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><BadgeCheck className="h-5 w-5" /></div>}
@@ -621,7 +592,7 @@ export default function Profile() {
           })}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {(["frame", "pet", "title", "completion_effect", "transition", "profile_theme", "focus_sound", "badge_display", "momentum_cosmetic"] as const).map((kind) => rewards?.equipped[kind] !== "none" && <button key={kind} disabled={working !== null} onClick={() => void unequip(kind)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold hover:bg-muted disabled:opacity-45"><X className="h-3.5 w-3.5" /> Remove {kind === "pet" ? "pet" : kind.replace("_", " ")}</button>)}
+          {(["frame", "pet", "title", "completion_effect", "profile_theme", "focus_sound", "badge_display", "momentum_cosmetic"] as const).map((kind) => rewards?.equipped[kind] !== "none" && <button key={kind} disabled={working !== null} onClick={() => void unequip(kind)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-bold hover:bg-muted disabled:opacity-45"><X className="h-3.5 w-3.5" /> Remove {kind === "pet" ? "pet" : kind.replace("_", " ")}</button>)}
         </div>
       </section>
 
@@ -643,33 +614,6 @@ export default function Profile() {
           </motion.button>)}
         </div>
       </motion.section>
-      {createPortal(
-        <AnimatePresence>
-          {transitionPreview && (() => {
-            const preview = transitionMotion(transitionPreview.id);
-            return (
-              <motion.div
-                key={transitionPreview.sequence}
-                role="status"
-                initial={reduceMotion ? false : preview.initial}
-                animate={preview.animate}
-                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -24 }}
-                transition={reduceMotion ? { duration: 0 } : preview.transition}
-                className="pointer-events-none fixed bottom-20 right-4 z-[110] flex w-[min(20rem,calc(100vw-2rem))] items-center gap-3 rounded-lg border border-primary/30 bg-background/95 px-4 py-3 shadow-xl backdrop-blur-md md:bottom-5"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Navigation2 className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[10px] font-black uppercase text-muted-foreground">Transition preview</span>
-                  <span className="block truncate text-sm font-black">{transitionPreview.name}</span>
-                </span>
-              </motion.div>
-            );
-          })()}
-        </AnimatePresence>,
-        document.body,
-      )}
       {createPortal(<AnimatePresence mode="wait">
         {opening && (
           <motion.div

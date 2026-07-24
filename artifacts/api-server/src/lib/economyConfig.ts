@@ -88,7 +88,6 @@ const chest = (
 
 export const DEFAULT_ITEMS: EconomyItem[] = [
   { id: "clean-confetti", name: "Clean Confetti", description: "A restrained completion burst.", kind: "completion_effect", category: "reward_effects", priceBp: 0, style: "clean-confetti", rarity: "common", source: "default", equipable: true },
-  { id: "velocity-slide", name: "Velocity Slide", description: "The standard workspace transition.", kind: "transition", category: "reward_effects", priceBp: 0, style: "velocity-slide", rarity: "common", source: "default", equipable: true },
 ];
 
 export const STORE_ITEMS: EconomyItem[] = [
@@ -129,7 +128,6 @@ export const CHEST_ITEMS: EconomyItem[] = [
   chest({ id: "aperture-frame", name: "Aperture Frame", description: "A focused chest-exclusive frame.", kind: "frame", category: "profile_customization", style: "aperture", rarity: "common", chestRarity: "common", equipable: true }),
   chest({ id: "clear-intent", name: "Clear Intent", description: "A chest-exclusive profile title.", kind: "title", category: "profile_customization", style: "clear-intent", rarity: "common", chestRarity: "common", equipable: true }),
   chest({ id: "prism-pop", name: "Prism Pop", description: "A compact completion effect.", kind: "completion_effect", category: "reward_effects", style: "prism-pop", rarity: "common", chestRarity: "common", equipable: true }),
-  chest({ id: "soft-glide", name: "Soft Glide", description: "A calm workspace transition.", kind: "transition", category: "reward_effects", style: "soft-glide", rarity: "common", chestRarity: "common", equipable: true }),
   chest({ id: "lumen-bot", name: "Lumen Bot", description: "A rare responsive study pet.", kind: "pet", category: "pet_cosmetics", style: "lumen-bot", rarity: "rare", chestRarity: "rare", equipable: true }),
   chest({ id: "orbit-bud", name: "Orbit Bud", description: "A rare orbital profile pet.", kind: "pet", category: "pet_cosmetics", style: "orbit-bud", rarity: "rare", chestRarity: "rare", equipable: true }),
   chest({ id: "pulse-grid", name: "Pulse Grid", description: "A rare animated profile frame.", kind: "frame", category: "profile_customization", style: "pulse-grid", rarity: "rare", chestRarity: "rare", equipable: true }),
@@ -137,12 +135,10 @@ export const CHEST_ITEMS: EconomyItem[] = [
   chest({ id: "deep-work", name: "Deep Work", description: "A rare chest-exclusive title.", kind: "title", category: "profile_customization", style: "deep-work", rarity: "rare", chestRarity: "rare", equipable: true }),
   chest({ id: "week-architect", name: "Week Architect", description: "A rare planning title.", kind: "title", category: "profile_customization", style: "week-architect", rarity: "rare", chestRarity: "rare", equipable: true }),
   chest({ id: "signal-rings", name: "Signal Rings", description: "A rare completion effect.", kind: "completion_effect", category: "reward_effects", style: "signal-rings", rarity: "rare", chestRarity: "rare", equipable: true }),
-  chest({ id: "panel-sweep", name: "Panel Sweep", description: "A rare workspace transition.", kind: "transition", category: "reward_effects", style: "panel-sweep", rarity: "rare", chestRarity: "rare", equipable: true }),
   chest({ id: "tempo-kite", name: "Tempo Kite", description: "An epic motion-driven pet.", kind: "pet", category: "pet_cosmetics", style: "tempo-kite", rarity: "epic", chestRarity: "epic", equipable: true }),
   chest({ id: "carbon-halo", name: "Carbon Halo", description: "An epic precision frame.", kind: "frame", category: "profile_customization", style: "carbon-halo", rarity: "epic", chestRarity: "epic", equipable: true }),
   chest({ id: "steady-hand", name: "Steady Hand", description: "An epic consistency title.", kind: "title", category: "profile_customization", style: "steady-hand", rarity: "epic", chestRarity: "epic", equipable: true }),
   chest({ id: "paper-stream", name: "Paper Stream", description: "An epic completion effect.", kind: "completion_effect", category: "reward_effects", style: "paper-stream", rarity: "epic", chestRarity: "epic", equipable: true }),
-  chest({ id: "quick-stack", name: "Quick Stack", description: "An epic workspace transition.", kind: "transition", category: "reward_effects", style: "quick-stack", rarity: "epic", chestRarity: "epic", equipable: true }),
   chest({ id: "vector-pet", name: "Vector Pet", description: "A legendary geometric profile pet.", kind: "pet", category: "pet_cosmetics", style: "vector-pet", rarity: "legendary", chestRarity: "legendary", equipable: true }),
   chest({ id: "founders-edge", name: "Founder's Edge", description: "A legendary profile frame.", kind: "frame", category: "limited_items", style: "founders-edge", rarity: "legendary", chestRarity: "legendary", equipable: true }),
   chest({ id: "quiet-force", name: "Quiet Force", description: "A legendary profile title.", kind: "title", category: "profile_customization", style: "quiet-force", rarity: "legendary", chestRarity: "legendary", equipable: true }),

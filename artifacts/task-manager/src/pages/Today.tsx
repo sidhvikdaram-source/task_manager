@@ -191,7 +191,7 @@ export default function Today() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="page-stack space-y-5">
       <section data-tour="quick-capture" className="bento-card p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -215,7 +215,35 @@ export default function Today() {
                   {visibleTasks.length}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <select
+                  aria-label="Available time"
+                  value={availableMinutes}
+                  onChange={(event) => {
+                    setAvailableMinutes(Number(event.target.value));
+                    setRecommendation(null);
+                  }}
+                  className="h-8 min-w-20 flex-1 rounded-md border bg-background px-2 text-xs font-bold sm:flex-none"
+                >
+                  {[10, 20, 30, 45, 60].map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {minutes} min
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Energy level"
+                  value={energy}
+                  onChange={(event) => {
+                    setEnergy(event.target.value as typeof energy);
+                    setRecommendation(null);
+                  }}
+                  className="h-8 min-w-28 flex-1 rounded-md border bg-background px-2 text-xs font-bold sm:flex-none"
+                >
+                  <option value="low">Low energy</option>
+                  <option value="medium">Medium energy</option>
+                  <option value="high">High energy</option>
+                </select>
                 <Button
                   type="button"
                   size="sm"
@@ -316,33 +344,7 @@ export default function Today() {
                     {recommendation.reason}
                   </p>
                 </button>
-                <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <select
-                    aria-label="Available time"
-                    value={availableMinutes}
-                    onChange={(event) =>
-                      setAvailableMinutes(Number(event.target.value))
-                    }
-                    className="h-8 rounded-md border bg-background px-2 text-xs font-bold"
-                  >
-                    {[10, 20, 30, 45, 60].map((minutes) => (
-                      <option key={minutes} value={minutes}>
-                        {minutes} min
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="Energy level"
-                    value={energy}
-                    onChange={(event) =>
-                      setEnergy(event.target.value as typeof energy)
-                    }
-                    className="h-8 rounded-md border bg-background px-2 text-xs font-bold"
-                  >
-                    <option value="low">Low energy</option>
-                    <option value="medium">Medium energy</option>
-                    <option value="high">High energy</option>
-                  </select>
+                <div className="flex shrink-0 items-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"

@@ -23,7 +23,11 @@ async function userDateContext(userId: string) {
 async function ensureSubjects(userId: string) {
   const current = await db.select().from(subjectsTable).where(eq(subjectsTable.userId, userId));
   if (current.length) return current;
-  return db.insert(subjectsTable).values(defaultSubjects.map(([name, color]) => ({ userId, name, color }))).returning();
+  await db
+    .insert(subjectsTable)
+    .values(defaultSubjects.map(([name, color]) => ({ userId, name, color })))
+    .onConflictDoNothing();
+  return db.select().from(subjectsTable).where(eq(subjectsTable.userId, userId));
 }
 
 router.get("/subjects", async (req, res): Promise<void> => {
@@ -49,7 +53,7 @@ router.patch("/subjects/:id", async (req, res): Promise<void> => {
   const [existing] = await db.select().from(subjectsTable).where(and(eq(subjectsTable.id, Number(req.params.id)), eq(subjectsTable.userId, req.user.id)));
   if (!existing) { res.status(404).json({ error: "Subject not found." }); return; }
   const [subject] = await db.transaction(async (tx) => {
-    const changed = await tx.update(subjectsTable).set(update).where(eq(subjectsTable.id, existing.id)).returning();
+    const changed = await tx.update(subjectsTable).set(update).where(and(eq(subjectsTable.id, existing.id), eq(subjectsTable.userId, req.user.id))).returning();
     if (update.name && update.name !== existing.name) {
       await Promise.all([
         tx.update(tasksTable).set({ subject: update.name }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.subject, existing.name))),
@@ -70,7 +74,7 @@ router.delete("/subjects/:id", async (req, res): Promise<void> => {
       tx.update(tasksTable).set({ subject: "Other" }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.subject, subject.name))),
       tx.update(projectsTable).set({ subject: "Other" }).where(and(eq(projectsTable.userId, req.user.id), eq(projectsTable.subject, subject.name))),
     ]);
-    await tx.delete(subjectsTable).where(eq(subjectsTable.id, subject.id));
+    await tx.delete(subjectsTable).where(and(eq(subjectsTable.id, subject.id), eq(subjectsTable.userId, req.user.id)));
   });
   res.sendStatus(204);
 });
@@ -100,11 +104,32 @@ router.get("/recommendations/next", async (req, res): Promise<void> => {
     .filter((item) => item.ranking.eligible)
     .sort((a,b) => b.ranking.score - a.ranking.score || a.task.title.localeCompare(b.task.title));
   const best = scored[0];
-  if (!best) { res.json({ recommendation: null, reason: tasks.length ? `No unblocked task fits within ${minutes} minutes.` : "Your active task list is clear." }); return; }
+  if (!best) {
+    res.json({
+      recommendation: null,
+      reason: tasks.length
+        ? `No unblocked task can be finished in ${minutes} minutes at ${energy} energy. Add a duration estimate or choose a longer work block.`
+        : "Your active task list is clear.",
+      fit: null,
+    });
+    return;
+  }
   const dueReason = best.ranking.days < 0 ? "is overdue" : best.ranking.days === 0 ? "is due today" : best.ranking.days === 1 ? "is due tomorrow" : best.task.dueDate ? `is due in ${best.ranking.days} days` : "has no fixed deadline";
   const priorityReason = best.task.priority === "critical" || best.task.priority === "high" ? ` It is ${best.task.priority} priority.` : "";
   const timeReason = best.ranking.canFinish ? `It should fit in about ${best.ranking.duration} minutes.` : `Use the next ${minutes} minutes to make focused progress.`;
-  res.json({ recommendation: best.task, reason: `${best.task.title} ${dueReason}.${priorityReason} ${timeReason} It matches ${energy} energy as ${best.ranking.workload}.` });
+  res.json({
+    recommendation: best.task,
+    reason: `${best.task.title} ${dueReason}.${priorityReason} ${timeReason} It matches ${energy} energy as ${best.ranking.workload}.`,
+    fit: {
+      requestedMinutes: minutes,
+      estimatedMinutes: best.ranking.duration,
+      energy,
+      workload: best.ranking.workload,
+      canFinish: best.ranking.canFinish,
+      priority: best.task.priority,
+      dueInDays: best.ranking.days,
+    },
+  });
 });
 
 router.get("/weekly-review", async (req, res): Promise<void> => {

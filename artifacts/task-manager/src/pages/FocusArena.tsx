@@ -253,7 +253,7 @@ export default function FocusArena() {
 
   return (
     <div
-      className={`space-y-8 transition-colors duration-700 ${isActive ? "brightness-90" : ""}`}
+      className={`page-stack space-y-8 transition-colors duration-700 ${isActive ? "brightness-90" : ""}`}
     >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
