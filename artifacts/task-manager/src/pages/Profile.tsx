@@ -89,6 +89,12 @@ function rarityStyle(rarity: ChestRarity) {
       : "border-sky-500/35 bg-sky-500/15 text-sky-500 shadow-[0_0_24px_rgba(14,165,233,.2)]";
 }
 
+function animationScope(item: Pick<Reward, "kind">) {
+  if (item.kind === "transition") return "Page navigation";
+  if (item.kind === "completion_effect") return "Task completion";
+  return null;
+}
+
 export default function Profile() {
   const { user } = useAuth();
   const { data: stats, refetch: refetchStats } = useGetUserStats();
@@ -465,7 +471,7 @@ export default function Profile() {
         </div>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Metric icon={<Zap className="h-5 w-5" />} value={stats?.totalVp ?? 0} label="Lifetime VP" />
         <Metric icon={<CircleDollarSign className="h-5 w-5" />} value={rewards?.bpBalance ?? 0} label="BP balance" />
         <Metric icon={<MomentumIcon className="h-5 w-5" />} value={stats?.streakDays ?? 0} label="Momentum days" />
@@ -564,19 +570,20 @@ export default function Profile() {
           <div><div className="flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-primary" /><h2 className="text-lg font-black">Velocity Store</h2></div><p className="mt-1 text-sm text-muted-foreground">Spend BP on optional customization. VP always stays with your progress.</p></div>
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-secondary/15 px-3 text-xs font-black text-secondary"><CircleDollarSign className="h-4 w-4" /> {rewards?.bpBalance ?? 0} BP</span>
-            <select aria-label="Store category" value={category} onChange={(event) => setCategory(event.target.value as typeof category)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">All categories</option><option value="profile_customization">Profile customization</option><option value="pet_cosmetics">Pet cosmetics</option><option value="focus_items">Focus items</option><option value="chest_items">Chest items</option><option value="reward_effects">Reward effects</option><option value="limited_items">Limited items</option><option value="momentum_cosmetics">Momentum cosmetics</option></select>
+            <select aria-label="Store category" value={category} onChange={(event) => setCategory(event.target.value as typeof category)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">All categories</option><option value="profile_customization">Profile customization</option><option value="pet_cosmetics">Pet cosmetics</option><option value="focus_items">Focus items</option><option value="chest_items">Chest items</option><option value="reward_effects">Animations</option><option value="limited_items">Limited items</option><option value="momentum_cosmetics">Momentum cosmetics</option></select>
             <select aria-label="Ownership filter" value={ownership} onChange={(event) => setOwnership(event.target.value as typeof ownership)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">Owned and locked</option><option value="owned">Owned</option><option value="locked">Not owned</option></select>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        <div className="mt-4 grid grid-flow-dense grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {visibleItems.map((item) => {
             const owned = !item.repeatable && (rewards?.owned.includes(item.id) ?? false);
             const equipped = item.equipable && rewards?.equipped[item.kind] === item.id;
+            const scope = animationScope(item);
             const previewable = owned && (
               item.kind === "completion_effect" || item.kind === "transition"
             );
-            return <motion.article key={item.id} layout whileHover={reduceMotion ? undefined : { y: -3 }} whileTap={reduceMotion ? undefined : { scale: 0.985 }} className={`relative overflow-hidden rounded-lg border p-3 transition-colors ${equipped ? "border-primary bg-primary/10 shadow-[0_0_22px_hsl(var(--primary)/.12)]" : "bg-muted/15 hover:border-primary/40"}`}>
+            return <motion.article key={item.id} layout whileHover={reduceMotion ? undefined : { y: -4 }} whileTap={reduceMotion ? undefined : { scale: 0.985 }} transition={{ type: "spring", stiffness: 380, damping: 28 }} className={`group relative flex min-h-64 flex-col overflow-hidden rounded-xl border p-4 transition-colors ${equipped ? "border-primary bg-primary/10 shadow-[0_0_22px_hsl(var(--primary)/.12)]" : "bg-muted/15 hover:border-primary/40 hover:bg-muted/25"}`}>
               {equipped && <motion.div layoutId={`equipped-${item.kind}`} className="pointer-events-none absolute inset-0 rounded-lg border-2 border-primary" transition={{ type: "spring", stiffness: 320, damping: 26 }} />}
               <div className="flex h-14 items-center justify-between">
                 {item.kind === "frame" && <FramePreview frameId={item.id} className="w-14" />}
@@ -591,9 +598,10 @@ export default function Profile() {
                 {item.kind === "chest_key" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><KeyRound className="h-5 w-5" /></div>}
                 <Sparkles className="h-4 w-4 text-secondary" />
               </div>
-              <div className="mt-3 flex items-start justify-between gap-2"><p className="min-h-10 text-sm font-black leading-tight">{item.name}</p><span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${rarityStyle(item.rarity).split(" ").slice(0, 3).join(" ")}`}>{item.rarity}</span></div>
-              <p className="min-h-12 text-[11px] leading-4 text-muted-foreground">{item.description || item.requirement}</p>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-4 flex items-start justify-between gap-2"><p className="text-sm font-black leading-tight text-balance">{item.name}</p><span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${rarityStyle(item.rarity).split(" ").slice(0, 3).join(" ")}`}>{item.rarity}</span></div>
+              {scope && <p className="mt-1 text-[10px] font-black uppercase tracking-[0.12em] text-primary">{scope}</p>}
+              <p className="mt-2 flex-1 text-xs leading-5 text-muted-foreground">{item.description || item.requirement}</p>
+              <div className="mt-4 flex gap-2">
                 {previewable && (
                   <button
                     type="button"
@@ -601,12 +609,13 @@ export default function Profile() {
                     title={`Preview ${item.name}`}
                     disabled={working !== null}
                     onClick={(event) => previewReward(item, event.currentTarget)}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary disabled:opacity-45"
+                    className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-black text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary disabled:opacity-45"
                   >
                     <Play className="h-3.5 w-3.5 fill-current" />
+                    Preview
                   </button>
                 )}
-                {item.lockReason ? <div className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Lock className="h-3.5 w-3.5" /> {item.lockReason}</div> : owned && item.equipable ? <button disabled={working !== null || equipped} onClick={() => void equip(item)} className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-2 text-xs font-black text-primary-foreground disabled:opacity-55">{equipped ? <><Check className="h-3.5 w-3.5" /> Equipped</> : "Equip"}</button> : owned ? <div className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-primary"><Check className="h-3.5 w-3.5" /> Owned</div> : item.source === "chest" ? <div className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Gift className="h-3.5 w-3.5" /> Chest reward</div> : item.source === "quest" || item.source === "achievement" || item.source === "tier" ? <div className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Lock className="h-3.5 w-3.5" /> {item.requirement ?? "Earn to unlock"}</div> : <button disabled={working !== null || (rewards?.bpBalance ?? 0) < item.priceBp} onClick={() => void purchase(item)} className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-secondary px-2 text-xs font-black text-secondary-foreground disabled:opacity-55"><CircleDollarSign className="h-3.5 w-3.5" /> {item.priceBp} BP</button>}
+                {item.lockReason ? <div className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-black text-muted-foreground"><Lock className="h-3.5 w-3.5" /> {item.lockReason}</div> : owned && item.equipable ? <button disabled={working !== null || equipped} onClick={() => void equip(item)} className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-2 text-xs font-black text-primary-foreground disabled:opacity-55">{equipped ? <><Check className="h-3.5 w-3.5" /> Equipped</> : "Equip"}</button> : owned ? <div className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-primary"><Check className="h-3.5 w-3.5" /> Owned</div> : item.source === "chest" ? <div className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border text-xs font-black text-muted-foreground"><Gift className="h-3.5 w-3.5" /> Chest reward</div> : item.source === "quest" || item.source === "achievement" || item.source === "tier" ? <div className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-black text-muted-foreground"><Lock className="h-3.5 w-3.5" /> {item.requirement ?? "Earn to unlock"}</div> : <button disabled={working !== null || (rewards?.bpBalance ?? 0) < item.priceBp} onClick={() => void purchase(item)} className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-secondary px-2 text-xs font-black text-secondary-foreground disabled:opacity-55"><CircleDollarSign className="h-3.5 w-3.5" /> {item.priceBp} BP</button>}
               </div>
             </motion.article>;
           })}

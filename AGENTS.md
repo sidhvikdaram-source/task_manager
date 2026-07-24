@@ -12,6 +12,11 @@
 - Exercise the changed interaction and relevant surrounding flow, check responsive behavior when applicable, and inspect the browser console for errors.
 - If browser verification is blocked by missing credentials or an unavailable dependency, complete all other verification and clearly report the blocker.
 
+## Required UI Design Skill
+
+- For user-interface design, redesign, layout, or motion work, read and apply the repository's `gpt-taste` skill at `.agents/skills/gpt-taste/SKILL.md`.
+- Adapt its visual principles to the existing product architecture and interaction model without breaking established functionality or introducing a competing framework without need.
+
 ## GitHub Delivery
 
 - After making repository changes, run appropriate verification, commit the completed changes, and push the current branch to GitHub.

@@ -2,6 +2,7 @@ import {
   useEffect,
   useId,
   useState,
+  type ReactNode,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link, useLocation } from "wouter";
@@ -35,6 +36,37 @@ const navLinks = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/analytics", label: "Insights", icon: ChartNoAxesCombined },
 ];
+
+function SlidingLabel({
+  show,
+  children,
+  className,
+}: {
+  show: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <AnimatePresence initial={false}>
+      {show && (
+        <motion.span
+          initial={reduceMotion ? false : { opacity: 0, x: -14 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -14 }}
+          transition={
+            reduceMotion
+              ? { duration: 0 }
+              : { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+          }
+          className={className}
+        >
+          {children}
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
 
 function NavItem({
   href,
@@ -86,9 +118,12 @@ function NavItem({
           />
         )}
         <Icon className="relative z-10 h-4 w-4 shrink-0" />
-        {!collapsed && (
-          <span className="relative z-10 flex-1">{label}</span>
-        )}
+        <SlidingLabel
+          show={!collapsed}
+          className="relative z-10 flex-1 whitespace-nowrap"
+        >
+          {label}
+        </SlidingLabel>
       </div>
     </Link>
   );
@@ -129,24 +164,40 @@ function SidebarBody({
           collapsed ? "justify-center px-2" : "gap-3 px-4",
         )}
       >
-        <Link href="/" onClick={onNavigate}>
-          <motion.div
-            className="flex cursor-pointer items-center gap-2.5"
-            whileHover={reduceMotion ? undefined : { scale: 1.03 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+        {collapsed && onToggle ? (
+          <motion.button
+            type="button"
+            onClick={onToggle}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.94 }}
             transition={{ type: "spring", stiffness: 400, damping: 22 }}
-            title="Velocity"
+            className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-[0_6px_14px_rgba(0,0,0,0.14)]"
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-[0_6px_14px_rgba(0,0,0,0.14)]">
-              <Zap className="h-5 w-5 fill-white text-white" />
-            </div>
-            {!collapsed && (
-              <span className="text-lg font-black tracking-tight">
+            <PanelLeftOpen className="h-5 w-5" />
+          </motion.button>
+        ) : (
+          <Link href="/" onClick={onNavigate}>
+            <motion.div
+              className="flex cursor-pointer items-center gap-2.5"
+              whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              transition={{ type: "spring", stiffness: 400, damping: 22 }}
+              title="Velocity"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-[0_6px_14px_rgba(0,0,0,0.14)]">
+                <Zap className="h-5 w-5 fill-white text-white" />
+              </div>
+              <SlidingLabel
+                show={!collapsed}
+                className="whitespace-nowrap text-lg font-black tracking-tight"
+              >
                 Velocity
-              </span>
-            )}
-          </motion.div>
-        </Link>
+              </SlidingLabel>
+            </motion.div>
+          </Link>
+        )}
         {onToggle && !collapsed && (
           <motion.button
             type="button"
@@ -169,11 +220,12 @@ function SidebarBody({
           collapsed ? "px-2" : "px-3",
         )}
       >
-        {!collapsed && (
-          <p className="mb-2 px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70">
-            Navigate
-          </p>
-        )}
+        <SlidingLabel
+          show={!collapsed}
+          className="mb-2 block px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70"
+        >
+          Navigate
+        </SlidingLabel>
         <nav className="space-y-0.5" aria-label="Primary navigation">
           {navLinks.map((item) => (
             <NavItem
@@ -214,7 +266,12 @@ function SidebarBody({
               />
             )}
             <Settings2 className="relative z-10 h-4 w-4" />
-            {!collapsed && <span className="relative z-10">Settings</span>}
+            <SlidingLabel
+              show={!collapsed}
+              className="relative z-10 whitespace-nowrap"
+            >
+              Settings
+            </SlidingLabel>
           </motion.div>
         </Link>
       </div>
@@ -275,19 +332,6 @@ function SidebarBody({
         </div>
       )}
 
-      {collapsed && onToggle && (
-        <motion.button
-          type="button"
-          onClick={onToggle}
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
-          whileHover={reduceMotion ? undefined : { scale: 1.1 }}
-          whileTap={reduceMotion ? undefined : { scale: 0.92 }}
-          className="absolute bottom-16 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-lg border bg-background text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground"
-        >
-          <PanelLeftOpen className="h-4 w-4" />
-        </motion.button>
-      )}
       </div>
     </LayoutGroup>
   );
@@ -336,10 +380,20 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   return (
     <>
       <motion.aside
-        className="relative hidden h-[100dvh] shrink-0 border-r border-border/70 lg:block"
+        data-sidebar-state={collapsed ? "collapsed" : "expanded"}
+        className="relative hidden h-[100dvh] shrink-0 overflow-hidden border-r border-border/70 bg-background/92 shadow-[12px_0_32px_hsl(var(--background)/.16)] backdrop-blur-xl lg:block"
         initial={false}
         animate={{ width: collapsed ? 64 : width }}
-        transition={reduceMotion || resizing ? { duration: 0 } : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        transition={
+          reduceMotion || resizing
+            ? { duration: 0 }
+            : {
+                type: "spring",
+                stiffness: 360,
+                damping: 34,
+                mass: 0.78,
+              }
+        }
       >
         <SidebarBody
           onNavigate={() => undefined}
@@ -384,7 +438,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : {
+                      type: "spring",
+                      stiffness: 330,
+                      damping: 32,
+                      mass: 0.8,
+                    }
+              }
               className="relative h-full w-[min(82vw,280px)] border-r border-border bg-background shadow-2xl"
             >
               <button

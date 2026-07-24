@@ -34,10 +34,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     );
   return (
     <div className="tech-shell flex h-[100dvh] w-full overflow-hidden bg-background">
+      <a
+        href="#main-content"
+        className="fixed left-4 top-3 z-[120] -translate-y-20 rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground shadow-xl transition-transform focus:translate-y-0"
+      >
+        Skip to content
+      </a>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopNav onOpenSidebar={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 overflow-x-hidden overflow-y-auto scroll-smooth pb-[calc(4rem+env(safe-area-inset-bottom))] outline-none md:pb-0"
+        >
           <div className="container mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-6">
             {children}
           </div>

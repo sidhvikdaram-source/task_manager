@@ -53,18 +53,29 @@ test("route transitions slide in the actual navigation direction", () => {
   assert.equal(routeDirection("/", "/calendar"), 1);
   assert.equal(routeDirection("/calendar", "/"), -1);
 
-  for (const style of [
+  const styles = [
     "velocity-slide",
     "soft-glide",
     "panel-sweep",
     "quick-stack",
-  ]) {
+  ];
+  const signatures = [];
+  for (const style of styles) {
     const forward = transitionMotion(style, 1);
     const backward = transitionMotion(style, -1);
     assert.ok(forward.initial.x > 0, `${style} should enter from the right`);
     assert.ok(backward.initial.x < 0, `${style} should enter from the left`);
     assert.equal(forward.animate.x, 0);
+    signatures.push(JSON.stringify({
+      initial: forward.initial,
+      transition: forward.transition,
+    }));
   }
+  assert.equal(
+    new Set(signatures).size,
+    styles.length,
+    "every equipped transition should produce distinct website motion",
+  );
 });
 
 test("Quick Capture uses one visible, forward-only trace and pauses off-page", () => {
