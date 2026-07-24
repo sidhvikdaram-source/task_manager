@@ -189,7 +189,7 @@ function TaskRow({
           {task.priority}
         </span>
         <div className="flex items-center gap-0.5 text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md">
-          <Zap className="w-3 h-3 fill-primary" />+{task.vpValue} VP
+          <Zap className="w-3 h-3 fill-primary" />+{task.vpValue} NP
         </div>
         <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
@@ -278,10 +278,10 @@ export default function Dashboard() {
           invalidate();
           if (result.tierUp) {
             toast.success(`Tier ${result.newTier} unlocked!`, {
-              description: `+${result.vpAwarded} VP earned. You've advanced to the next tier.`,
+              description: `+${result.vpAwarded} NP earned. You've advanced to the next tier.`,
             });
           } else {
-            toast.success(`+${result.vpAwarded} VP earned`, {
+            toast.success(`+${result.vpAwarded} NP earned`, {
               description:
                 result.multiplier > 1
                   ? `${result.multiplier}× multiplier applied`
@@ -387,7 +387,7 @@ export default function Dashboard() {
           <p className="mt-1 text-sm text-muted-foreground">
             {stats.totalVp === 0
               ? "Start completing tasks to build your velocity."
-              : `${vpToNextTier} VP to Tier ${stats.tier + 1}. ${activeTasks.length} active task${activeTasks.length === 1 ? "" : "s"}.`}
+              : `${vpToNextTier} NP to Tier ${stats.tier + 1}. ${activeTasks.length} active task${activeTasks.length === 1 ? "" : "s"}.`}
           </p>
         </div>
         <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
@@ -665,7 +665,7 @@ export default function Dashboard() {
                     : "Building Momentum"}
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">
-                Earn {vpToNextTier} VP to unlock Tier {stats.tier + 1}
+                Earn {vpToNextTier} NP to unlock Tier {stats.tier + 1}
               </div>
             </div>
 
@@ -697,7 +697,7 @@ export default function Dashboard() {
             <div className="space-y-1.5">
               <AnimatedProgressBar value={stats.tierProgress} />
               <div className="flex justify-between text-[11px] text-muted-foreground">
-                <span>{stats.tierProgress} VP earned</span>
+                <span>{stats.tierProgress} NP earned</span>
                 <span>{stats.tierProgress}%</span>
               </div>
             </div>

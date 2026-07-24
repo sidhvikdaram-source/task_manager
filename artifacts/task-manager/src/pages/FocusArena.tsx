@@ -191,7 +191,7 @@ export default function FocusArena() {
           stopFocusSound();
           setIsActive(false);
           setActiveSessionId(null);
-          toast.success(`Focus session complete! +${session.vpAwarded} VP`);
+          toast.success(`Focus session complete! +${session.vpAwarded} NP`);
           queryClient.invalidateQueries({
             queryKey: getListFocusSessionsQueryKey(),
           });
@@ -231,7 +231,7 @@ export default function FocusArena() {
     // Ideally we would have an abandon API, but completing it prematurely acts as abandon or we can just drop it if API doesn't support abandon.
     // We will just let it be or mark it if possible. The spec says Complete API, but status can be abandoned.
     // Given the hooks, we only have completeFocusSession. Let's just reset UI.
-    toast("Session abandoned", { description: "No VP awarded." });
+    toast("Session abandoned", { description: "No NP awarded." });
     queryClient.invalidateQueries({ queryKey: getListFocusSessionsQueryKey() });
   };
 
@@ -263,7 +263,7 @@ export default function FocusArena() {
           <p className="text-muted-foreground mt-1">
             {focusTask
               ? "One task, no competing backlog."
-              : "Deep work. Earn VP."}
+              : "Deep work. Earn NP."}
           </p>
         </div>
         {focusTask && (
@@ -474,7 +474,7 @@ export default function FocusArena() {
                     Start Session
                   </Button>
                   <p className="text-center text-xs font-black text-primary">
-                    Estimated reward: +{estimatedVp} VP
+                    Estimated reward: +{estimatedVp} NP
                   </p>
                 </motion.div>
               ) : (
@@ -543,7 +543,7 @@ export default function FocusArena() {
                         </span>
                         {session.vpAwarded && (
                           <span className="text-primary font-bold">
-                            +{session.vpAwarded} VP
+                            +{session.vpAwarded} NP
                           </span>
                         )}
                       </div>

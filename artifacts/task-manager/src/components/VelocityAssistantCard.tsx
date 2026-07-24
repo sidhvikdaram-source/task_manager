@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, FolderKanban, Loader2, Send, Sparkles, X, Zap } from 'lucide-react';
+import { Check, FolderKanban, Loader2, Send, Sparkles, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetDashboardOverviewQueryKey,
@@ -9,6 +9,7 @@ import {
   type Task,
 } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
+import { NimbusMascot } from '@/components/NimbusMascot';
 
 type ChatRole = 'assistant' | 'user';
 
@@ -56,11 +57,11 @@ const priorityRank: Record<Task['priority'], number> = {
 function AssistantLogo({ className, circular = false }: { className?: string; circular?: boolean }) {
   return (
     <span className={cn(
-      'logo-mark inline-flex h-8 w-8 shrink-0 items-center justify-center bg-primary text-primary-foreground',
-      circular && '!rounded-full bg-[#141414] text-white shadow-[0_8px_18px_rgba(0,0,0,0.18)] [&_svg]:fill-white [&_svg]:text-white',
+      'inline-flex h-8 w-9 shrink-0 items-center justify-center',
+      circular && 'rounded-full bg-violet-100/80 shadow-[0_8px_18px_rgba(73,52,156,0.18)]',
       className,
     )}>
-      <Zap className="h-4 w-4 fill-primary-foreground" />
+      <NimbusMascot state="assistant" className="h-full w-full" />
     </span>
   );
 }
@@ -144,7 +145,7 @@ export function VelocityAssistantCard() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'I organize your Velocity workspace. Try: "Prioritize today\'s tasks" or "Create a science project with three study tasks."',
+      content: 'I am Nimbo, your Nimbus planning companion. Try: "Prioritize today\'s tasks" or "Create a science project with three study tasks."',
     },
   ]);
   const [input, setInput] = useState('');
@@ -155,7 +156,7 @@ export function VelocityAssistantCard() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const canSend = input.trim().length > 0 && !isSending;
-  const placeholder = useMemo(() => isSending ? 'Velocity Assistant is thinking...' : 'Create, sort, schedule, or review work...', [isSending]);
+  const placeholder = useMemo(() => isSending ? 'Nimbo is thinking...' : 'Create, sort, schedule, or review work...', [isSending]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -300,7 +301,7 @@ export function VelocityAssistantCard() {
         setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, workspacePreview: data.workspacePreview ?? undefined } : message));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Velocity Assistant hit a snag. Please try again.';
+      const message = error instanceof Error ? error.message : 'Nimbo hit a snag. Please try again.';
       await animateAssistantMessage(assistantId, message);
     } finally {
       setIsSending(false);
@@ -320,13 +321,13 @@ export function VelocityAssistantCard() {
             'bento-card fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-2 right-2 z-[70] flex h-[min(42rem,calc(100dvh-6rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:w-[28rem] sm:p-5',
             isFocused && 'ring-2 ring-primary/35 shadow-[0_0_42px_hsl(var(--primary)/0.18)]',
           )}
-          aria-label="Velocity Assistant"
+          aria-label="Nimbo assistant"
         >
           <div className="flex shrink-0 items-center gap-3 border-b border-border/70 pb-3">
             <AssistantLogo circular className="h-9 w-9 [&_svg]:h-4 [&_svg]:w-4" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h2 className="tech-title truncate text-base">Velocity Assistant</h2>
+                <h2 className="tech-title truncate text-base">Nimbo</h2>
                 <Sparkles className="h-3.5 w-3.5 shrink-0 text-secondary" />
               </div>
               <p className="text-[11px] text-muted-foreground">Nothing changes until you confirm.</p>
@@ -335,7 +336,7 @@ export function VelocityAssistantCard() {
               type="button"
               onClick={() => setIsOpen(false)}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Close Velocity Assistant"
+              aria-label="Close Nimbo"
               title="Close assistant"
             >
               <X className="h-4 w-4" />
@@ -376,10 +377,10 @@ export function VelocityAssistantCard() {
           whileTap={{ scale: 0.94 }}
           onClick={() => setIsOpen(true)}
           className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-50 flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full border border-white/15 bg-[#141414] text-white shadow-[0_12px_34px_rgba(0,0,0,0.34)] sm:bottom-5 sm:right-5 sm:h-14 sm:w-14"
-          aria-label="Open Velocity Assistant"
-          title="Velocity Assistant"
+          aria-label="Open Nimbo"
+          title="Nimbo"
         >
-          <Zap className="h-6 w-6 fill-white text-white" />
+          <NimbusMascot state="assistant" className="h-12 w-13" />
         </motion.button>
       )}
     </AnimatePresence>

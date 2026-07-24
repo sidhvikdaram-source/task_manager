@@ -24,7 +24,7 @@ const priorityColors = {
 
 function parseVelocityType(notes?: string | null) {
   if (!notes) return null;
-  const match = notes.match(/^Velocity Type:\s*(\[[^\]]+\])\s*(.+)$/m);
+  const match = notes.match(/^(?:Nimbus|Velocity) Type:\s*(\[[^\]]+\])\s*(.+)$/m);
   if (!match?.[1] || !match?.[2]) return null;
   return { symbol: match[1], label: match[2] };
 }
@@ -87,7 +87,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
             exit={{ opacity: 0, scale: 0.98, y: -4 }}
             className="pointer-events-none absolute inset-x-4 top-3 z-10 rounded-xl border border-primary/30 bg-primary px-3 py-2 text-center text-xs font-black text-primary-foreground shadow-lg"
           >
-            Complete +VP
+            Complete +NP
           </motion.div>
         )}
         </AnimatePresence>
@@ -147,7 +147,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
 
             {task.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>}
             <div className="mt-3 flex items-center gap-3 text-xs">
-              <Badge variant="secondary" className="font-mono font-medium">+{task.vpValue} VP</Badge>
+              <Badge variant="secondary" className="font-mono font-medium">+{task.vpValue} NP</Badge>
               {task.dueDate && (
                 <div className={`flex items-center gap-1.5 ${isOverdue ? "font-medium text-destructive" : "text-muted-foreground"}`}>
                   <Clock className="h-3.5 w-3.5" />

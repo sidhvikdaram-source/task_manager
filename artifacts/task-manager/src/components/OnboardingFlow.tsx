@@ -103,7 +103,7 @@ export function OnboardingFlow() {
               <Zap className="h-5 w-5 fill-white" />
             </div>
             <div>
-              <p className="font-black">Set up Velocity</p>
+              <p className="font-black">Set up Nimbus</p>
               <p className="text-xs text-muted-foreground">About 30 seconds</p>
             </div>
           </div>

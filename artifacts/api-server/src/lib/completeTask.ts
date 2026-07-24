@@ -83,10 +83,10 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
     const bpAwarded = dailyBp.awarded + momentumRewards.reduce((sum, reward) => sum + reward.bp, 0);
 
     const copy: Record<number, [string, string]> = {
-      50: ["First Sprint", "Earned your first 50 VP"], 100: ["Century Mark", "Reached 100 total VP"],
-      250: ["Momentum Builder", "250 VP milestone achieved"], 500: ["High Velocity", "500 VP milestone achieved"],
-      1000: ["Elite Operator", "1000 VP milestone achieved"], 2500: ["Velocity Master", "2500 VP milestone achieved"],
-      5000: ["Legendary Status", "5000 VP achieved"],
+      50: ["First Sprint", "Earned your first 50 NP"], 100: ["Century Mark", "Reached 100 total NP"],
+      250: ["Momentum Builder", "250 NP milestone achieved"], 500: ["High Momentum", "500 NP milestone achieved"],
+      1000: ["Elite Operator", "1000 NP milestone achieved"], 2500: ["Nimbus Master", "2500 NP milestone achieved"],
+      5000: ["Legendary Status", "5000 NP achieved"],
     };
     for (const threshold of Object.keys(copy).map(Number)) {
       if (stats.totalVp < threshold && newTotal >= threshold) {

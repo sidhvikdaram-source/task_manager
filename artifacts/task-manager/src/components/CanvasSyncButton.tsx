@@ -11,7 +11,7 @@ export function CanvasSyncButton({ className }: { className?: string }) {
   const restoreAll = async () => {
     if (
       !window.confirm(
-        "Restore every hidden Canvas assignment and calendar item to Velocity? Canvas itself will not change.",
+        "Restore every hidden Canvas assignment and calendar item to Nimbus? Canvas itself will not change.",
       )
     )
       return;

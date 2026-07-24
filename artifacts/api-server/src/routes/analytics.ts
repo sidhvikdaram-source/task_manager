@@ -103,7 +103,7 @@ router.get("/analytics/insights", async (req, res): Promise<void> => {
   }
 
   const vpRemaining = stats.tierProgress === 0 && stats.totalVp > 0 ? 100 : 100 - stats.tierProgress;
-  insights.push({ type: "tier", text: `You are ${vpRemaining} VP away from your next tier.`, sampleSize: 1 });
+  insights.push({ type: "tier", text: `You are ${vpRemaining} NP away from your next tier.`, sampleSize: 1 });
   res.json(insights);
 });
 

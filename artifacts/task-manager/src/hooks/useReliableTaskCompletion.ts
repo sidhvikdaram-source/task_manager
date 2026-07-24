@@ -94,7 +94,7 @@ export function useReliableTaskCompletion() {
           detail: { momentumDays: result.streakDays },
         }));
       }
-      toast.success(result.vpAwarded ? `Done - +${result.vpAwarded} VP` : "Task complete");
+      toast.success(result.vpAwarded ? `Done - +${result.vpAwarded} NP` : "Task complete");
       if (result.bpAwarded) {
         const milestone = result.momentumRewards?.at(-1);
         toast.success(`+${result.bpAwarded} BP earned`, {

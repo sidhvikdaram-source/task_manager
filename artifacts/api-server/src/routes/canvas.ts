@@ -628,7 +628,7 @@ router.post("/canvas/ignore", async (req, res): Promise<void> => {
         reason:
           typeof req.body?.reason === "string"
             ? req.body.reason.slice(0, 200)
-            : "Removed from Velocity",
+            : "Removed from Nimbus",
       })
       .onConflictDoNothing();
   }

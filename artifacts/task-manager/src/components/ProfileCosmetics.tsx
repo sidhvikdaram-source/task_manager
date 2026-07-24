@@ -10,8 +10,6 @@ import {
   Boxes,
   Circle,
   CircleDot,
-  Cloud,
-  CloudLightning,
   Cpu,
   Flower2,
   Gem,
@@ -19,6 +17,7 @@ import {
   Mountain,
   Music2,
   Orbit,
+  PawPrint,
   Rocket,
   Sparkles,
   Star,
@@ -48,7 +47,7 @@ const frameClasses: Record<string, string> = {
 export function ProfilePhoto({
   frameId = "none",
   profileImageUrl,
-  name = "Velocity member",
+  name = "Nimbus member",
   className,
 }: {
   frameId?: string | null;
@@ -56,7 +55,7 @@ export function ProfilePhoto({
   name?: string;
   className?: string;
 }) {
-  const initial = name.trim().charAt(0).toUpperCase() || "V";
+  const initial = name.trim().charAt(0).toUpperCase() || "N";
   return (
     <div className={cn("relative aspect-square shrink-0", frameClasses[frameId ?? "none"] ?? frameClasses.none, className)}>
       <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2 border-background bg-primary text-xl font-black text-primary-foreground">
@@ -81,7 +80,7 @@ export function FramePreview({ frameId, className }: { frameId: string; classNam
 const stageThresholds = [0, 500, 1200, 2200, 3600];
 const petDefinitions = {
   "pixel-spark": { stages: 5, icons: [Sparkles, Star, Asterisk, Star, Sparkles], color: "bg-violet-500 text-white" },
-  "cloud-bit": { stages: 4, icons: [Cloud, Cloud, CloudLightning, CloudLightning], color: "bg-sky-200 text-sky-950" },
+  "cloud-bit": { stages: 4, icons: [PawPrint, PawPrint, Leaf, Rocket], color: "bg-lime-300 text-emerald-950" },
   "focus-cube": { stages: 3, icons: [Box, Boxes, Boxes], color: "bg-orange-400 text-slate-950" },
   "study-bot": { stages: 5, icons: [Bot, Bot, Cpu, Bot, Cpu], color: "bg-slate-800 text-cyan-300" },
   leafling: { stages: 4, icons: [Leaf, Flower2, TreePine, TreePine], color: "bg-emerald-400 text-emerald-950" },
@@ -133,8 +132,11 @@ export function PetPreview({
 
   if (!definition || !petId) return null;
   const Icon = definition.icons[stage] ?? definition.icons[0];
+  const petLabel = petId === "cloud-bit"
+    ? "Gust Gecko"
+    : petId.replace(/-/g, " ");
   const activeAnimation = petId === "cloud-bit"
-    ? { y: [0, -7, 1, 0], x: [0, 3, -2, 0], scale: [1, 1.13, 0.98, 1] }
+    ? { y: [0, -3, 1, 0], x: [0, 10, -4, 0], rotate: [0, -5, 3, 0], scale: [1, 1.08, 0.98, 1] }
     : petId === "study-bot"
       ? { rotate: [0, -7, 7, 0], y: [0, -3, 0], scale: [1, 1.08, 1] }
       : petId === "pixel-spark" || petId === "orbit-orb"
@@ -145,7 +147,7 @@ export function PetPreview({
 
   return (
     <motion.div
-      aria-label={`${petId.replace(/-/g, " ")} pet`}
+      aria-label={`${petLabel} pet`}
       animate={
         !animated || reduceMotion
           ? undefined

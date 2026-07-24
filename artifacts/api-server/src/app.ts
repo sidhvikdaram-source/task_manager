@@ -46,7 +46,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   if (!database.ready && req.path.startsWith("/api/")) {
     res.status(503).json({
       error:
-        "Velocity's database is temporarily unavailable. The server is reconnecting automatically.",
+        "Nimbus's database is temporarily unavailable. The server is reconnecting automatically.",
       code: "DATABASE_UNAVAILABLE",
       retryAfterSeconds: 30,
     });

@@ -42,6 +42,7 @@ const storeCollectables: RewardItem[] = STORE_ITEMS;
 const freeCollectables: RewardItem[] = DEFAULT_ITEMS;
 const chestCollectables: RewardItem[] = CHEST_ITEMS;
 const collectables: RewardItem[] = ECONOMY_ITEMS;
+const ADMIN_BALANCE = 999_999_999;
 
 type UnlockContext = {
   tier: number;
@@ -103,21 +104,21 @@ const titles: TitleDefinition[] = [
   title("lock-in-era", "Lock In Era", "Focus for 120 minutes", "achievement", (c) => c.focusMinutes >= 120),
   title("canvas-clear", "Canvas Clear", "Complete 20 Canvas tasks", "achievement", (c) => c.completed.filter((task) => task.externalSource === "canvas").length >= 20),
   title("gg-wp", "GG WP", "Complete 25 tasks", "achievement", (c) => c.tasksCompleted >= 25),
-  title("trust-the-process", "Trust The Process", "Earn 500 lifetime VP", "tier", (c) => c.earnedVp >= 500),
+  title("trust-the-process", "Trust The Process", "Earn 500 lifetime NP", "tier", (c) => c.earnedVp >= 500),
   title("clutch-player", "Clutch Player", "Complete 5 critical tasks", "quest", (c) => c.completed.filter((task) => task.priority === "critical").length >= 5),
   title("locked-in", "Locked In", "Focus for 600 minutes", "achievement", (c) => c.focusMinutes >= 600),
   title("in-the-zone", "In The Zone", "Focus for 1,200 minutes", "achievement", (c) => c.focusMinutes >= 1200),
   title("dialed-in", "Dialed In", "Focus for 2,400 minutes", "achievement", (c) => c.focusMinutes >= 2400),
   title("zero-backlog", "Zero Backlog", "Clear every active task after completing 10", "quest", (c) => c.tasksCompleted >= 10 && c.activeCount === 0),
   title("top-tier", "Top Tier", "Reach Tier 10", "tier", (c) => c.tier >= 10),
-  title("unbothered", "Unbothered", "Earn 1,500 lifetime VP", "tier", (c) => c.earnedVp >= 1500),
+  title("unbothered", "Unbothered", "Earn 1,500 lifetime NP", "tier", (c) => c.earnedVp >= 1500),
   title("built-different", "Built Different", "Complete 100 tasks", "achievement", (c) => c.tasksCompleted >= 100),
   title("overachiever", "Overachiever", "Complete 150 tasks", "achievement", (c) => c.tasksCompleted >= 150),
   title("backend-main", "Backend Main", "Complete 5 backend tasks", "quest", (c) => hasCompleted(c, /\b(backend|server|database|api)\b/i, 5)),
   title("full-stack", "Full Stack", "Complete 8 frontend or backend tasks", "quest", (c) => hasCompleted(c, /\b(frontend|backend|full stack|database|api|react)\b/i, 8)),
   title("bug-fixer", "Bug Fixer", "Complete 5 debugging tasks", "quest", (c) => hasCompleted(c, /\b(bug|debug|fix|repair)\b/i, 5)),
   title("git-push", "Git Push", "Complete 3 Git or deployment tasks", "quest", (c) => hasCompleted(c, /\b(git|push|deploy|release)\b/i, 3)),
-  title("terminal-velocity", "Terminal Velocity", "Reach Tier 20", "tier", (c) => c.tier >= 20),
+  title("terminal-velocity", "Nimbus Strider", "Reach Tier 20", "tier", (c) => c.tier >= 20),
   title("calc-ready", "Calc Ready", "Complete 10 math tasks", "achievement", (c) => hasCompleted(c, /\b(math|algebra|geometry|calculus|trig)\b/i, 10)),
   title("4-0-grind", "4.0 Grind", "Complete 50 school tasks", "achievement", (c) => c.completed.filter((task) => Boolean(task.subject)).length >= 50),
   title("mathletes", "Mathletes", "Complete 25 math tasks", "achievement", (c) => hasCompleted(c, /\b(math|algebra|geometry|calculus|trig|amc)\b/i, 25)),
@@ -130,6 +131,23 @@ const titles: TitleDefinition[] = [
 
 function findItem(itemId: string) {
   return collectables.find((item) => item.id === itemId) ?? titles.find((item) => item.id === itemId);
+}
+
+async function getRewardAdminUser(userId: string) {
+  return db
+    .select({
+      isAdmin: usersTable.isAdmin,
+      adminModeEnabled: usersTable.adminModeEnabled,
+      adminLoadout: usersTable.adminLoadout,
+      adminChestCount: usersTable.adminChestCount,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .then((rows) => rows[0]);
+}
+
+function isAdminSandbox(user: Awaited<ReturnType<typeof getRewardAdminUser>>) {
+  return Boolean(user?.isAdmin && user.adminModeEnabled);
 }
 
 const equipUpdates: Partial<Record<RewardKind, (itemId: string) => Partial<typeof usersTable.$inferInsert>>> = {
@@ -156,10 +174,11 @@ router.get("/rewards", async (req, res): Promise<void> => {
   const [stats, ownedRows, user, tasks, chests] = await Promise.all([
     db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id)).then((rows) => rows[0]),
     db.select({ itemId: userCosmeticsTable.itemId }).from(userCosmeticsTable).where(eq(userCosmeticsTable.userId, req.user.id)),
-    db.select({ equippedFrame: usersTable.equippedFrame, equippedPet: usersTable.equippedPet, equippedTitle: usersTable.equippedTitle, equippedCompletionEffect: usersTable.equippedCompletionEffect, equippedTransition: usersTable.equippedTransition, equippedProfileTheme: usersTable.equippedProfileTheme, equippedFocusSound: usersTable.equippedFocusSound, equippedBadgeDisplay: usersTable.equippedBadgeDisplay, equippedMomentumCosmetic: usersTable.equippedMomentumCosmetic, profileImageUrl: usersTable.profileImageUrl }).from(usersTable).where(eq(usersTable.id, req.user.id)).then((rows) => rows[0]),
+    db.select({ equippedFrame: usersTable.equippedFrame, equippedPet: usersTable.equippedPet, equippedTitle: usersTable.equippedTitle, equippedCompletionEffect: usersTable.equippedCompletionEffect, equippedTransition: usersTable.equippedTransition, equippedProfileTheme: usersTable.equippedProfileTheme, equippedFocusSound: usersTable.equippedFocusSound, equippedBadgeDisplay: usersTable.equippedBadgeDisplay, equippedMomentumCosmetic: usersTable.equippedMomentumCosmetic, profileImageUrl: usersTable.profileImageUrl, isAdmin: usersTable.isAdmin, adminModeEnabled: usersTable.adminModeEnabled, adminLoadout: usersTable.adminLoadout, adminChestCount: usersTable.adminChestCount }).from(usersTable).where(eq(usersTable.id, req.user.id)).then((rows) => rows[0]),
     db.select().from(tasksTable).where(eq(tasksTable.userId, req.user.id)),
     db.select().from(userRewardChestsTable).where(eq(userRewardChestsTable.userId, req.user.id)).orderBy(desc(userRewardChestsTable.awardedAt)),
   ]);
+  const sandbox = Boolean(user?.isAdmin && user.adminModeEnabled);
   const completed = tasks.filter((task) => task.status === "completed");
   const context: UnlockContext = {
     tier: stats?.tier ?? 1,
@@ -170,9 +189,13 @@ router.get("/rewards", async (req, res): Promise<void> => {
     completed,
     activeCount: tasks.filter((task) => task.status !== "completed" && !task.archived).length,
   };
-  const unlockedTitles = titles.filter((item) => item.test(context));
+  const unlockedTitles = sandbox ? [] : titles.filter((item) => item.test(context));
   const owned = new Set(ownedRows.map((entry) => entry.itemId));
   freeCollectables.forEach((item) => owned.add(item.id));
+  if (sandbox) {
+    collectables.forEach((item) => owned.add(item.id));
+    titles.forEach((item) => owned.add(item.id));
+  }
   const newlyUnlocked = unlockedTitles.filter((item) => !owned.has(item.id));
   const achievementBpAwarded = newlyUnlocked.length
     ? await db.transaction(async (tx) => {
@@ -202,21 +225,54 @@ router.get("/rewards", async (req, res): Promise<void> => {
   ]);
   const publicItems = [...collectables, ...titles.map(({ test: _test, ...item }) => item)].map((item) => ({
     ...item,
-    lockReason: itemLockReason(item, context.tier, context.momentum),
+    lockReason: sandbox ? null : itemLockReason(item, context.tier, context.momentum),
   }));
+  const regularEquipped = {
+    frame: user?.equippedFrame ?? "none",
+    pet: user?.equippedPet ?? "none",
+    title: user?.equippedTitle ?? "none",
+    completion_effect: user?.equippedCompletionEffect ?? "clean-confetti",
+    transition: user?.equippedTransition ?? "velocity-slide",
+    profile_theme: user?.equippedProfileTheme ?? "none",
+    focus_sound: user?.equippedFocusSound ?? "none",
+    badge_display: user?.equippedBadgeDisplay ?? "none",
+    momentum_cosmetic: user?.equippedMomentumCosmetic ?? "none",
+    chest_key: "none",
+  };
+  const equipped = sandbox
+    ? { ...regularEquipped, ...(user?.adminLoadout ?? {}) }
+    : regularEquipped;
+  const adminChest = sandbox && (user?.adminChestCount ?? 0) > 0
+    ? [{
+        id: -1,
+        userId: req.user.id,
+        sourceKey: "admin-sandbox",
+        rarity: "legendary",
+        status: "unopened",
+        rewardItemId: null,
+        vpFallback: 0,
+        bpReward: 0,
+        chestKeysReward: 0,
+        requiresKey: false,
+        awardedAt: new Date(),
+        openedAt: null,
+      }]
+    : [];
+  const visibleChests = [...adminChest, ...chests];
   res.json({
-    bpBalance: currentStats?.bpBalance ?? 0,
-    lifetimeBp: currentStats?.lifetimeBp ?? 0,
-    chestKeys: currentStats?.chestKeys ?? 0,
-    vpTotal: currentStats?.totalVp ?? 0,
-    earnedVp: context.earnedVp,
+    adminModeEnabled: sandbox,
+    bpBalance: sandbox ? ADMIN_BALANCE : currentStats?.bpBalance ?? 0,
+    lifetimeBp: sandbox ? ADMIN_BALANCE : currentStats?.lifetimeBp ?? 0,
+    chestKeys: sandbox ? 9_999 : currentStats?.chestKeys ?? 0,
+    vpTotal: sandbox ? ADMIN_BALANCE : currentStats?.totalVp ?? 0,
+    earnedVp: sandbox ? ADMIN_BALANCE : context.earnedVp,
     owned: [...owned],
     newlyUnlockedTitles: newlyUnlocked.map((item) => item.name),
     achievementBpAwarded,
-    equipped: { frame: user?.equippedFrame ?? "none", pet: user?.equippedPet ?? "none", title: user?.equippedTitle ?? "none", completion_effect: user?.equippedCompletionEffect ?? "clean-confetti", transition: user?.equippedTransition ?? "velocity-slide", profile_theme: user?.equippedProfileTheme ?? "none", focus_sound: user?.equippedFocusSound ?? "none", badge_display: user?.equippedBadgeDisplay ?? "none", momentum_cosmetic: user?.equippedMomentumCosmetic ?? "none", chest_key: "none" },
+    equipped,
     profileImageUrl: user?.profileImageUrl ?? null,
-    chests,
-    unopenedChestCount: chests.filter((chest) => chest.status === "unopened").length,
+    chests: visibleChests,
+    unopenedChestCount: visibleChests.filter((chest) => chest.status === "unopened").length,
     transactions,
     items: publicItems,
   });
@@ -226,6 +282,45 @@ router.post("/rewards/chests/:id/open", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const chestId = Number(req.params.id);
   if (!Number.isInteger(chestId)) { res.status(400).json({ error: "Invalid chest." }); return; }
+  if (chestId === -1) {
+    const admin = await getRewardAdminUser(req.user.id);
+    if (!isAdminSandbox(admin) || (admin?.adminChestCount ?? 0) < 1) {
+      res.status(409).json({ error: "This test chest is no longer available." });
+      return;
+    }
+    const finalRarity = ["common", "rare", "epic", "legendary"][randomInt(4)] as ChestRarity;
+    const candidates = chestCollectables.filter((item) => item.chestRarity === finalRarity);
+    const reward = candidates.length ? candidates[randomInt(candidates.length)] : null;
+    await db
+      .update(usersTable)
+      .set({ adminChestCount: 0, updatedAt: new Date() })
+      .where(eq(usersTable.id, req.user.id));
+    res.json({
+      chest: {
+        id: -1,
+        userId: req.user.id,
+        sourceKey: "admin-sandbox",
+        rarity: finalRarity,
+        status: "opened",
+        rewardItemId: reward?.id ?? null,
+        vpFallback: 0,
+        bpReward: reward ? 0 : 250,
+        chestKeysReward: 0,
+        requiresKey: false,
+        awardedAt: new Date(),
+        openedAt: new Date(),
+      },
+      reward,
+      rewardType: reward ? "item" : "bp",
+      bpReward: reward ? 0 : 250,
+      chestKeysReward: 0,
+      initialRarity: "legendary",
+      finalRarity,
+      upgraded: false,
+      sandbox: true,
+    });
+    return;
+  }
   try {
     const result = await db.transaction(async (tx) => {
       await lockEconomyUser(tx, req.user.id);
@@ -296,6 +391,16 @@ router.post("/rewards/:itemId/purchase", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const item = findItem(req.params.itemId);
   if (!item) { res.status(404).json({ error: "Unknown reward." }); return; }
+  const admin = await getRewardAdminUser(req.user.id);
+  if (isAdminSandbox(admin)) {
+    res.status(201).json({
+      bpBalance: ADMIN_BALANCE,
+      chestKeys: 9_999,
+      item,
+      sandbox: true,
+    });
+    return;
+  }
   if (item.source !== "store" || item.priceBp <= 0) { res.status(400).json({ error: "This reward must be earned, not purchased." }); return; }
   try {
     const response = await db.transaction(async (tx) => {
@@ -330,6 +435,16 @@ router.post("/rewards/:itemId/equip", async (req, res): Promise<void> => {
   if (!item) { res.status(404).json({ error: "Unknown reward." }); return; }
   const makeUpdate = equipUpdates[item.kind];
   if (!item.equipable || !makeUpdate) { res.status(400).json({ error: "This item is used rather than equipped." }); return; }
+  const admin = await getRewardAdminUser(req.user.id);
+  if (isAdminSandbox(admin)) {
+    const adminLoadout = { ...(admin?.adminLoadout ?? {}), [item.kind]: item.id };
+    await db
+      .update(usersTable)
+      .set({ adminLoadout, updatedAt: new Date() })
+      .where(eq(usersTable.id, req.user.id));
+    res.json({ kind: item.kind, equipped: item.id, sandbox: true });
+    return;
+  }
   const owned = item.source === "default" || await db.select().from(userCosmeticsTable).where(and(eq(userCosmeticsTable.userId, req.user.id), eq(userCosmeticsTable.itemId, item.id))).then((rows) => rows.length > 0);
   if (!owned) { res.status(403).json({ error: item.kind === "title" ? "Complete its requirement before equipping this title." : "Purchase this item before equipping it." }); return; }
   const update = makeUpdate(item.id);
@@ -349,6 +464,19 @@ router.delete("/rewards/equipped/:kind", async (req, res): Promise<void> => {
     : req.params.kind === "transition"
       ? "velocity-slide"
       : "none";
+  const admin = await getRewardAdminUser(req.user.id);
+  if (isAdminSandbox(admin)) {
+    const adminLoadout = {
+      ...(admin?.adminLoadout ?? {}),
+      [req.params.kind]: defaultItem,
+    };
+    await db
+      .update(usersTable)
+      .set({ adminLoadout, updatedAt: new Date() })
+      .where(eq(usersTable.id, req.user.id));
+    res.json({ kind: req.params.kind, equipped: defaultItem, sandbox: true });
+    return;
+  }
   const update = makeUpdate(defaultItem);
   await db.update(usersTable).set({ ...update, updatedAt: new Date() }).where(eq(usersTable.id, req.user.id));
   res.json({ kind: req.params.kind, equipped: defaultItem });

@@ -38,6 +38,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ProfilePhoto } from "@/components/ProfileCosmetics";
 import type { RewardsResponse } from "@/pages/Profile";
 import { toast } from "sonner";
+import { NimbusMascot } from "@/components/NimbusMascot";
+import { localDateKey } from "@/lib/localDate";
 
 const CreateTaskModal = lazy(() =>
   import("@/components/CreateTaskModal").then((module) => ({
@@ -91,6 +93,15 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
       rewards?.items.find((item) => item.id === rewards.equipped.title)?.name,
     [rewards],
   );
+  const hasOverdue = useMemo(() => {
+    const today = localDateKey(new Date());
+    return (tasks ?? []).some(
+      (task) =>
+        task.status !== "completed" &&
+        !task.archived &&
+        Boolean(task.dueDate && task.dueDate < today),
+    );
+  }, [tasks]);
   const accountRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const themesRef = useRef<HTMLDivElement>(null);
@@ -161,11 +172,9 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
           </button>
           <Link href="/" className="lg:hidden">
             <div className="flex cursor-pointer items-center gap-2.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-sm">
-                <Zap className="h-5 w-5 fill-white text-white" />
-              </div>
+              <NimbusMascot state={hasOverdue ? "overdue" : "ready"} className="h-11 w-12 shrink-0" />
               <span className="hidden text-lg font-black tracking-tight text-foreground sm:inline">
-                Velocity
+                Nimbus
               </span>
             </div>
           </Link>
@@ -175,11 +184,11 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
               <p className="mt-0.5 flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
                 <span>{stats?.streakDays ?? 0} Momentum days</span>
                 <span aria-hidden="true">/</span>
-                <span>Tier {stats?.tier ?? 1}, {stats?.tierProgress ?? 0}/100 VP</span>
+                <span>Tier {stats?.tier ?? 1}, {stats?.tierProgress ?? 0}/100 NP</span>
               </p>
             </div>
           ) : (
-            <h1 className="truncate text-base font-black sm:text-lg">{pageTitles[location] ?? "Velocity"}</h1>
+            <h1 className="truncate text-base font-black sm:text-lg">{pageTitles[location] ?? "Nimbus"}</h1>
           )}
         </div>
 
@@ -352,7 +361,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                       {equippedTitle && <p className="mt-1 truncate text-[10px] font-black uppercase text-primary">{equippedTitle}</p>}
                       {stats && (
                         <div className="mt-2 rounded-lg bg-primary/10 px-2 py-1.5 text-[11px] font-bold text-primary">
-                          <div className="flex items-center justify-between"><span>Tier {stats.tier}</span><span>{100 - stats.tierProgress} VP to next</span></div>
+                          <div className="flex items-center justify-between"><span>Tier {stats.tier}</span><span>{100 - stats.tierProgress} NP to next</span></div>
                           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-primary/15"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${stats.tierProgress}%` }} /></div>
                         </div>
                       )}

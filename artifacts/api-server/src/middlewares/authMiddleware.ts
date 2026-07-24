@@ -72,7 +72,7 @@ export async function authMiddleware(
     req.user = {
       id: "demo-user",
       email: "demo@velocity.app",
-      firstName: "Velocity",
+      firstName: "Nimbus",
       lastName: "User",
       profileImageUrl: null,
     };

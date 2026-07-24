@@ -22,14 +22,23 @@ router.get("/user/stats", async (req, res): Promise<void> => {
       .returning();
     stats = newStats;
   }
+  const [user] = await db
+    .select({
+      isAdmin: usersTable.isAdmin,
+      adminModeEnabled: usersTable.adminModeEnabled,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+  const sandbox = Boolean(user?.isAdmin && user.adminModeEnabled);
   res.json({
-    totalVp: stats.totalVp,
-    tier: stats.tier,
-    tierProgress: stats.tierProgress,
+    totalVp: sandbox ? 999_999_999 : stats.totalVp,
+    tier: sandbox ? 99 : stats.tier,
+    tierProgress: sandbox ? 100 : stats.tierProgress,
     streakDays: stats.streakDays,
-    multiplier: stats.multiplier,
+    multiplier: sandbox ? 9.9 : stats.multiplier,
     tasksCompleted: stats.tasksCompleted,
     focusMinutes: stats.focusMinutes,
+    adminModeEnabled: sandbox,
   });
 });
 

@@ -112,14 +112,14 @@ export default function Analytics() {
 
         <div className="p-4 bg-card rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-muted-foreground text-sm font-medium mb-1 flex items-center gap-2">
-            <Trophy className="w-4 h-4" /> Total VP
+            <Trophy className="w-4 h-4" /> Total NP
           </div>
           <div className="text-2xl font-bold">{summary.totalVp}</div>
         </div>
 
         <div className="p-4 bg-card rounded-xl border shadow-sm flex flex-col justify-center">
           <div className="text-muted-foreground text-sm font-medium mb-1 flex items-center gap-2">
-            <Zap className="w-4 h-4" /> Avg Daily VP
+            <Zap className="w-4 h-4" /> Avg Daily NP
           </div>
           <div className="text-2xl font-bold">{summary.avgDailyVp}</div>
         </div>
@@ -166,7 +166,7 @@ export default function Analytics() {
       <div className="grid md:grid-cols-[1fr_350px] gap-8 items-start">
         <div className="bg-card border rounded-2xl shadow-sm p-6">
           <h2 className="text-lg font-semibold mb-6">
-            Velocity History (30 Days)
+            Nimbus Points history (30 days)
           </h2>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -210,7 +210,7 @@ export default function Analytics() {
                   axisLine={false}
                   tickFormatter={(val) => `${val}`}
                   width={44}
-                  label={{ value: "VP", angle: -90, position: "insideLeft" }}
+                  label={{ value: "NP", angle: -90, position: "insideLeft" }}
                 />
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -277,7 +277,7 @@ export default function Analytics() {
 
             {(!milestones || milestones.length === 0) && (
               <div className="text-center p-8 text-muted-foreground bg-card border rounded-xl shadow-sm text-sm">
-                Complete tasks and earn VP to unlock milestones.
+                Complete tasks and earn NP to unlock milestones.
               </div>
             )}
           </div>

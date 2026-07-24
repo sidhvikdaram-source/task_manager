@@ -71,6 +71,13 @@ export const usersTable = pgTable("users", {
   equippedMomentumCosmetic: varchar("equipped_momentum_cosmetic")
     .notNull()
     .default("none"),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  adminModeEnabled: boolean("admin_mode_enabled").notNull().default(false),
+  adminLoadout: jsonb("admin_loadout")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default({}),
+  adminChestCount: integer("admin_chest_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

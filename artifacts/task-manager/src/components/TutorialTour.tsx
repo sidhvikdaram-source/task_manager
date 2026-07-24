@@ -13,7 +13,7 @@ const steps = [
     target: "[data-tour='quick-capture']",
     title: "Capture naturally",
     detail:
-      "Type a task with a date, subject, or priority. Velocity organizes it while you type.",
+      "Type a task with a date, subject, or priority. Nimbus organizes it while you type.",
   },
   {
     target: "[data-tour='today-list']",

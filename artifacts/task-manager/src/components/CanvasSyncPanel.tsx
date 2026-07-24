@@ -143,7 +143,7 @@ export function CanvasSyncPanel({
   const restoreAll = async () => {
     if (
       !window.confirm(
-        "Restore every hidden Canvas assignment and calendar item to Velocity? Canvas itself will not change.",
+        "Restore every hidden Canvas assignment and calendar item to Nimbus? Canvas itself will not change.",
       )
     )
       return;
@@ -214,7 +214,7 @@ export function CanvasSyncPanel({
   const removeAll = async () => {
     if (
       !window.confirm(
-        "Remove every imported Canvas task and event from Velocity? Canvas itself will not change. You can restore items later from Ignored Canvas items.",
+        "Remove every imported Canvas task and event from Nimbus? Canvas itself will not change. You can restore items later from Ignored Canvas items.",
       )
     )
       return;
@@ -224,7 +224,7 @@ export function CanvasSyncPanel({
     );
     await Promise.all([statusQuery.refetch(), loadDetails(), onChanged()]);
     toast.success(
-      `Removed ${result.removedTasks} Canvas task${result.removedTasks === 1 ? "" : "s"} from Velocity`,
+      `Removed ${result.removedTasks} Canvas task${result.removedTasks === 1 ? "" : "s"} from Nimbus`,
     );
   };
   const disconnect = async () => {
@@ -262,7 +262,7 @@ export function CanvasSyncPanel({
           <span className="block truncate text-xs text-muted-foreground">
             {status?.connected
               ? `${status.integration?.mode === "oauth" ? "Full course sync" : "Calendar feed"} · ${status.integration?.lastSyncedAt ? `updated ${new Date(status.integration.lastSyncedAt).toLocaleString()}` : "not synced yet"}`
-              : "Bring courses and due dates into Velocity"}
+              : "Bring courses and due dates into Nimbus"}
           </span>
         </span>
         {status?.connected && (

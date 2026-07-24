@@ -12,7 +12,7 @@ export default function NotFound() {
         <p className="mt-8 text-xs font-black uppercase tracking-[0.16em] text-primary">Page not found</p>
         <h1 className="tech-title mt-2 text-4xl sm:text-6xl">This route has moved.</h1>
         <p className="mt-4 max-w-lg text-base leading-7 text-muted-foreground">
-          The address does not point to an active Velocity screen. Return to My Day and continue from your current plan.
+          The address does not point to an active Nimbus screen. Return to My Day and continue from your current plan.
         </p>
         <Link href="/" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground">
           <ArrowLeft className="h-4 w-4" />

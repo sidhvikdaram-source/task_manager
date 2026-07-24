@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
-import { MomentumIcon } from "@/components/MomentumIcon";
+import { NimbusMascot } from "@/components/NimbusMascot";
 
 export function ConsecutiveMomentumCelebration() {
   const [momentumDays, setMomentumDays] = useState<number | null>(null);
@@ -54,9 +54,7 @@ export function ConsecutiveMomentumCelebration() {
                   {[0, 1, 2, 3].map((index) => <motion.span key={index} className="absolute h-1.5 w-1.5 rounded-full bg-primary" initial={{ opacity: 0, scale: 0 }} animate={{ opacity: [0, 1, 0], scale: [0, 1, 0], x: Math.cos(index * Math.PI / 2) * 50, y: Math.sin(index * Math.PI / 2) * 50 }} transition={{ duration: 1.1, delay: 0.15 + index * 0.08 }} />)}
                 </>
               )}
-              <motion.div animate={reduceMotion ? undefined : { y: [0, -5, 0], scale: [1, 1.1, 1] }} transition={{ duration: 0.9 }} className="relative z-10 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_30px_hsl(var(--primary)/.28)]">
-                <MomentumIcon className="h-9 w-9" />
-              </motion.div>
+              <NimbusMascot state="momentum" className="relative z-10 h-20 w-28 drop-shadow-[0_14px_20px_hsl(var(--primary)/.2)]" />
               <div className="absolute bottom-0 flex h-5 items-end gap-1">{[8, 15, 11, 19, 13].map((height, index) => <motion.span key={index} className="w-1 rounded-full bg-secondary" initial={reduceMotion ? false : { height: 2 }} animate={{ height: reduceMotion ? height : [2, height, 4] }} transition={{ duration: 0.72, delay: 0.28 + index * 0.05 }} />)}</div>
             </div>
             <p className="mt-4 text-xs font-black uppercase text-primary">Consecutive Momentum</p>

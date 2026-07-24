@@ -173,7 +173,7 @@ export default function Calendar() {
   const ignoreEvent = async (event: CanvasEvent) => {
     if (
       !window.confirm(
-        "Remove this event from Velocity? Canvas itself will not be changed.",
+        "Remove this event from Nimbus? Canvas itself will not be changed.",
       )
     )
       return;
@@ -188,7 +188,7 @@ export default function Calendar() {
     });
     if (response.ok) {
       await queryClient.invalidateQueries({ queryKey: ["canvas-events"] });
-      toast.success("Canvas event removed from Velocity");
+      toast.success("Canvas event removed from Nimbus");
     }
   };
 

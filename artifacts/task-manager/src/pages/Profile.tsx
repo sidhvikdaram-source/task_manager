@@ -62,6 +62,7 @@ type ChestOpenResponse = {
   error?: string;
 };
 export type RewardsResponse = {
+  adminModeEnabled?: boolean;
   bpBalance: number;
   lifetimeBp: number;
   chestKeys: number;
@@ -111,7 +112,7 @@ export default function Profile() {
   const [showAllChests, setShowAllChests] = useState(false);
   const [equippedPulse, setEquippedPulse] = useState<RewardKind | null>(null);
   const equippedPulseTimer = useRef<number | null>(null);
-  const name = user?.firstName || user?.email?.split("@")[0] || "Velocity member";
+  const name = user?.firstName || user?.email?.split("@")[0] || "Nimbus member";
 
   const loadRewards = async (force = false) => {
     const data = await queryClient.fetchQuery<RewardsResponse>({
@@ -428,7 +429,7 @@ export default function Profile() {
             <PetPreview petId={rewards?.equipped.pet} earnedVp={rewards?.earnedVp} className="absolute -bottom-2 -right-4 h-11 w-11" animated />
           </motion.div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-black uppercase text-primary">Velocity profile</p>
+            <p className="text-xs font-black uppercase text-primary">Nimbus profile</p>
             <h1 className="mt-1 truncate text-3xl font-black">{name}</h1>
             <AnimatePresence mode="wait">
               {equippedTitle && <motion.p key={equippedTitle} initial={reduceMotion ? false : { opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 6 }} className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary"><Tag className="h-3 w-3" /> {equippedTitle}</motion.p>}
@@ -446,13 +447,13 @@ export default function Profile() {
       </section>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <Metric icon={<Zap className="h-5 w-5" />} value={stats?.totalVp ?? 0} label="Lifetime VP" />
-        <Metric icon={<CircleDollarSign className="h-5 w-5" />} value={rewards?.bpBalance ?? 0} label="BP balance" />
+        <Metric icon={<Zap className="h-5 w-5" />} value={rewards?.adminModeEnabled ? "Unlimited" : stats?.totalVp ?? 0} label="Nimbus Points" />
+        <Metric icon={<CircleDollarSign className="h-5 w-5" />} value={rewards?.adminModeEnabled ? "Unlimited" : rewards?.bpBalance ?? 0} label="Breeze Points" />
         <Metric icon={<MomentumIcon className="h-5 w-5" />} value={stats?.streakDays ?? 0} label="Momentum days" />
         <div className="bento-card p-4">
           <div className="flex items-center justify-between text-primary"><Award className="h-5 w-5" /><span className="text-xs font-black">Tier {stats?.tier ?? 1}</span></div>
           <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${stats?.tierProgress ?? 0}%` }} /></div>
-          <div className="mt-2 flex justify-between text-[11px] font-bold text-muted-foreground"><span>{stats?.tierProgress ?? 0} VP</span><span>100 VP</span></div>
+          <div className="mt-2 flex justify-between text-[11px] font-bold text-muted-foreground"><span>{stats?.tierProgress ?? 0} NP</span><span>100 NP</span></div>
         </div>
       </div>
 
@@ -505,7 +506,7 @@ export default function Profile() {
                   <p className="truncate text-sm font-black capitalize">{chest.rarity} chest</p>
                   <p className="truncate text-[11px] text-muted-foreground">
                     {chest.status === "opened"
-                      ? reward?.name ?? (chest.bpReward ? `+${chest.bpReward} BP` : chest.chestKeysReward ? `${chest.chestKeysReward} key${chest.chestKeysReward === 1 ? "" : "s"}` : chest.vpFallback ? `${chest.vpFallback} VP` : "Reward claimed")
+                      ? reward?.name ?? (chest.bpReward ? `+${chest.bpReward} BP` : chest.chestKeysReward ? `${chest.chestKeysReward} key${chest.chestKeysReward === 1 ? "" : "s"}` : chest.vpFallback ? `${chest.vpFallback} NP` : "Reward claimed")
                       : chest.sourceKey.replace(/[:-]/g, " ")}
                   </p>
                 </div>
@@ -541,9 +542,9 @@ export default function Profile() {
 
       <section className="bento-card p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div><div className="flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-primary" /><h2 className="text-lg font-black">Velocity Store</h2></div><p className="mt-1 text-sm text-muted-foreground">Spend BP on optional customization. VP always stays with your progress.</p></div>
+          <div><div className="flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-primary" /><h2 className="text-lg font-black">Nimbus Shop</h2></div><p className="mt-1 text-sm text-muted-foreground">Spend Breeze Points (BP) on optional customization. Nimbus Points (NP) always stay with your progress.</p></div>
           <div className="flex flex-wrap gap-2">
-            <span className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-secondary/15 px-3 text-xs font-black text-secondary"><CircleDollarSign className="h-4 w-4" /> {rewards?.bpBalance ?? 0} BP</span>
+            <span className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-secondary/15 px-3 text-xs font-black text-secondary"><CircleDollarSign className="h-4 w-4" /> {rewards?.adminModeEnabled ? "Unlimited BP" : `${rewards?.bpBalance ?? 0} BP`}</span>
             <select aria-label="Store category" value={category} onChange={(event) => setCategory(event.target.value as typeof category)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">All categories</option><option value="profile_customization">Profile customization</option><option value="pet_cosmetics">Pet cosmetics</option><option value="focus_items">Focus items</option><option value="chest_items">Chest items</option><option value="reward_effects">Animations</option><option value="limited_items">Limited items</option><option value="momentum_cosmetics">Momentum cosmetics</option></select>
             <select aria-label="Ownership filter" value={ownership} onChange={(event) => setOwnership(event.target.value as typeof ownership)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">Owned and locked</option><option value="owned">Owned</option><option value="locked">Not owned</option></select>
           </div>
@@ -818,7 +819,7 @@ export default function Profile() {
   );
 }
 
-function Metric({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+function Metric({ icon, value, label }: { icon: React.ReactNode; value: React.ReactNode; label: string }) {
   const reduceMotion = useReducedMotion();
   return (
     <motion.div
@@ -829,7 +830,7 @@ function Metric({ icon, value, label }: { icon: React.ReactNode; value: number; 
       <div>{icon}</div>
       <motion.p
         className="mt-2 text-2xl font-black text-foreground"
-        key={value}
+        key={String(value)}
         initial={reduceMotion ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.25 }}

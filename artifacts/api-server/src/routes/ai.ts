@@ -8,20 +8,20 @@ import { addCalendarDays, localDateKey } from "../lib/localDate";
 const router: IRouter = Router();
 
 const systemPrompt = [
-  "You are Velocity Assistant.",
-  "You are exclusively a productivity and workspace assistant for Velocity. Do not solve math, write essays, generate code, or act as a general-purpose chatbot.",
+  "You are Nimbo, the Nimbus planning companion.",
+  "You are exclusively a productivity and workspace assistant for Nimbus. Do not solve math, write essays, generate code, or act as a general-purpose chatbot.",
   "Help users capture, organize, prioritize, schedule, sort, and review tasks, projects, subjects, checklists, habits, and focus work.",
-  "You may help send a concise message only to an accepted friend, and may summarize only friend names, levels, Momentum active-day counts, or activity explicitly supplied by Velocity. Never infer private activity or claim access to unavailable data.",
+  "You may help send a concise message only to an accepted friend, and may summarize only friend names, levels, Momentum active-day counts, or activity explicitly supplied by Nimbus. Never infer private activity or claim access to unavailable data.",
   "Time is strictly optional; never force a deadline or invent one when the user did not ask for it.",
   "If a user sets a time without a task name, such as remind me at 4, generate a smart title like Afternoon Focus Block instead of Task at 4.",
   "Handle relative dates like tomorrow, next Monday, Friday afternoon, in two hours, and in three days accurately.",
   "Infer intent from short user phrases, but do not pretend to complete actions that the backend did not report as completed.",
   "When the backend created a task, confirm the title and schedule reference first.",
   "When the backend created multiple tasks from a previous agenda or plan, briefly list the tasks that were added.",
-  "When a request is outside Velocity productivity, briefly state your scope and suggest a task-oriented alternative.",
+  "When a request is outside Nimbus productivity, briefly state your scope and suggest a task-oriented alternative.",
   "Keep responses brief, professional, and free of filler.",
   "Use structured Markdown only: short paragraphs, bullets, bold labels, and code fences when useful.",
-  "Never turn a math expression, essay request, explanation request, or general homework question into a task unless the user explicitly asks Velocity to track or schedule work related to it.",
+  "Never turn a math expression, essay request, explanation request, or general homework question into a task unless the user explicitly asks Nimbus to track or schedule work related to it.",
   "Do not include malformed tables, decorative characters, fake JSON, or hidden chain-of-thought.",
 ].join(" ");
 
@@ -639,7 +639,7 @@ function formatScheduleLabel(date?: string, time?: string) {
 
 function buildTaskNotes(command: ParsedTaskCommand) {
   const notes = [
-    `Velocity Type: ${taskTypeSymbols[command.taskType]} ${taskTypeLabels[command.taskType]}`,
+    `Nimbus Type: ${taskTypeSymbols[command.taskType]} ${taskTypeLabels[command.taskType]}`,
   ];
   if (command.time) notes.push(`Time: ${command.time}`);
   if (command.scheduleLabel) notes.push(`Schedule: ${command.scheduleLabel}`);
@@ -814,7 +814,7 @@ async function scheduleGeminiRequest<T>(operation: () => Promise<T>) {
 function formatConversationForGemini(history: ChatHistoryMessage[], message: string) {
   const previous = history
     .slice(-8)
-    .map((item) => `${item.role === "assistant" ? "Velocity Assistant" : "User"}: ${item.content}`)
+    .map((item) => `${item.role === "assistant" ? "Nimbo" : "User"}: ${item.content}`)
     .join("\n");
 
   return previous ? `${previous}\nUser: ${message}` : message;
@@ -921,7 +921,7 @@ async function generateStrictWorkspaceDecision(instruction: string, history: Cha
     messages: [
       {
         role: "system",
-        content: "You are Velocity's workspace action planner. Infer meaning from the whole conversation. Return only the requested structured decision and never claim an action already happened.",
+        content: "You are Nimbo, Nimbus's workspace action planner. Infer meaning from the whole conversation. Return only the requested structured decision and never claim an action already happened.",
       },
       ...history.slice(-6).map((item) => ({ role: item.role, content: item.content })),
       { role: "user", content: instruction },
@@ -1160,17 +1160,17 @@ async function generateWorkspaceActionPlan(userId: string, message: string, hist
     friends,
   };
   const instruction = [
-    "Decide whether the user wants Velocity workspace data changed, wants to inspect visible workspace data, or is outside Velocity's productivity scope.",
+    "Decide whether the user wants Nimbus workspace data changed, wants to inspect visible workspace data, or is outside Nimbus's productivity scope.",
     "Set intent to workspace_changes whenever the desired result includes creating, saving, editing, organizing, rescheduling, archiving, or deleting tasks, projects, subjects, or checklist steps. Infer this semantically from the full request; do not depend on exact command words.",
-    "Set intent to workspace_query when the user wants to inspect, filter, count, or get advice about their saved Velocity data without changing it.",
-    "Set intent to general for unrelated math, explanations, essays, coding, or creative writing. Task planning and prioritization are in scope. If the user asks both to develop a plan and add its work to Velocity, use workspace_changes and create every concrete operation needed.",
+    "Set intent to workspace_query when the user wants to inspect, filter, count, or get advice about their saved Nimbus data without changing it.",
+    "Set intent to general for unrelated math, explanations, essays, coding, or creative writing. Task planning and prioritization are in scope. If the user asks both to develop a plan and add its work to Nimbus, use workspace_changes and create every concrete operation needed.",
     "For general and workspace_query intents, return an empty operations array. For workspace_changes, return all operations in dependency order.",
     "For every unused nullable operation field return null. Set clearSubject, clearProject, clearDueDate, or clearDescription true only when the user explicitly asks to remove that value; otherwise each flag must be false. Use targetId from the current workspace for updates and deletes; never guess an ID.",
     "A new project with a subject and tasks normally requires: create_subject only when missing, then create_project, then specific create_task operations whose projectName exactly matches the project name and whose subject matches the project subject.",
     "Do not copy the user's whole sentence into a title. Make each title concise, specific, and actionable. Correct obvious typos while preserving names and meaning.",
     "Preserve priorities, dates, durations, statuses, and relationships. A task or project without an explicit deadline must have dueDate null and must still be created.",
     "When an update refers to an existing item, resolve it from the supplied workspace by meaning and use its exact ID. If the reference is genuinely ambiguous, choose general and explain the ambiguity in summary instead of guessing.",
-    "Task statuses may be todo, backlog, or in_progress. Project statuses may be active, planning, waiting, or completed. Task completion must use the normal task UI because it awards VP.",
+    "Task statuses may be todo, backlog, or in_progress. Project statuses may be active, planning, waiting, or completed. Task completion must use the normal task UI because it awards Nimbus Points (NP).",
     "A request to message someone may use send_message only when that person is uniquely matched in Current workspace friends. Use the exact friend id as recipientId and include the intended text as body. Messages always require preview confirmation.",
     "For friend activity questions, use only the level and Momentum active-day values supplied in Current workspace friends. Say when other activity is unavailable; never invent it.",
     `The user's timezone is ${user?.timezone ?? "UTC"}. Today is ${today}. Resolve relative dates from that date. Current workspace: ${JSON.stringify(context)}. Current user request: ${JSON.stringify(message)}`,
@@ -1260,7 +1260,7 @@ function getGroqStatus(err: unknown) {
 function formatGroqError(err: unknown) {
   if (!(err instanceof Error)) return "Groq request failed.";
   if (getGroqStatus(err) === 429) {
-    return "Groq is temporarily rate limited. The Velocity request queue is active; try again in a moment.";
+    return "Groq is temporarily rate limited. The Nimbus request queue is active; try again in a moment.";
   }
   return err.message
     .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [redacted]")
@@ -1318,7 +1318,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
 
     if (decision.intent === "general" && !isVelocityProductivityRequest(message, history)) {
       res.json({
-        reply: "I am focused on organizing work inside Velocity. I can create or sort tasks and projects, plan your workload, review deadlines, or message an accepted friend. Turn this into something you want to track, and I will help set it up.",
+        reply: "I am focused on organizing work inside Nimbus. I can create or sort tasks and projects, plan your workload, review deadlines, or message an accepted friend. Turn this into something you want to track, and I will help set it up.",
         provider: "velocity",
         taskCreated: false,
         task: null,
@@ -1331,7 +1331,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
       return;
     }
 
-    let semanticContext = "This is a general request. Do not create, update, or claim to save any Velocity data.";
+    let semanticContext = "This is a general request. Do not create, update, or claim to save any Nimbus data.";
     if (decision.intent === "workspace_query") {
       const [tasks, projects, subjects, friends] = await Promise.all([
         db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"))),
@@ -1340,7 +1340,7 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
         loadAcceptedFriends(req.user.id),
       ]);
       semanticContext = [
-        "Answer using only the user's actual Velocity workspace data. Do not invent records or claim changes.",
+        "Answer using only the user's actual Nimbus workspace data. Do not invent records or claim changes.",
         `Tasks: ${JSON.stringify(tasks.slice(0, 100).map((task) => ({ title: task.title, dueDate: task.dueDate, priority: task.priority, status: task.status, subject: task.subject, projectId: task.projectId, estimatedMinutes: task.estimatedMinutes, blocked: task.blocked })))}`,
         `Projects: ${JSON.stringify(projects.slice(0, 60).map((project) => ({ id: project.id, name: project.name, subject: project.subject, priority: project.priority, dueDate: project.dueDate, status: project.status })))}`,
         `Subjects: ${JSON.stringify(subjects.slice(0, 40).map((subject) => subject.name))}`,
@@ -1457,8 +1457,8 @@ router.post("/ai/chat", async (req, res): Promise<void> => {
   } catch (err) {
     req.log?.error({ err }, "AI chat request failed");
     const message = err instanceof Error && err.message === "GROQ_API_KEY is not configured"
-      ? "Velocity Assistant is not connected yet. Set GEMINI_API_KEY or GROQ_API_KEY on the server."
-      : `Velocity Assistant could not reach its AI providers: ${formatAiError(err)}`;
+      ? "Nimbo is not connected yet. Set GEMINI_API_KEY or GROQ_API_KEY on the server."
+      : `Nimbo could not reach its AI providers: ${formatAiError(err)}`;
     res.status(500).json({
       error: message,
     });
@@ -1591,7 +1591,7 @@ router.post("/ai/workspace/confirm", async (req, res): Promise<void> => {
       } else if (operation.type === "delete_task") {
         const existing = taskMap.get(operation.targetId);
         if (!existing) throw new Error("Task no longer exists.");
-        if (existing.externalSource) throw new Error("Use Remove from Velocity for Canvas tasks so future syncs keep them ignored.");
+        if (existing.externalSource) throw new Error("Use Remove from Nimbus for Canvas tasks so future syncs keep them ignored.");
         await tx.delete(tasksTable).where(and(eq(tasksTable.id, existing.id), eq(tasksTable.userId, req.user.id)));
         taskMap.delete(existing.id);
       } else if (operation.type === "add_checklist_item") {

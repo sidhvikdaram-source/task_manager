@@ -511,7 +511,7 @@ export default function Workspace() {
             </div>
           )}
           <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
-            Low energy only changes matching. It never reduces VP or Momentum.
+            Low energy only changes matching. It never reduces NP or Momentum.
           </p>
         </aside>
       </div>

@@ -91,7 +91,7 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
 function ProfileMark({ person }: { person: Profile }) {
   return (
     <div className="relative h-10 w-10 shrink-0">
-      <ProfilePhoto frameId={person.equippedFrame} profileImageUrl={person.profileImageUrl} name={person.displayName ?? person.username ?? "Velocity member"} className="w-10" />
+      <ProfilePhoto frameId={person.equippedFrame} profileImageUrl={person.profileImageUrl} name={person.displayName ?? person.username ?? "Nimbus member"} className="w-10" />
       {person.online && (
         <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-400" />
       )}
@@ -340,7 +340,7 @@ export default function Social() {
       await navigator.clipboard.writeText(link);
       toast.success("Profile search link copied");
     } catch {
-      window.prompt("Share this Velocity link", link);
+      window.prompt("Share this Nimbus link", link);
     }
   };
   const streakLeaders = [...friends]
@@ -433,13 +433,13 @@ export default function Social() {
                     <ProfileMark person={person} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-bold">
-                        {person.displayName ?? "Velocity member"}
+                        {person.displayName ?? "Nimbus member"}
                       </p>
                       {titleLabel(person.equippedTitle) && <p className="truncate text-[10px] font-black uppercase text-primary">{titleLabel(person.equippedTitle)}</p>}
                       <p className="truncate text-xs text-muted-foreground">
                         {person.username
                           ? `@${person.username}`
-                          : "Velocity member"}{" "}
+                          : "Nimbus member"}{" "}
                         · Level {person.level} · {person.streakDays} momentum days
                       </p>
                     </div>
@@ -482,7 +482,7 @@ export default function Social() {
                         <ProfileMark person={friend} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-bold">
-                            {friend.displayName ?? "Velocity member"}
+                            {friend.displayName ?? "Nimbus member"}
                           </p>
                           {titleLabel(friend.equippedTitle) && <p className="truncate text-[10px] font-black uppercase text-primary">{titleLabel(friend.equippedTitle)}</p>}
                           <p className="text-xs text-muted-foreground">
@@ -535,7 +535,7 @@ export default function Social() {
                     <div className="flex items-center gap-2">
                       <ProfileMark person={request} />
                       <p className="min-w-0 flex-1 truncate text-sm font-bold">
-                        {request.displayName ?? "Velocity member"}
+                        {request.displayName ?? "Nimbus member"}
                       </p>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -594,7 +594,7 @@ export default function Social() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <p className="truncate text-sm font-bold">
-                          {conversation.friend.displayName ?? "Velocity member"}
+                          {conversation.friend.displayName ?? "Nimbus member"}
                         </p>
                         {conversation.unreadCount > 0 && (
                           <span className="rounded-full bg-primary px-1.5 text-[10px] font-black text-primary-foreground">
@@ -632,7 +632,7 @@ export default function Social() {
                     <ProfileMark person={selected} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-bold">
-                        {selected.displayName ?? "Velocity member"}
+                        {selected.displayName ?? "Nimbus member"}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Accepted friend
@@ -775,7 +775,7 @@ export default function Social() {
                     </span>
                     <ProfileMark person={friend} />
                     <span className="min-w-0 flex-1 truncate text-sm font-bold">
-                      {friend.displayName ?? "Velocity member"}
+                      {friend.displayName ?? "Nimbus member"}
                     </span>
                     <span className="text-xs font-black text-primary">
                       {friend.streakDays} days

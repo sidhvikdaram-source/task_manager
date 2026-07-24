@@ -117,7 +117,7 @@ export default function WeeklyReview() {
       toast.success(
         result.alreadyCompleted
           ? "Review already completed this week"
-          : `Weekly review complete - +${result.awarded ?? 0} VP and +${result.bpAwarded ?? 0} BP`,
+          : `Weekly review complete - +${result.awarded ?? 0} NP and +${result.bpAwarded ?? 0} BP`,
       );
       await load();
     } finally {
@@ -159,7 +159,7 @@ export default function WeeklyReview() {
           value={data.completed.length}
         />
         <Metric icon={Clock3} label="Focus" value={`${data.focusMinutes}m`} />
-        <Metric icon={Zap} label="VP earned" value={data.vpEarned} />
+        <Metric icon={Zap} label="NP earned" value={data.vpEarned} />
         <Metric icon={MomentumIcon} label="Momentum" value={`${data.streakDays}d`} />
       </div>
 
@@ -265,7 +265,7 @@ export default function WeeklyReview() {
               ? "Review completed"
               : finishing
                 ? "Saving..."
-                : `Complete review - +${data.reviewRewards.vp} VP and +${data.reviewRewards.bp} BP`}
+                : `Complete review - +${data.reviewRewards.vp} NP and +${data.reviewRewards.bp} BP`}
           </button>
         </section>
       </div>

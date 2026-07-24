@@ -236,7 +236,7 @@ export function TaskDetailsModal({
     if (
       !task?.externalId ||
       !window.confirm(
-        "Remove this assignment from Velocity? Canvas itself will not be changed, and future syncs will keep it ignored.",
+        "Remove this assignment from Nimbus? Canvas itself will not be changed, and future syncs will keep it ignored.",
       )
     )
       return;
@@ -254,7 +254,7 @@ export function TaskDetailsModal({
       toast.error("Could not remove the Canvas assignment");
       return;
     }
-    toast.success("Removed from Velocity. Canvas was not changed.");
+    toast.success("Removed from Nimbus. Canvas was not changed.");
     await invalidateCanvasData(queryClient);
     onOpenChange(false);
   };
@@ -287,9 +287,9 @@ export function TaskDetailsModal({
                   Canvas controls the title, course, and due time.
                   {canvasControlsCompletion
                     ? " Canvas submission status controls completion."
-                    : " You can complete this calendar item inside Velocity."}{" "}
+                    : " You can complete this calendar item inside Nimbus."}{" "}
                   Your priority, estimates, notes, project, and checklist stay
-                  private to Velocity.
+                  private to Nimbus.
                 </p>
                 {task.externalUrl && (
                   <a
@@ -686,7 +686,7 @@ export function TaskDetailsModal({
                 disabled={deleteTask.isPending}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                {isCanvasTask ? "Remove from Velocity" : "Delete"}
+                {isCanvasTask ? "Remove from Nimbus" : "Delete"}
               </Button>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close

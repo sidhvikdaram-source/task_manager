@@ -12,6 +12,7 @@ import { useCanvasSync } from "@/hooks/useCanvasSync";
 import { ExperienceProvider, useExperience } from "@/experience";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LandingPage } from "@/components/LandingPage";
 
 const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
@@ -88,7 +89,7 @@ function LoginScreen() {
             <Zap className="h-7 w-7 fill-white text-white" />
           </div>
           <span className="text-4xl font-black tracking-tight text-foreground">
-            Velocity
+            Nimbus
           </span>
         </div>
         <div className="mb-6 text-center">
@@ -96,7 +97,7 @@ function LoginScreen() {
             Your gamified task manager
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Complete tasks, earn VP, and level up your productivity.
+            Complete tasks, earn NP, and level up your productivity.
           </p>
         </div>
         {isEmbedded ? (
@@ -108,7 +109,7 @@ function LoginScreen() {
               size="lg"
               className="w-full"
             >
-              Open Velocity
+              Open Nimbus
             </Button>
             <p className="mt-3 text-center text-xs text-muted-foreground">
               Log in there, then come back here. The embed will update
@@ -249,7 +250,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return <LoginScreen />;
+    return <LandingPage />;
   }
 
   return <>{children}</>;

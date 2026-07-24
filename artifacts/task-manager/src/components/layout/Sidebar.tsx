@@ -19,9 +19,15 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useGetUserStats } from "@workspace/api-client-react";
+import {
+  getListTasksQueryKey,
+  useGetUserStats,
+  useListTasks,
+} from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import { NimbusMascot } from "@/components/NimbusMascot";
+import { localDateKey } from "@/lib/localDate";
 
 type SidebarProps = {
   open: boolean;
@@ -140,6 +146,17 @@ function SidebarBody({
 }) {
   const [location] = useLocation();
   const { data: stats } = useGetUserStats();
+  const { data: tasks = [] } = useListTasks(
+    { sortBy: "dueDate" },
+    { query: { queryKey: getListTasksQueryKey({ sortBy: "dueDate" }) } },
+  );
+  const today = localDateKey(new Date());
+  const hasOverdue = tasks.some(
+    (task) =>
+      task.status !== "completed" &&
+      !task.archived &&
+      Boolean(task.dueDate && task.dueDate < today),
+  );
   const reduceMotion = useReducedMotion();
   const indicatorId = useId();
   const activeTransition = reduceMotion
@@ -184,16 +201,14 @@ function SidebarBody({
               whileHover={reduceMotion ? undefined : { scale: 1.03 }}
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
               transition={{ type: "spring", stiffness: 400, damping: 22 }}
-              title="Velocity"
+              title="Nimbus"
             >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-[0_6px_14px_rgba(0,0,0,0.14)]">
-                <Zap className="h-5 w-5 fill-white text-white" />
-              </div>
+              <NimbusMascot state={hasOverdue ? "overdue" : "ready"} className="h-11 w-12 shrink-0" />
               <SlidingLabel
                 show={!collapsed}
                 className="whitespace-nowrap text-lg font-black tracking-tight"
               >
-                Velocity
+                Nimbus
               </SlidingLabel>
             </motion.div>
           </Link>
@@ -289,7 +304,7 @@ function SidebarBody({
                 location === "/profile" ? "text-primary-foreground" : "hover:bg-muted",
                 collapsed ? "justify-center p-2" : "gap-3 px-2 py-2.5",
               )}
-              title={collapsed ? `Tier ${stats.tier} · ${100 - stats.tierProgress} VP to next` : undefined}
+              title={collapsed ? `Tier ${stats.tier} · ${100 - stats.tierProgress} NP to next` : undefined}
             >
               {location === "/profile" && (
                 <motion.span

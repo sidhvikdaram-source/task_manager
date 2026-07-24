@@ -44,6 +44,18 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "equipped_badge_display" varchar DEFAULT 'none' NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_momentum_cosmetic" varchar DEFAULT 'none' NOT NULL;
   `);
+  // Existing accounts are the original Nimbus testers. New registrations stay
+  // standard users because the admin flag defaults to false after this backfill.
+  await db.execute(sql`
+    ALTER TABLE "users"
+      ADD COLUMN IF NOT EXISTS "is_admin" boolean,
+      ADD COLUMN IF NOT EXISTS "admin_mode_enabled" boolean DEFAULT false NOT NULL,
+      ADD COLUMN IF NOT EXISTS "admin_loadout" jsonb DEFAULT '{}'::jsonb NOT NULL,
+      ADD COLUMN IF NOT EXISTS "admin_chest_count" integer DEFAULT 0 NOT NULL;
+    UPDATE "users" SET "is_admin" = true WHERE "is_admin" IS NULL;
+    ALTER TABLE "users" ALTER COLUMN "is_admin" SET DEFAULT false;
+    ALTER TABLE "users" ALTER COLUMN "is_admin" SET NOT NULL;
+  `);
   await db.execute(
     sql`CREATE UNIQUE INDEX IF NOT EXISTS "users_username_unique" ON "users" ("username") WHERE "username" IS NOT NULL;`,
   );

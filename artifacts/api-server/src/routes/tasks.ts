@@ -187,7 +187,7 @@ router.delete("/tasks/:id", async (req, res): Promise<void> => {
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const [existing] = await db.select().from(tasksTable).where(and(eq(tasksTable.id, params.data.id), eq(tasksTable.userId, userId)));
-  if (existing?.externalSource) { res.status(409).json({ error: "Use Remove from Velocity for Canvas tasks so they remain ignored on future syncs." }); return; }
+  if (existing?.externalSource) { res.status(409).json({ error: "Use Remove from Nimbus for Canvas tasks so they remain ignored on future syncs." }); return; }
 
   const [task] = await db
     .delete(tasksTable)

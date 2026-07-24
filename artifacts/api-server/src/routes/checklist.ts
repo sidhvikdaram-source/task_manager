@@ -100,7 +100,7 @@ router.patch("/checklist/:itemId", async (req, res): Promise<void> => {
     return;
   }
 
-  // Award 2 VP when completing a checklist item
+  // Award 2 Nimbus Points when completing a checklist item
   if (parsed.data.completed === true && !existing.completed) {
     const [stats] = await db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id));
     if (stats) {

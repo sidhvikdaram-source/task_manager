@@ -14,6 +14,7 @@ import rewardsRouter from "./rewards";
 import planningRouter from "./planning";
 import quickCaptureRouter from "./quickCapture";
 import canvasRouter from "./canvas";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(rewardsRouter);
 router.use(planningRouter);
 router.use(quickCaptureRouter);
 router.use(canvasRouter);
+router.use(adminRouter);
 
 export default router;
