@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@workspace/replit-auth-web";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useGSAP } from "@gsap/react";
@@ -42,6 +42,17 @@ export function LandingPage() {
   const reduceMotion = useReducedMotion();
   const isEmbedded = window.self !== window.top;
   const appUrl = window.location.origin + (import.meta.env.BASE_URL ?? "/");
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("authError") !== "google_unavailable") return;
+    setMode("login");
+    setAuthError(
+      "Google sign-in is temporarily unavailable. You can still sign in with email and password.",
+    );
+    url.searchParams.delete("authError");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   useGSAP(() => {
     if (reduceMotion) return;

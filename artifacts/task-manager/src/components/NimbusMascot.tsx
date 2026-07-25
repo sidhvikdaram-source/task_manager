@@ -92,12 +92,18 @@ export function NimbusMascot({
         className={cn("h-full w-full overflow-visible select-none", imageClassName)}
       >
         <motion.path
-          d="M34 86C18 86 8 76 8 62c0-13 10-24 23-26 5-17 20-29 38-29 16 0 30 9 37 23 4-2 9-3 14-3 17 0 31 13 31 30 0 16-13 29-30 29h-20l-22 25 7-25H34Z"
+          d="M34 86C18 86 8 76 8 62c0-13 10-24 23-26 5-17 20-29 38-29 16 0 30 9 37 23 4-2 9-3 14-3 17 0 31 13 31 30 0 16-13 29-30 29H34Z"
           fill={cloudColors[state]}
           animate={canMove && state === "overdue" ? { y: [0, 1.5, 0] } : undefined}
           transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
         />
-        <path d="M101 86 79 111l7-25Z" fill={tailColors[state]} />
+        <path
+          d="M91 80h20L99 94h12l-34 27 10-22H75l16-19Z"
+          fill={tailColors[state]}
+          stroke={cloudColors[state]}
+          strokeLinejoin="round"
+          strokeWidth="2"
+        />
         <path d="M31 51c8-22 25-34 48-35" fill="none" stroke="#FFFFFF" strokeLinecap="round" strokeWidth="5" opacity=".13" />
 
         {state === "overdue" && (

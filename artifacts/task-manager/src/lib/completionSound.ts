@@ -246,23 +246,73 @@ export function playCompletionEffect(
   }
   if (effectId === "aurora-finish") {
     const layer = effectLayer(effectId, origin);
-    const aurora = document.createElement("span");
-    Object.assign(aurora.style, {
+    const sky = document.createElement("div");
+    Object.assign(sky.style, {
       position: "absolute",
-      inset: "-20%",
-      background: "radial-gradient(circle at var(--effect-x) var(--effect-y), rgba(255,255,255,.75) 0 2%, transparent 16%), conic-gradient(from 190deg at var(--effect-x) var(--effect-y), transparent 0 18%, rgba(103,232,249,.55) 26%, rgba(196,181,253,.58) 36%, rgba(253,164,175,.4) 44%, transparent 58%)",
-      filter: "blur(22px) saturate(1.25)",
+      inset: "0",
+      background: `radial-gradient(circle at ${origin.x * 100}% ${origin.y * 100}%, rgba(255,255,255,.28), rgba(103,232,249,.1) 22%, transparent 52%)`,
       mixBlendMode: "screen",
     });
-    layer.append(aurora);
-    aurora.animate(
+    layer.append(sky);
+    sky.animate(
       [
-        { opacity: 0, transform: "scale(.72) rotate(-8deg)" },
-        { opacity: 0.9, offset: 0.34, transform: "scale(1.02) rotate(0)" },
-        { opacity: 0, transform: "scale(1.22) rotate(7deg)" },
+        { opacity: 0 },
+        { opacity: 1, offset: 0.28 },
+        { opacity: 0 },
       ],
-      { duration: 1450, easing: "cubic-bezier(.22,1,.36,1)", fill: "forwards" },
+      { duration: 1650, easing: "ease-out", fill: "forwards" },
     );
+
+    const colors = [
+      ["rgba(103,232,249,.88)", "rgba(45,212,191,.18)"],
+      ["rgba(196,181,253,.92)", "rgba(129,140,248,.2)"],
+      ["rgba(253,164,175,.72)", "rgba(244,114,182,.12)"],
+    ];
+    colors.forEach(([bright, fade], index) => {
+      const ribbon = document.createElement("div");
+      const width = 460 + index * 90;
+      Object.assign(ribbon.style, {
+        position: "absolute",
+        left: `${origin.x * 100}%`,
+        top: `${origin.y * 100}%`,
+        width: `${width}px`,
+        height: `${82 + index * 16}px`,
+        marginLeft: `${-width / 2}px`,
+        marginTop: `${-58 - index * 18}px`,
+        borderRadius: "50%",
+        background: `linear-gradient(90deg, transparent 3%, ${fade} 18%, ${bright} 48%, ${fade} 78%, transparent 97%)`,
+        filter: `blur(${10 + index * 3}px) saturate(1.35)`,
+        mixBlendMode: "screen",
+        transformOrigin: "center",
+      });
+      layer.append(ribbon);
+      ribbon.animate(
+        [
+          { opacity: 0, transform: `translate3d(-22px, ${30 + index * 8}px, 0) scaleX(.58) rotate(${-12 + index * 5}deg)` },
+          { opacity: 0.92 - index * 0.12, offset: 0.32, transform: `translate3d(0, ${-8 - index * 5}px, 0) scaleX(1) rotate(${-5 + index * 4}deg)` },
+          { opacity: 0, transform: `translate3d(26px, ${-48 - index * 8}px, 0) scaleX(1.16) rotate(${2 + index * 4}deg)` },
+        ],
+        {
+          duration: 1320 + index * 140,
+          delay: index * 70,
+          easing: "cubic-bezier(.22,1,.36,1)",
+          fill: "forwards",
+        },
+      );
+    });
+
+    ring(layer, origin, { size: 86, color: "#c4b5fd", width: 2 });
+    void confetti({
+      ...base,
+      particleCount: 34,
+      spread: 88,
+      startVelocity: 18,
+      gravity: 0.32,
+      drift: -0.2,
+      scalar: 0.72,
+      ticks: 190,
+      colors: ["#67e8f9", "#c4b5fd", "#fda4af", "#ffffff"],
+    });
     return;
   }
   void confetti({ ...base, particleCount: 28, spread: 52, startVelocity: 22, gravity: 0.95, scalar: 0.72, colors: ["#22d3ee", "#fb923c", "#f8fafc"] });

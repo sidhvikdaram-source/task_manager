@@ -210,38 +210,50 @@ router.post("/auth/login", async (req: Request, res: Response): Promise<void> =>
 });
 
 router.get("/login", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const callbackUrl = `${getOrigin(req)}/api/callback`;
+  try {
+    const config = await getOidcConfig();
+    const callbackUrl = `${getOrigin(req)}/api/callback`;
 
-  const returnTo = getSafeReturnTo(req.query.returnTo);
+    const returnTo = getSafeReturnTo(req.query.returnTo);
 
-  const state = oidc.randomState();
-  const nonce = oidc.randomNonce();
-  const codeVerifier = oidc.randomPKCECodeVerifier();
-  const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
+    const state = oidc.randomState();
+    const nonce = oidc.randomNonce();
+    const codeVerifier = oidc.randomPKCECodeVerifier();
+    const codeChallenge = await oidc.calculatePKCECodeChallenge(codeVerifier);
 
-  const redirectTo = oidc.buildAuthorizationUrl(config, {
-    redirect_uri: callbackUrl,
-    scope: "openid email profile",
-    code_challenge: codeChallenge,
-    code_challenge_method: "S256",
-    prompt: "consent",
-    state,
-    nonce,
-  });
+    const redirectTo = oidc.buildAuthorizationUrl(config, {
+      redirect_uri: callbackUrl,
+      scope: "openid email profile",
+      code_challenge: codeChallenge,
+      code_challenge_method: "S256",
+      prompt: "select_account",
+      state,
+      nonce,
+    });
 
-  setOidcCookie(res, "code_verifier", codeVerifier);
-  setOidcCookie(res, "nonce", nonce);
-  setOidcCookie(res, "state", state);
-  setOidcCookie(res, "return_to", returnTo);
+    setOidcCookie(res, "code_verifier", codeVerifier);
+    setOidcCookie(res, "nonce", nonce);
+    setOidcCookie(res, "state", state);
+    setOidcCookie(res, "return_to", returnTo);
 
-  res.redirect(redirectTo.href);
+    res.redirect(redirectTo.href);
+  } catch (err) {
+    req.log?.error({ err }, "Google OIDC login initialization failed");
+    res.redirect("/?authError=google_unavailable");
+  }
 });
 
 // Query params are not validated because the OIDC provider may include
 // parameters not expressed in the schema.
 router.get("/callback", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
+  let config: oidc.Configuration;
+  try {
+    config = await getOidcConfig();
+  } catch (err) {
+    req.log?.error({ err }, "Google OIDC callback configuration failed");
+    res.redirect("/?authError=google_unavailable");
+    return;
+  }
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
   const codeVerifier = req.cookies?.code_verifier;
@@ -250,7 +262,7 @@ router.get("/callback", async (req: Request, res: Response) => {
 
   if (!codeVerifier || !expectedState) {
     req.log.warn("Missing codeVerifier or expectedState cookies — redirecting to login");
-    res.redirect("/api/login");
+    res.redirect("/?authError=google_unavailable");
     return;
   }
 
@@ -268,7 +280,7 @@ router.get("/callback", async (req: Request, res: Response) => {
     });
   } catch (err) {
     req.log.error({ err }, "OIDC token exchange failed — redirecting to login");
-    res.redirect("/api/login");
+    res.redirect("/?authError=google_unavailable");
     return;
   }
 
@@ -281,7 +293,7 @@ router.get("/callback", async (req: Request, res: Response) => {
 
   const claims = tokens.claims();
   if (!claims) {
-    res.redirect("/api/login");
+    res.redirect("/?authError=google_unavailable");
     return;
   }
 
