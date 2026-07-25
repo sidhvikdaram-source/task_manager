@@ -1,5 +1,19 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+
+.nimbus-marketing,
+.nimbus-marketing button,
+.nimbus-marketing input {
+  font-family: "Outfit Variable", "Outfit", "Aptos", system-ui, sans-serif;
+}
+
+.nimbus-wordmark {
+  font-family: "Outfit Variable", "Outfit", "Aptos Display", system-ui, sans-serif;
+  font-variation-settings: "wght" 675;
+  font-weight: 675;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));

@@ -74,6 +74,9 @@
     "zod": "3.25.76"
   },
   "dependencies": {
-    "canvas-confetti": "^1.9.4"
+    "@fontsource-variable/outfit": "^5.3.0",
+    "@gsap/react": "^2.1.2",
+    "canvas-confetti": "^1.9.4",
+    "gsap": "^3.15.0"
   }
 }
