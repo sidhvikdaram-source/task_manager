@@ -109,9 +109,16 @@ export function LandingPage() {
 
   return (
     <main className="w-full max-w-full overflow-x-hidden bg-[#f7f5ff] font-sans text-[#171522] selection:bg-[#8b7cf6]/25">
-      <nav className="fixed inset-x-0 top-0 z-50 px-3 py-3 sm:px-5">
-        <div className="mx-auto grid max-w-[92rem] grid-cols-[1fr_auto_1fr] items-center rounded-2xl border border-white/80 bg-white/80 px-3 py-2 shadow-[0_12px_40px_rgba(55,43,110,.1)] backdrop-blur-xl sm:px-4">
-          <div className="flex items-center gap-1.5 sm:gap-2">
+      <nav className="fixed inset-x-0 top-0 z-50 px-3 py-3 sm:px-5 sm:py-4">
+        <div className="mx-auto flex max-w-[92rem] items-center justify-between gap-4">
+          <a href="#top" className="group flex shrink-0 items-center gap-2.5 rounded-2xl bg-white/88 p-1.5 shadow-[0_8px_28px_rgba(55,43,110,.09)] ring-1 ring-white/80 backdrop-blur-xl min-[430px]:pl-2 min-[430px]:pr-4" aria-label="Nimbus home">
+            <NimbusMascot variant="mark" className="h-11 w-13 sm:h-12 sm:w-14" />
+            <span className="hidden text-base font-black tracking-[-0.045em] text-[#211d36] min-[430px]:inline sm:text-lg">nimbus</span>
+          </a>
+          <div className="flex items-center gap-1 rounded-2xl bg-white/88 p-1.5 shadow-[0_8px_28px_rgba(55,43,110,.09)] ring-1 ring-white/80 backdrop-blur-xl sm:gap-1.5">
+            <button type="button" onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" })} className="hidden rounded-xl px-3 py-2 text-sm font-bold text-[#655f77] transition-colors hover:bg-[#eeeaff] hover:text-[#211d36] sm:block">
+              How it works
+            </button>
             <button type="button" onClick={() => moveToAuth("login")} className="rounded-xl px-2.5 py-2 text-xs font-black text-[#211d36] transition-colors hover:bg-[#eeeaff] sm:px-3 sm:text-sm">
               Log in
             </button>
@@ -119,13 +126,6 @@ export function LandingPage() {
               Register
             </button>
           </div>
-          <a href="#top" className="flex items-center gap-2" aria-label="Nimbus home">
-            <NimbusMascot className="h-9 w-12 sm:h-10 sm:w-14" />
-            <span className="hidden text-lg font-black tracking-[-0.04em] sm:inline">nimbus</span>
-          </a>
-          <button type="button" onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" })} className="justify-self-end rounded-xl px-2.5 py-2 text-xs font-bold text-[#655f77] transition-colors hover:bg-[#eeeaff] hover:text-[#211d36] sm:px-3 sm:text-sm">
-            How it works
-          </button>
         </div>
       </nav>
 
@@ -346,7 +346,7 @@ export function LandingPage() {
 
       <footer className="border-t border-[#ddd7f1] px-5 py-8 sm:px-8">
         <div className="mx-auto flex max-w-[92rem] flex-col gap-4 text-sm text-[#655f77] sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2"><NimbusMascot animated={false} className="h-8 w-11" /><span className="font-black text-[#211d36]">nimbus</span></div>
+          <div className="flex items-center gap-2"><NimbusMascot variant="mark" animated={false} interactive={false} className="h-9 w-11" /><span className="font-black text-[#211d36]">nimbus</span></div>
           <p>Plan what fits. Finish what matters.</p>
         </div>
       </footer>

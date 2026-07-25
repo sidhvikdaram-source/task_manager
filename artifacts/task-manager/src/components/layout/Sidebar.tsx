@@ -178,7 +178,7 @@ function SidebarBody({
       <div
         className={cn(
           "relative z-10 flex h-16 shrink-0 items-center border-b border-border/70 bg-background",
-          collapsed ? "justify-center px-2" : "gap-3 px-4",
+          collapsed ? "justify-center px-1.5" : "gap-3 px-3",
         )}
       >
         {collapsed && onToggle ? (
@@ -190,9 +190,16 @@ function SidebarBody({
             whileHover={reduceMotion ? undefined : { scale: 1.05 }}
             whileTap={reduceMotion ? undefined : { scale: 0.94 }}
             transition={{ type: "spring", stiffness: 400, damping: 22 }}
-            className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] bg-[#141414] text-white shadow-[0_6px_14px_rgba(0,0,0,0.14)]"
+            className="group relative flex h-13 w-13 items-center justify-center rounded-[1rem] transition-colors hover:bg-primary/8"
           >
-            <PanelLeftOpen className="h-5 w-5" />
+            <NimbusMascot
+              state={hasOverdue ? "overdue" : "ready"}
+              variant="mark"
+              className="h-12 w-13 drop-shadow-[0_7px_12px_hsl(var(--primary)/.2)]"
+            />
+            <span className="absolute -right-0.5 bottom-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+              <PanelLeftOpen className="h-3 w-3" />
+            </span>
           </motion.button>
         ) : (
           <Link href="/" onClick={onNavigate}>
@@ -203,7 +210,7 @@ function SidebarBody({
               transition={{ type: "spring", stiffness: 400, damping: 22 }}
               title="Nimbus"
             >
-              <NimbusMascot state={hasOverdue ? "overdue" : "ready"} className="h-11 w-12 shrink-0" />
+              <NimbusMascot state={hasOverdue ? "overdue" : "ready"} variant="mark" className="h-13 w-15 shrink-0 drop-shadow-[0_8px_14px_hsl(var(--primary)/.18)]" />
               <SlidingLabel
                 show={!collapsed}
                 className="whitespace-nowrap text-lg font-black tracking-tight"

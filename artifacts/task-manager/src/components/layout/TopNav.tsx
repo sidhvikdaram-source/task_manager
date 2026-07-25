@@ -172,7 +172,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
           </button>
           <Link href="/" className="lg:hidden">
             <div className="flex cursor-pointer items-center gap-2.5">
-              <NimbusMascot state={hasOverdue ? "overdue" : "ready"} className="h-11 w-12 shrink-0" />
+              <NimbusMascot state={hasOverdue ? "overdue" : "ready"} variant="mark" className="h-12 w-14 shrink-0 drop-shadow-[0_7px_12px_hsl(var(--primary)/.16)]" />
               <span className="hidden text-lg font-black tracking-tight text-foreground sm:inline">
                 Nimbus
               </span>

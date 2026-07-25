@@ -1,9 +1,9 @@
-# Render Blueprint — deploys API server + PostgreSQL + builds frontend
+# Render Blueprint — deploys Nimbus Do + PostgreSQL + builds the frontend
 # https://render.com/docs/blueprint-spec
 
 services:
   - type: web
-    name: task-manager
+    name: nimbusdo
     runtime: node
     repo: https://github.com/sidhvikdaram-source/task_manager.git
     branch: main
