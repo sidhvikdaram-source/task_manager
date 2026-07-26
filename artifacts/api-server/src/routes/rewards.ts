@@ -30,8 +30,24 @@ import {
   type RewardKind,
 } from "../lib/economyConfig";
 import { purchaseEligibility } from "../lib/economyRules";
+import { localDateKey } from "../lib/localDate";
 
 const router: IRouter = Router();
+
+const DAILY_DRIFT_REWARDS = [
+  { amount: 8, name: "Calm Current", weight: 55 },
+  { amount: 12, name: "Swift Current", weight: 30 },
+  { amount: 18, name: "Nimbus Boost", weight: 15 },
+] as const;
+
+function rollDailyDrift() {
+  const roll = randomInt(100);
+  let cursor = 0;
+  return DAILY_DRIFT_REWARDS.find((reward) => {
+    cursor += reward.weight;
+    return roll < cursor;
+  }) ?? DAILY_DRIFT_REWARDS[0];
+}
 
 type RewardItem = Omit<EconomyItem, "source"> & {
   requirement?: string;
@@ -161,6 +177,33 @@ const equipUpdates: Partial<Record<RewardKind, (itemId: string) => Partial<typeo
   badge_display: (itemId) => ({ equippedBadgeDisplay: itemId }),
   momentum_cosmetic: (itemId) => ({ equippedMomentumCosmetic: itemId }),
 };
+
+router.post("/rewards/daily-drift", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
+  const user = await db.select({ timezone: usersTable.timezone })
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user.id))
+    .then((rows) => rows[0]);
+  const rewardDate = localDateKey(new Date(), user?.timezone);
+  const reward = rollDailyDrift();
+  const result = await db.transaction(async (tx) => {
+    await lockEconomyUser(tx, req.user!.id);
+    return awardBpInTransaction(
+      tx,
+      req.user!.id,
+      reward.amount,
+      `daily-drift:${rewardDate}`,
+      `${reward.name} return reward`,
+    );
+  });
+  res.json({
+    awarded: result.awarded > 0,
+    amount: result.awarded,
+    rewardName: result.awarded > 0 ? reward.name : null,
+    rewardDate,
+    balance: result.balance,
+  });
+});
 
 router.get("/rewards", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
