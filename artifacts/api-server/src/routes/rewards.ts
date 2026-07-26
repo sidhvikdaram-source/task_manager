@@ -30,24 +30,9 @@ import {
   type RewardKind,
 } from "../lib/economyConfig";
 import { purchaseEligibility } from "../lib/economyRules";
-import { localDateKey } from "../lib/localDate";
+import { loadForecastDashboard, purchaseForecastConsumable } from "../lib/forecastRewards";
 
 const router: IRouter = Router();
-
-const DAILY_DRIFT_REWARDS = [
-  { amount: 8, name: "Calm Current", weight: 55 },
-  { amount: 12, name: "Swift Current", weight: 30 },
-  { amount: 18, name: "Nimbus Boost", weight: 15 },
-] as const;
-
-function rollDailyDrift() {
-  const roll = randomInt(100);
-  let cursor = 0;
-  return DAILY_DRIFT_REWARDS.find((reward) => {
-    cursor += reward.weight;
-    return roll < cursor;
-  }) ?? DAILY_DRIFT_REWARDS[0];
-}
 
 type RewardItem = Omit<EconomyItem, "source"> & {
   requirement?: string;
@@ -178,31 +163,9 @@ const equipUpdates: Partial<Record<RewardKind, (itemId: string) => Partial<typeo
   momentum_cosmetic: (itemId) => ({ equippedMomentumCosmetic: itemId }),
 };
 
-router.post("/rewards/daily-drift", async (req, res): Promise<void> => {
+router.get("/rewards/forecast", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
-  const user = await db.select({ timezone: usersTable.timezone })
-    .from(usersTable)
-    .where(eq(usersTable.id, req.user.id))
-    .then((rows) => rows[0]);
-  const rewardDate = localDateKey(new Date(), user?.timezone);
-  const reward = rollDailyDrift();
-  const result = await db.transaction(async (tx) => {
-    await lockEconomyUser(tx, req.user!.id);
-    return awardBpInTransaction(
-      tx,
-      req.user!.id,
-      reward.amount,
-      `daily-drift:${rewardDate}`,
-      `${reward.name} return reward`,
-    );
-  });
-  res.json({
-    awarded: result.awarded > 0,
-    amount: result.awarded,
-    rewardName: result.awarded > 0 ? reward.name : null,
-    rewardDate,
-    balance: result.balance,
-  });
+  res.json(await loadForecastDashboard(req.user.id));
 });
 
 router.get("/rewards", async (req, res): Promise<void> => {
@@ -445,6 +408,23 @@ router.post("/rewards/:itemId/purchase", async (req, res): Promise<void> => {
     return;
   }
   if (item.source !== "store" || item.priceBp <= 0) { res.status(400).json({ error: "This reward must be earned, not purchased." }); return; }
+  if (item.kind === "forecast_consumable") {
+    try {
+      const response = await purchaseForecastConsumable(req.user.id, item.id);
+      res.status(201).json({ ...response, item });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "PURCHASE_FAILED";
+      const messages: Record<string, string> = {
+        INSUFFICIENT_BP: "Not enough BP for that forecast action.",
+        FORECAST_LOCKED: "Today's forecast can only be rerolled before your first completion.",
+        ALREADY_PEEKED: "Tomorrow's forecast is already visible.",
+        BOOST_ACTIVE: "Today's NP Tailwind is already active.",
+      };
+      res.status(["INSUFFICIENT_BP", "FORECAST_LOCKED", "ALREADY_PEEKED", "BOOST_ACTIVE"].includes(code) ? 400 : 500)
+        .json({ error: messages[code] ?? "Could not update the forecast." });
+    }
+    return;
+  }
   try {
     const response = await db.transaction(async (tx) => {
       await lockEconomyUser(tx, req.user.id);

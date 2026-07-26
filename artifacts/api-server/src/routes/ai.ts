@@ -950,6 +950,46 @@ function extractJsonObject(text: string) {
   try { return JSON.parse(match[0]) as Record<string, unknown>; } catch { return null; }
 }
 
+function normalizeWorkspaceDecision(value: Record<string, unknown> | null) {
+  if (!value) return null;
+  const nested = value.plan && typeof value.plan === "object"
+    ? value.plan as Record<string, unknown>
+    : value.workspacePreview && typeof value.workspacePreview === "object"
+      ? value.workspacePreview as Record<string, unknown>
+      : null;
+  const source = nested ? { ...value, ...nested } : value;
+  const rawOperations = Array.isArray(source.operations)
+    ? source.operations
+    : Array.isArray(source.actions)
+      ? source.actions
+      : [];
+  const typeAliases: Record<string, string> = {
+    createTask: "create_task",
+    updateTask: "update_task",
+    deleteTask: "delete_task",
+    createProject: "create_project",
+    updateProject: "update_project",
+    deleteProject: "delete_project",
+    createSubject: "create_subject",
+    updateSubject: "update_subject",
+    deleteSubject: "delete_subject",
+    addChecklistItem: "add_checklist_item",
+    sendMessage: "send_message",
+  };
+  const operations = rawOperations.map((operation) => {
+    if (!operation || typeof operation !== "object") return operation;
+    const normalized = { ...(operation as Record<string, unknown>) };
+    if (typeof normalized.type === "string" && typeAliases[normalized.type]) {
+      normalized.type = typeAliases[normalized.type];
+    }
+    return normalized;
+  });
+  const intent = source.intent === "change" || source.intent === "action"
+    ? "workspace_changes"
+    : source.intent ?? (operations.length ? "workspace_changes" : "general");
+  return { ...source, intent, operations };
+}
+
 function validateActionPlan(value: Record<string, unknown> | null, expectations?: PlanExpectations): AssistantActionPlan | null {
   if (!value || !Array.isArray(value.tasks)) return null;
   const rawProject = value.project && typeof value.project === "object" ? value.project as Record<string, unknown> : null;
@@ -1194,9 +1234,28 @@ async function generateWorkspaceActionPlan(userId: string, message: string, hist
       history.slice(-6),
       log,
     );
-    const value = extractJsonObject(fallback.reply);
+    let value = normalizeWorkspaceDecision(extractJsonObject(fallback.reply));
     if (value?.intent === "general" || value?.intent === "workspace_query") return { intent: value.intent, plan: null, provider: fallback.provider };
-    const plan = value?.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
+    let plan = value?.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
+    if (!plan) {
+      const repair = await generateAssistantReply(
+        [
+          "Repair the invalid workspace decision below. Return one JSON object only.",
+          "Use intent workspace_changes and an operations array. Operation type names must use snake_case.",
+          "For create operations, targetId must be null. For update/delete operations, use only IDs present in Current workspace.",
+          "Preserve the user's actual request. Do not add actions they did not request.",
+          `Current workspace: ${JSON.stringify(context)}.`,
+          `User request: ${JSON.stringify(message)}.`,
+          `Invalid decision: ${JSON.stringify(value ?? fallback.reply).slice(0, 12_000)}.`,
+        ].join(" "),
+        "Output strict JSON only. Never wrap the object in Markdown.",
+        [],
+        log,
+      );
+      value = normalizeWorkspaceDecision(extractJsonObject(repair.reply));
+      if (value?.intent === "general" || value?.intent === "workspace_query") return { intent: value.intent, plan: null, provider: repair.provider };
+      plan = value?.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
+    }
     if (!plan) throw new Error("The assistant could not produce a safe workspace preview. Please retry the request.");
     return { intent: "workspace_changes" as const, plan, provider: fallback.provider };
   }

@@ -13,7 +13,6 @@ import { ExperienceProvider, useExperience } from "@/experience";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LandingPage } from "@/components/LandingPage";
-import { DailyDriftReward } from "@/components/DailyDriftReward";
 
 const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
@@ -254,7 +253,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return <LandingPage />;
   }
 
-  return <><DailyDriftReward />{children}</>;
+  return <>{children}</>;
 }
 
 function SocialRoute() {

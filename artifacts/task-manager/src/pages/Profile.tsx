@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Award, BadgeCheck, Check, CircleDollarSign, Gift, Headphones, ImagePlus, KeyRound, Lock, PackageOpen, Palette, PartyPopper, Play, ShoppingBag, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
+import { Award, BadgeCheck, Check, CircleDollarSign, CloudSun, Gift, Headphones, ImagePlus, KeyRound, Lock, PackageOpen, Palette, PartyPopper, Play, ShoppingBag, Sparkles, Tag, Trash2, X, Zap } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useGetUserStats } from "@workspace/api-client-react";
 import { useAuth } from "@workspace/replit-auth-web";
@@ -11,9 +11,10 @@ import { FramePreview, PetPreview, ProfilePhoto } from "@/components/ProfileCosm
 import { useQueryClient } from "@tanstack/react-query";
 import { sortRewardChests, withEquippedReward } from "@/lib/rewardUi";
 import { playCompletionEffect, completionOrigin } from "@/lib/completionSound";
+import { ForecastExperience } from "@/components/ForecastExperience";
 
-type RewardKind = "frame" | "pet" | "title" | "completion_effect" | "transition" | "profile_theme" | "focus_sound" | "badge_display" | "momentum_cosmetic" | "chest_key";
-type StoreCategory = "profile_customization" | "pet_cosmetics" | "focus_items" | "chest_items" | "reward_effects" | "limited_items" | "momentum_cosmetics";
+type RewardKind = "frame" | "pet" | "title" | "completion_effect" | "transition" | "profile_theme" | "focus_sound" | "badge_display" | "momentum_cosmetic" | "chest_key" | "forecast_consumable";
+type StoreCategory = "profile_customization" | "pet_cosmetics" | "focus_items" | "chest_items" | "reward_effects" | "limited_items" | "momentum_cosmetics" | "forecast_items";
 type ChestRarity = "common" | "rare" | "epic" | "legendary";
 type Reward = {
   id: string;
@@ -138,6 +139,12 @@ export default function Profile() {
       .finally(() => setRewardsLoading(false));
   }, []);
 
+  useEffect(() => {
+    const refresh = () => void loadRewards(true).catch(() => undefined);
+    window.addEventListener("nimbus:rewards-refresh", refresh);
+    return () => window.removeEventListener("nimbus:rewards-refresh", refresh);
+  }, []);
+
   useEffect(() => () => {
     if (equippedPulseTimer.current) window.clearTimeout(equippedPulseTimer.current);
   }, []);
@@ -190,6 +197,9 @@ export default function Profile() {
         applyPurchase(current) ?? current,
       );
       toast.success(`${item.name} purchased`, { description: `${item.priceBp} BP spent.` });
+      if (item.kind === "forecast_consumable") {
+        window.dispatchEvent(new CustomEvent("nimbus:forecast-refresh"));
+      }
       playCompletionEffect("aurora-finish", completionOrigin());
       void Promise.all([loadRewards(true), refetchStats()]).catch(() => undefined);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Purchase failed"); }
@@ -457,6 +467,8 @@ export default function Profile() {
         </div>
       </div>
 
+      <ForecastExperience />
+
       <section id="reward-chests" className="bento-card scroll-mt-4 overflow-hidden">
         <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-center gap-3">
@@ -545,7 +557,7 @@ export default function Profile() {
           <div><div className="flex items-center gap-2"><ShoppingBag className="h-5 w-5 text-primary" /><h2 className="text-lg font-black">Nimbus Shop</h2></div><p className="mt-1 text-sm text-muted-foreground">Spend Breeze Points (BP) on optional customization. Nimbus Points (NP) always stay with your progress.</p></div>
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-secondary/15 px-3 text-xs font-black text-secondary"><CircleDollarSign className="h-4 w-4" /> {rewards?.adminModeEnabled ? "Unlimited BP" : `${rewards?.bpBalance ?? 0} BP`}</span>
-            <select aria-label="Store category" value={category} onChange={(event) => setCategory(event.target.value as typeof category)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">All categories</option><option value="profile_customization">Profile customization</option><option value="pet_cosmetics">Pet cosmetics</option><option value="focus_items">Focus items</option><option value="chest_items">Chest items</option><option value="reward_effects">Animations</option><option value="limited_items">Limited items</option><option value="momentum_cosmetics">Momentum cosmetics</option></select>
+            <select aria-label="Store category" value={category} onChange={(event) => setCategory(event.target.value as typeof category)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">All categories</option><option value="forecast_items">Weather tools</option><option value="profile_customization">Profile customization</option><option value="pet_cosmetics">Pet cosmetics</option><option value="focus_items">Focus items</option><option value="chest_items">Chest items</option><option value="reward_effects">Animations</option><option value="limited_items">Limited items</option><option value="momentum_cosmetics">Momentum cosmetics</option></select>
             <select aria-label="Ownership filter" value={ownership} onChange={(event) => setOwnership(event.target.value as typeof ownership)} className="h-9 rounded-lg border bg-background px-2 text-xs font-bold"><option value="all">Owned and locked</option><option value="owned">Owned</option><option value="locked">Not owned</option></select>
           </div>
         </div>
@@ -568,6 +580,7 @@ export default function Profile() {
                 {item.kind === "badge_display" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><BadgeCheck className="h-5 w-5" /></div>}
                 {item.kind === "momentum_cosmetic" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/15 text-secondary"><MomentumIcon className="h-5 w-5" /></div>}
                 {item.kind === "chest_key" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><KeyRound className="h-5 w-5" /></div>}
+                {item.kind === "forecast_consumable" && <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary"><CloudSun className="h-5 w-5" /></div>}
                 <Sparkles className="h-4 w-4 text-secondary" />
               </div>
               <div className="mt-4 flex items-start justify-between gap-2"><p className="text-sm font-black leading-tight text-balance">{item.name}</p><span className={`rounded px-1.5 py-0.5 text-[9px] font-black uppercase ${rarityStyle(item.rarity).split(" ").slice(0, 3).join(" ")}`}>{item.rarity}</span></div>

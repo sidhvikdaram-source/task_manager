@@ -10,6 +10,7 @@ import { completionDisposition } from "./taskCompletionRules";
 import { awardBpInTransaction, awardMomentumMilestonesInTransaction, lockEconomyUser } from "./bpEconomy";
 import { BP_RULES, VP_RULES } from "./economyConfig";
 import { areConsecutiveCalendarDates, localDateKey } from "./localDate";
+import { applyForecastCompletionInTransaction } from "./forecastRewards";
 
 export class TaskNotFoundError extends Error {}
 
@@ -53,13 +54,23 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
       .select({ timezone: usersTable.timezone })
       .from(usersTable)
       .where(eq(usersTable.id, userId));
-    const multiplier = stats.multiplier ?? 1;
-    const vpAwarded = Math.round((task.vpValue ?? 10) * multiplier);
+    const baseMultiplier = stats.multiplier ?? 1;
+    const baseVpAwarded = Math.round((task.vpValue ?? 10) * baseMultiplier);
+    const timezone = user?.timezone ?? "UTC";
+    const forecastReward = await applyForecastCompletionInTransaction(
+      tx,
+      userId,
+      task,
+      completedAt,
+      baseVpAwarded,
+      timezone,
+    );
+    const vpAwarded = baseVpAwarded + forecastReward.bonusNp;
+    const multiplier = (task.vpValue ?? 10) > 0 ? vpAwarded / (task.vpValue ?? 10) : baseMultiplier;
     const newTotal = stats.totalVp + vpAwarded;
     const progress = stats.tierProgress + vpAwarded;
     const tierUps = Math.floor(progress / VP_RULES.tierSize);
     const newTier = stats.tier + tierUps;
-    const timezone = user?.timezone ?? "UTC";
     const today = localDateKey(completedAt, timezone);
     const lastActivity = stats.lastActivityDate
       ? localDateKey(stats.lastActivityDate, timezone)
@@ -80,7 +91,8 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
     const dailyBp = firstCompletionToday
       ? await awardBpInTransaction(tx, userId, BP_RULES.dailyCompletion, `daily-task:${today}`, "Daily task reward")
       : { awarded: 0 };
-    const bpAwarded = dailyBp.awarded + momentumRewards.reduce((sum, reward) => sum + reward.bp, 0);
+    const visibleForecastBp = forecastReward.hidden ? 0 : forecastReward.bonusBp;
+    const bpAwarded = dailyBp.awarded + momentumRewards.reduce((sum, reward) => sum + reward.bp, 0) + visibleForecastBp;
 
     const copy: Record<number, [string, string]> = {
       50: ["First Sprint", "Earned your first 50 NP"], 100: ["Century Mark", "Reached 100 total NP"],
@@ -94,6 +106,25 @@ export async function completeTaskAndAward(userId: string, taskId: number) {
         await tx.insert(milestonesTable).values({ userId, title, description, vpThreshold: threshold, achievedAt: completedAt });
       }
     }
-    return { task, vpAwarded, bpAwarded, momentumRewards, multiplier, newTotal, tierUp: tierUps > 0, newTier: tierUps > 0 ? newTier : null, firstCompletionToday, consecutiveMomentum, streakDays: newStreak };
+    return {
+      task,
+      vpAwarded,
+      bpAwarded,
+      momentumRewards,
+      multiplier,
+      newTotal,
+      tierUp: tierUps > 0,
+      newTier: tierUps > 0 ? newTier : null,
+      firstCompletionToday,
+      consecutiveMomentum,
+      streakDays: newStreak,
+      forecastReward: {
+        weather: forecastReward.weather,
+        triggered: forecastReward.triggered,
+        bonusNp: forecastReward.bonusNp,
+        bonusBp: visibleForecastBp,
+        hidden: forecastReward.hidden,
+      },
+    };
   });
 }

@@ -24,6 +24,12 @@ test("repeatable chest keys remain purchasable after ownership", () => {
   assert.equal(STORE_ITEMS.find((item) => item.id === "chest-key")?.repeatable, true);
 });
 
+test("forecast tools are repeatable BP purchases rather than permanent cosmetics", () => {
+  const tools = STORE_ITEMS.filter((item) => item.category === "forecast_items");
+  assert.deepEqual(tools.map((item) => item.id), ["weather-reroll", "tomorrow-peek", "tailwind-boost"]);
+  assert.ok(tools.every((item) => item.repeatable && !item.equipable && item.kind === "forecast_consumable"));
+});
+
 test("Momentum milestone rewards are lifetime thresholds and never imply a reset", () => {
   assert.deepEqual(momentumMilestoneAwards(2, 3), [{ days: 3, bp: 20 }]);
   assert.deepEqual(momentumMilestoneAwards(3, 7), [{ days: 7, bp: 35 }]);

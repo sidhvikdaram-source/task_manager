@@ -16,6 +16,13 @@ type CompletionResult = Awaited<ReturnType<typeof requestTaskCompletion>> & {
   streakDays?: number | null;
   bpAwarded?: number;
   momentumRewards?: Array<{ days: number; bp: number }>;
+  forecastReward?: {
+    weather: "sunny" | "stormy" | "foggy" | "windy" | "rainbow" | null;
+    triggered: boolean;
+    bonusNp: number;
+    bonusBp: number;
+    hidden: boolean;
+  };
 };
 type CompletionHandlers = {
   onOptimistic?: () => void;
@@ -102,6 +109,25 @@ export function useReliableTaskCompletion() {
             ? `${milestone.days} Momentum days reached. Momentum never resets.`
             : "Added to your store balance.",
         });
+      }
+      if (result.forecastReward?.triggered) {
+        window.dispatchEvent(new CustomEvent("nimbus:forecast-reward", {
+          detail: result.forecastReward,
+        }));
+        if (result.forecastReward.hidden) {
+          toast("The fog kept something back", {
+            description: "Your hidden forecast reward will clear after midnight.",
+          });
+        } else if (result.forecastReward.bonusNp || result.forecastReward.bonusBp) {
+          const parts = [
+            result.forecastReward.bonusNp ? `+${result.forecastReward.bonusNp} NP` : "",
+            result.forecastReward.bonusBp ? `+${result.forecastReward.bonusBp} BP` : "",
+          ].filter(Boolean).join(" and ");
+          toast.success(`${result.forecastReward.weather} forecast triggered`, {
+            description: parts,
+          });
+        }
+        queryClient.invalidateQueries({ queryKey: ["forecast"] });
       }
       try {
         await handlers.onSuccess?.(result);

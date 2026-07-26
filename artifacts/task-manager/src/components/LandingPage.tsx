@@ -7,9 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import {
   ArrowRight,
   Brain,
-  CalendarDays,
   Check,
-  Clock3,
   GraduationCap,
   Lock,
   Mail,
@@ -50,22 +48,6 @@ const productStories = [
     alt: "Nimbus Focus timer with task selection and session lengths",
     accent: "#ff7a24",
   },
-  {
-    number: "04",
-    title: "See time before it disappears.",
-    description: "Month, week, day, and agenda views combine tasks with school events. Sync deliberately, filter quickly, and restore changes safely.",
-    image: "/brand/product/calendar.png",
-    alt: "Nimbus Calendar month view and selected day panel",
-    accent: "#37b89f",
-  },
-  {
-    number: "05",
-    title: "Finish the long work.",
-    description: "Projects connect milestones, rubrics, due dates, and related tasks so a big assignment becomes a sequence you can actually complete.",
-    image: "/brand/product/projects.png",
-    alt: "Nimbus Projects workspace with progress and related tasks",
-    accent: "#2f6df6",
-  },
 ];
 
 const featureGroups = [
@@ -91,7 +73,7 @@ const featureGroups = [
   },
   {
     title: "Stay motivated",
-    items: ["Momentum without streak guilt", "Nimbus Points and tiers", "Breeze Points shop", "Reward chests", "Daily Drift return rewards"],
+    items: ["Momentum without streak guilt", "Nimbus Points and tiers", "Daily weather forecasts", "Forecast rerolls and early peeks", "Reward chests"],
   },
 ];
 
@@ -99,7 +81,7 @@ const accordionFeatures = [
   { title: "Choose", detail: "A next task matched to your energy and available minutes.", image: "/brand/product/my-day.png", position: "50% 35%" },
   { title: "Learn", detail: "Canvas work sorted into subjects instead of one endless feed.", image: "/brand/product/academics.png", position: "50% 48%" },
   { title: "Focus", detail: "A calm timer tied to the work you chose.", image: "/brand/product/focus.png", position: "50% 40%" },
-  { title: "Finish", detail: "Projects and deadlines that stay visible all the way through.", image: "/brand/product/projects.png", position: "50% 42%" },
+  { title: "Return", detail: "A new mascot forecast changes how progress pays out each day.", image: "/brand/product/my-day.png", position: "55% 48%" },
 ];
 
 export function LandingPage() {
@@ -259,8 +241,8 @@ export function LandingPage() {
       <section id="product" data-story className="px-5 py-28 sm:px-8 sm:py-40">
         <div className="mx-auto grid max-w-[92rem] gap-16 lg:grid-cols-12 lg:gap-10">
           <div data-story-copy className="self-start lg:col-span-5 lg:pt-8">
-            <h2 className="max-w-xl text-[clamp(3rem,5.5vw,6.5rem)] font-[630] leading-[.89] tracking-[-.065em]">One day.<br />Five clear views.</h2>
-            <p className="mt-7 max-w-md text-lg leading-8 text-[#686177]">Nimbus does not hide the product behind promises. These are the actual workspaces you use to decide, learn, focus, schedule, and finish.</p>
+            <h2 className="max-w-xl text-[clamp(3rem,5.5vw,6.5rem)] font-[630] leading-[.89] tracking-[-.065em]">One day.<br />Three clear views.</h2>
+            <p className="mt-7 max-w-md text-lg leading-8 text-[#686177]">Real Nimbus screens, tightly framed around the moments that matter: deciding, learning, and focusing.</p>
             <div className="mt-9 flex items-center gap-3 text-sm font-black text-[#50486a]"><Wind className="h-5 w-5 text-[#7c68ef]" />Scroll through a real Nimbus day</div>
           </div>
           <div className="space-y-24 lg:col-span-7 lg:space-y-32">
@@ -273,8 +255,8 @@ export function LandingPage() {
                     <p className="mt-3 max-w-xl leading-7 text-[#6c657d]">{story.description}</p>
                   </div>
                 </div>
-                <div className="border-t border-[#e7e2f0] bg-[#0a0d14] p-2 sm:p-3">
-                  <img src={story.image} alt={story.alt} loading="lazy" className="h-auto w-full rounded-xl" />
+                <div className="aspect-[16/8.2] overflow-hidden border-t border-[#e7e2f0] bg-[#0a0d14] p-2 sm:p-3">
+                  <img src={story.image} alt={story.alt} loading="lazy" decoding="async" className="h-full w-[116%] max-w-none -translate-x-[12%] rounded-xl object-cover object-left" />
                 </div>
               </article>
             ))}
@@ -328,18 +310,18 @@ export function LandingPage() {
       <section className="px-5 py-28 sm:px-8 sm:py-44">
         <div className="mx-auto max-w-[92rem]">
           <div className="mx-auto max-w-5xl text-center">
-            <h2 className="text-[clamp(3rem,6vw,7rem)] font-[630] leading-[.88] tracking-[-.068em]">Come back to a tailwind.</h2>
-            <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-[#686177]">Daily Drift gives you a small, varied Breeze Point boost the first time you return each day. It celebrates the return—not endless app opening.</p>
+            <h2 className="text-[clamp(3rem,6vw,7rem)] font-[630] leading-[.88] tracking-[-.068em]">Every day has weather.</h2>
+            <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-[#686177]">Once Nimbus knows you understand the basics, Nimbo delivers a daily forecast in your Profile. Each forecast changes how progress can pay out.</p>
           </div>
           <div className="relative mx-auto mt-20 max-w-4xl">
             <article data-stack-card className="sticky top-24 overflow-hidden rounded-[2rem] bg-[#201b31] p-7 text-white shadow-[0_35px_90px_rgba(42,32,86,.22)] sm:p-12">
               <div className="grid items-center gap-8 sm:grid-cols-2">
-                <div><Wind className="h-8 w-8 text-[#9c8cff]" /><h3 className="mt-7 text-5xl font-[620] leading-[.9] tracking-[-.055em]">Daily Drift</h3><p className="mt-5 leading-7 text-white/60">One server-issued reward per local day. Refresh-safe, account-specific, and deliberately modest.</p></div>
-                <div className="rounded-[1.75rem] bg-[#7765e3] p-8 text-center"><NimbusMascot state="momentum" className="mx-auto w-52" /><p className="mt-4 text-sm font-bold text-white/72">A little tailwind for coming back</p><p className="mt-2 text-4xl font-black">+12 BP</p></div>
+                <div><Wind className="h-8 w-8 text-[#9c8cff]" /><h3 className="mt-7 text-5xl font-[620] leading-[.9] tracking-[-.055em]">Forecasts with consequences</h3><p className="mt-5 leading-7 text-white/60">Sunny multiplies NP. Stormy charges one task. Fog hides the result. Wind scatters BP. A rare rainbow unlocks something free.</p></div>
+                <div className="rounded-[1.75rem] bg-[#7765e3] p-8 text-center"><NimbusMascot state="stormy" className="mx-auto w-52" /><p className="mt-4 text-sm font-bold text-white/72">Storm front detected</p><p className="mt-2 text-2xl font-black">One task is carrying a charge</p></div>
               </div>
             </article>
             <article data-stack-card className="sticky top-28 mt-20 rounded-[2rem] border border-[#d9d3ea] bg-white p-7 shadow-[0_35px_90px_rgba(42,32,86,.16)] sm:p-12">
-              <div className="flex flex-col justify-between gap-12 sm:flex-row sm:items-end"><div><Target className="h-8 w-8 text-[#ff7a24]" /><h3 className="mt-7 max-w-xl text-5xl font-[620] leading-[.9] tracking-[-.055em]">Spend it on a system that feels like yours.</h3></div><p className="max-w-sm leading-7 text-[#686177]">Completion effects, themes, profile frames, titles, and focus sounds make progress visible without changing your real data.</p></div>
+              <div className="flex flex-col justify-between gap-12 sm:flex-row sm:items-end"><div><Target className="h-8 w-8 text-[#ff7a24]" /><h3 className="mt-7 max-w-xl text-5xl font-[620] leading-[.9] tracking-[-.055em]">Spend BP on agency, not only decoration.</h3></div><p className="max-w-sm leading-7 text-[#686177]">Reroll today, peek at tomorrow, or add a temporary NP Tailwind. Cosmetics still matter, but weather tools let you steer the system.</p></div>
             </article>
           </div>
         </div>

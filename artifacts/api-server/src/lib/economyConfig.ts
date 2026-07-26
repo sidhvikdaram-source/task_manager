@@ -6,7 +6,8 @@ export type StoreCategory =
   | "chest_items"
   | "reward_effects"
   | "limited_items"
-  | "momentum_cosmetics";
+  | "momentum_cosmetics"
+  | "forecast_items";
 export type RewardKind =
   | "frame"
   | "pet"
@@ -17,7 +18,8 @@ export type RewardKind =
   | "focus_sound"
   | "badge_display"
   | "momentum_cosmetic"
-  | "chest_key";
+  | "chest_key"
+  | "forecast_consumable";
 
 export type EconomyItem = {
   id: string;
@@ -121,6 +123,9 @@ export const STORE_ITEMS: EconomyItem[] = [
   store({ id: "momentum-trace", name: "Momentum Trace", description: "A cosmetic profile trace for 14 Momentum days.", kind: "momentum_cosmetic", category: "momentum_cosmetics", priceBp: 180, style: "momentum-trace", rarity: "rare", minimumMomentum: 14, equipable: true }),
   store({ id: "momentum-halo", name: "Momentum Halo", description: "A restrained profile aura for long-term consistency.", kind: "momentum_cosmetic", category: "momentum_cosmetics", priceBp: 480, style: "momentum-halo", rarity: "legendary", minimumMomentum: 60, equipable: true }),
   store({ id: "chest-key", name: "Chest Key", description: "Opens one additional reward chest.", kind: "chest_key", category: "chest_items", priceBp: 125, style: "key", rarity: "rare", repeatable: true, equipable: false }),
+  store({ id: "weather-reroll", name: "Forecast Reroll", description: "Replace today's forecast before completing a task.", kind: "forecast_consumable", category: "forecast_items", priceBp: 45, style: "reroll", rarity: "common", repeatable: true, equipable: false }),
+  store({ id: "tomorrow-peek", name: "Tomorrow Peek", description: "Reveal tomorrow's forecast one day early.", kind: "forecast_consumable", category: "forecast_items", priceBp: 65, style: "peek", rarity: "rare", repeatable: true, equipable: false }),
+  store({ id: "tailwind-boost", name: "NP Tailwind", description: "Add a 25% Nimbus Point boost to today's task completions.", kind: "forecast_consumable", category: "forecast_items", priceBp: 90, style: "boost", rarity: "rare", repeatable: true, equipable: false }),
 ];
 
 export const CHEST_ITEMS: EconomyItem[] = [

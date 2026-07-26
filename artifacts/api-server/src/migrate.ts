@@ -183,6 +183,31 @@ export async function runMigrations(): Promise<void> {
   `);
   await db.execute(sql`UPDATE "user_stats" SET "lifetime_vp" = GREATEST("lifetime_vp", "total_vp", (("tier" - 1) * 100) + "tier_progress");`);
 
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "daily_forecasts" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" varchar NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
+      "forecast_date" varchar NOT NULL,
+      "weather" varchar NOT NULL,
+      "target_task_id" integer,
+      "free_item_id" varchar,
+      "task_completions" integer DEFAULT 0 NOT NULL,
+      "reward_np" integer DEFAULT 0 NOT NULL,
+      "reward_bp" integer DEFAULT 0 NOT NULL,
+      "boost_percent" integer DEFAULT 0 NOT NULL,
+      "revealed_at" timestamp with time zone,
+      "peeked_at" timestamp with time zone,
+      "rerolled_at" timestamp with time zone,
+      "settled_at" timestamp with time zone,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+      UNIQUE ("user_id", "forecast_date")
+    );
+    CREATE INDEX IF NOT EXISTS "daily_forecasts_user_created_idx"
+      ON "daily_forecasts" ("user_id", "created_at");
+  `);
+  await db.execute(sql`ALTER TABLE "daily_forecasts" ADD COLUMN IF NOT EXISTS "settled_at" timestamp with time zone;`);
+
   // Create tasks table
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS "tasks" (

@@ -152,5 +152,37 @@ export const bpTransactionsTable = pgTable(
   ],
 );
 
+export const dailyForecastsTable = pgTable(
+  "daily_forecasts",
+  {
+    id: serial("id").primaryKey(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    forecastDate: varchar("forecast_date").notNull(),
+    weather: varchar("weather").notNull(),
+    targetTaskId: integer("target_task_id"),
+    freeItemId: varchar("free_item_id"),
+    taskCompletions: integer("task_completions").notNull().default(0),
+    rewardNp: integer("reward_np").notNull().default(0),
+    rewardBp: integer("reward_bp").notNull().default(0),
+    boostPercent: integer("boost_percent").notNull().default(0),
+    revealedAt: timestamp("revealed_at", { withTimezone: true }),
+    peekedAt: timestamp("peeked_at", { withTimezone: true }),
+    rerolledAt: timestamp("rerolled_at", { withTimezone: true }),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("daily_forecasts_user_date_unique").on(table.userId, table.forecastDate),
+    index("daily_forecasts_user_created_idx").on(table.userId, table.createdAt),
+  ],
+);
+
 export type UpsertUser = typeof usersTable.$inferInsert;
 export type User = typeof usersTable.$inferSelect;
