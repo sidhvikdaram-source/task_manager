@@ -1,6 +1,8 @@
 import { randomInt } from "node:crypto";
-import { and, eq, gte, ne } from "drizzle-orm";
+import { and, eq, gte, inArray, ne } from "drizzle-orm";
 import {
+  dailyHabitCompletionsTable,
+  dailyHabitsTable,
   dailyForecastsTable,
   db,
   tasksTable,
@@ -9,22 +11,56 @@ import {
   userStatsTable,
 } from "@workspace/db";
 import { awardBpInTransaction, lockEconomyUser, spendBpInTransaction, type EconomyTransaction } from "./bpEconomy";
-import { ECONOMY_ITEMS } from "./economyConfig";
+import { ECONOMY_ITEMS, VP_RULES } from "./economyConfig";
 import { addCalendarDays, localDateKey, startOfWeekKey } from "./localDate";
-import { FORECAST_COSTS, FORECAST_DETAILS, rollForecast, windyReward, type ForecastWeather } from "./forecastRules";
+import {
+  FORECAST_COSTS,
+  FORECAST_DETAILS,
+  isChargeableTask,
+  isHabitScheduledToday,
+  rollForecast,
+  windyReward,
+  type ForecastWeather,
+} from "./forecastRules";
 
 type ForecastInsert = typeof dailyForecastsTable.$inferInsert;
 type ForecastRow = typeof dailyForecastsTable.$inferSelect;
 
-async function rolledForecastValues(tx: EconomyTransaction, userId: string) {
+async function stormCandidates(tx: EconomyTransaction, userId: string, forecastDate: string) {
+  const [tasks, habits] = await Promise.all([
+    tx.select().from(tasksTable)
+      .where(and(eq(tasksTable.userId, userId), ne(tasksTable.status, "completed"), eq(tasksTable.archived, false))),
+    tx.select().from(dailyHabitsTable)
+      .where(and(eq(dailyHabitsTable.userId, userId), eq(dailyHabitsTable.status, "active"))),
+  ]);
+  const scheduledHabits = habits.filter((habit) => isHabitScheduledToday(habit.daysOfWeek, forecastDate));
+  const completedHabitIds = scheduledHabits.length
+    ? new Set(await tx.select({ habitId: dailyHabitCompletionsTable.habitId }).from(dailyHabitCompletionsTable)
+      .where(and(
+        inArray(dailyHabitCompletionsTable.habitId, scheduledHabits.map((habit) => habit.id)),
+        eq(dailyHabitCompletionsTable.completedDate, forecastDate),
+        eq(dailyHabitCompletionsTable.completed, true),
+      )).then((rows) => rows.map((row) => row.habitId)))
+    : new Set<number>();
+  return [
+    ...tasks.filter((task) => isChargeableTask(task, forecastDate)).map((task) => ({ taskId: task.id, habitId: null })),
+    ...scheduledHabits.filter((habit) => !completedHabitIds.has(habit.id)).map((habit) => ({ taskId: null, habitId: habit.id })),
+  ];
+}
+
+async function rolledForecastValues(tx: EconomyTransaction, userId: string, forecastDate: string) {
   let weather = rollForecast(randomInt(100));
   let targetTaskId: number | null = null;
+  let targetHabitId: number | null = null;
   let freeItemId: string | null = null;
   if (weather === "stormy") {
-    const active = await tx.select({ id: tasksTable.id }).from(tasksTable)
-      .where(and(eq(tasksTable.userId, userId), ne(tasksTable.status, "completed"), eq(tasksTable.archived, false)));
-    targetTaskId = active.length ? active[randomInt(active.length)].id : null;
-    if (!targetTaskId) weather = "sunny";
+    const candidates = await stormCandidates(tx, userId, forecastDate);
+    const target = candidates.length ? candidates[randomInt(candidates.length)] : null;
+    targetTaskId = target?.taskId ?? null;
+    targetHabitId = target?.habitId ?? null;
+    // A forecast can offer an extra opportunity, but it must never invent an
+    // impossible requirement. Clear skies are the fair, no-target fallback.
+    if (!target) weather = "sunny";
   }
   if (weather === "rainbow") {
     const owned = new Set(await tx.select({ itemId: userCosmeticsTable.itemId }).from(userCosmeticsTable)
@@ -34,7 +70,7 @@ async function rolledForecastValues(tx: EconomyTransaction, userId: string) {
     );
     freeItemId = candidates.length ? candidates[randomInt(candidates.length)].id : null;
   }
-  return { weather, targetTaskId, freeItemId };
+  return { weather, targetTaskId, targetHabitId, freeItemId };
 }
 
 async function createForecast(tx: EconomyTransaction, userId: string, forecastDate: string) {
@@ -42,7 +78,7 @@ async function createForecast(tx: EconomyTransaction, userId: string, forecastDa
     .where(and(eq(dailyForecastsTable.userId, userId), eq(dailyForecastsTable.forecastDate, forecastDate)))
     .then((rows) => rows[0]);
   if (existing) return { forecast: existing, created: false };
-  const values = await rolledForecastValues(tx, userId);
+  const values = await rolledForecastValues(tx, userId, forecastDate);
   const [created] = await tx.insert(dailyForecastsTable).values({
     userId,
     forecastDate,
@@ -69,7 +105,7 @@ async function createForecast(tx: EconomyTransaction, userId: string, forecastDa
   return { forecast: created, created: true };
 }
 
-function publicForecast(forecast: ForecastRow, taskTitle?: string | null) {
+function publicForecast(forecast: ForecastRow, targetTitle?: string | null) {
   const details = FORECAST_DETAILS[forecast.weather as ForecastWeather];
   return {
     id: forecast.id,
@@ -79,7 +115,10 @@ function publicForecast(forecast: ForecastRow, taskTitle?: string | null) {
     headline: details.headline,
     description: details.description,
     targetTaskId: forecast.targetTaskId,
-    targetTaskTitle: taskTitle ?? null,
+    targetHabitId: forecast.targetHabitId,
+    targetKind: forecast.targetHabitId ? "habit" : forecast.targetTaskId ? "task" : null,
+    targetTitle: targetTitle ?? null,
+    targetTaskTitle: forecast.targetTaskId ? targetTitle ?? null : null,
     freeItemId: forecast.freeItemId,
     freeItemName: forecast.freeItemId ? ECONOMY_ITEMS.find((item) => item.id === forecast.freeItemId)?.name ?? null : null,
     taskCompletions: forecast.taskCompletions,
@@ -88,6 +127,24 @@ function publicForecast(forecast: ForecastRow, taskTitle?: string | null) {
     boostPercent: forecast.boostPercent,
     canReroll: !forecast.rerolledAt && forecast.taskCompletions === 0 && forecast.weather !== "rainbow",
   };
+}
+
+async function repairStormTarget(tx: EconomyTransaction, userId: string, forecast: ForecastRow) {
+  if (forecast.weather !== "stormy" || forecast.chargeClaimedAt) return forecast;
+  const candidates = await stormCandidates(tx, userId, forecast.forecastDate);
+  const stillEligible = candidates.some((candidate) =>
+    (forecast.targetTaskId && candidate.taskId === forecast.targetTaskId)
+    || (forecast.targetHabitId && candidate.habitId === forecast.targetHabitId),
+  );
+  if (stillEligible) return forecast;
+  const target = candidates.length ? candidates[randomInt(candidates.length)] : null;
+  const [updated] = await tx.update(dailyForecastsTable).set({
+    weather: target ? "stormy" : "sunny",
+    targetTaskId: target?.taskId ?? null,
+    targetHabitId: target?.habitId ?? null,
+    updatedAt: new Date(),
+  }).where(eq(dailyForecastsTable.id, forecast.id)).returning();
+  return updated;
 }
 
 export async function loadForecastDashboard(userId: string) {
@@ -127,18 +184,23 @@ export async function loadForecastDashboard(userId: string) {
   const { forecast, shouldReveal } = await db.transaction(async (tx) => {
     await lockEconomyUser(tx, userId);
     const result = await createForecast(tx, userId, today);
-    const reveal = !result.forecast.revealedAt && !result.forecast.peekedAt;
+    const safeForecast = await repairStormTarget(tx, userId, result.forecast);
+    const reveal = !safeForecast.revealedAt && !safeForecast.peekedAt;
     const [updated] = reveal
       ? await tx.update(dailyForecastsTable).set({ revealedAt: now, updatedAt: now })
-        .where(eq(dailyForecastsTable.id, result.forecast.id)).returning()
-      : [result.forecast];
+        .where(eq(dailyForecastsTable.id, safeForecast.id)).returning()
+      : [safeForecast];
     return { forecast: updated, shouldReveal: reveal };
   });
-  const targetTaskTitle = forecast.targetTaskId
+  const targetTitle = forecast.targetTaskId
     ? await db.select({ title: tasksTable.title }).from(tasksTable)
       .where(and(eq(tasksTable.id, forecast.targetTaskId), eq(tasksTable.userId, userId)))
       .then((rows) => rows[0]?.title ?? null)
-    : null;
+    : forecast.targetHabitId
+      ? await db.select({ title: dailyHabitsTable.title }).from(dailyHabitsTable)
+        .where(and(eq(dailyHabitsTable.id, forecast.targetHabitId), eq(dailyHabitsTable.userId, userId)))
+        .then((rows) => rows[0]?.title ?? null)
+      : null;
   const yesterday = addCalendarDays(today, -1);
   const yesterdayForecast = await db.transaction(async (tx) => {
     await lockEconomyUser(tx, userId);
@@ -184,7 +246,7 @@ export async function loadForecastDashboard(userId: string) {
   return {
     eligible: true,
     requirements: null,
-    today: publicForecast(forecast, targetTaskTitle),
+    today: publicForecast(forecast, targetTitle),
     shouldReveal,
     yesterdayReveal: yesterdayForecast ? {
       weather: "foggy",
@@ -206,8 +268,8 @@ export async function purchaseForecastConsumable(userId: string, itemId: string)
     if (itemId === "weather-reroll") {
       if (current.forecast.rerolledAt || current.forecast.taskCompletions > 0 || current.forecast.weather === "rainbow") throw new Error("FORECAST_LOCKED");
       const spent = await spendBpInTransaction(tx, userId, FORECAST_COSTS.reroll, `forecast-reroll:${today}`, "Rerolled today's forecast");
-      const values = await rolledForecastValues(tx, userId);
-      const [forecast] = await tx.update(dailyForecastsTable).set({ ...values, rerolledAt: new Date(), updatedAt: new Date() })
+      const values = await rolledForecastValues(tx, userId, today);
+      const [forecast] = await tx.update(dailyForecastsTable).set({ ...values, chargeClaimedAt: null, rerolledAt: new Date(), updatedAt: new Date() })
         .where(eq(dailyForecastsTable.id, current.forecast.id)).returning();
       if (forecast.weather === "rainbow" && forecast.freeItemId) {
         await tx.insert(userCosmeticsTable).values({ userId, itemId: forecast.freeItemId }).onConflictDoNothing();
@@ -273,7 +335,42 @@ export async function applyForecastCompletionInTransaction(
     taskCompletions: forecast.taskCompletions + 1,
     rewardNp: forecast.rewardNp + bonusNp,
     rewardBp: forecast.rewardBp + bonusBp,
+    chargeClaimedAt: weather === "stormy" && forecast.targetTaskId === task.id ? completedAt : forecast.chargeClaimedAt,
     updatedAt: completedAt,
   }).where(eq(dailyForecastsTable.id, forecast.id));
   return { bonusNp, bonusBp, weather, triggered, hidden: weather === "foggy" };
+}
+
+export async function applyForecastHabitCompletion(userId: string, habitId: number, completedAt = new Date()) {
+  return db.transaction(async (tx) => {
+    await lockEconomyUser(tx, userId);
+    const [user] = await tx.select({ timezone: usersTable.timezone }).from(usersTable).where(eq(usersTable.id, userId));
+    const date = localDateKey(completedAt, user?.timezone);
+    const forecast = await tx.select().from(dailyForecastsTable)
+      .where(and(eq(dailyForecastsTable.userId, userId), eq(dailyForecastsTable.forecastDate, date)))
+      .then((rows) => rows[0]);
+    if (!forecast || forecast.weather !== "stormy" || forecast.targetHabitId !== habitId || forecast.chargeClaimedAt) {
+      return { triggered: false, bonusNp: 0, bonusBp: 0, weather: forecast?.weather ?? null };
+    }
+    let [stats] = await tx.select().from(userStatsTable).where(eq(userStatsTable.userId, userId));
+    if (!stats) [stats] = await tx.insert(userStatsTable).values({ userId }).returning();
+    const bonusNp = 50;
+    const progress = stats.tierProgress + bonusNp;
+    await tx.update(userStatsTable).set({
+      totalVp: stats.totalVp + bonusNp,
+      lifetimeVp: stats.lifetimeVp + bonusNp,
+      tier: stats.tier + Math.floor(progress / VP_RULES.tierSize),
+      tierProgress: progress % VP_RULES.tierSize,
+      updatedAt: completedAt,
+    }).where(eq(userStatsTable.id, stats.id));
+    const bp = await awardBpInTransaction(tx, userId, 25, `forecast:${date}:habit:${habitId}:bp`, "Storm forecast habit reward");
+    await tx.update(dailyForecastsTable).set({
+      taskCompletions: forecast.taskCompletions + 1,
+      rewardNp: forecast.rewardNp + bonusNp,
+      rewardBp: forecast.rewardBp + bp.awarded,
+      chargeClaimedAt: completedAt,
+      updatedAt: completedAt,
+    }).where(eq(dailyForecastsTable.id, forecast.id));
+    return { triggered: true, bonusNp, bonusBp: bp.awarded, weather: "stormy" as const };
+  });
 }

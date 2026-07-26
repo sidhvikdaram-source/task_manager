@@ -162,6 +162,7 @@ export const dailyForecastsTable = pgTable(
     forecastDate: varchar("forecast_date").notNull(),
     weather: varchar("weather").notNull(),
     targetTaskId: integer("target_task_id"),
+    targetHabitId: integer("target_habit_id"),
     freeItemId: varchar("free_item_id"),
     taskCompletions: integer("task_completions").notNull().default(0),
     rewardNp: integer("reward_np").notNull().default(0),
@@ -170,6 +171,7 @@ export const dailyForecastsTable = pgTable(
     revealedAt: timestamp("revealed_at", { withTimezone: true }),
     peekedAt: timestamp("peeked_at", { withTimezone: true }),
     rerolledAt: timestamp("rerolled_at", { withTimezone: true }),
+    chargeClaimedAt: timestamp("charge_claimed_at", { withTimezone: true }),
     settledAt: timestamp("settled_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

@@ -190,6 +190,7 @@ export async function runMigrations(): Promise<void> {
       "forecast_date" varchar NOT NULL,
       "weather" varchar NOT NULL,
       "target_task_id" integer,
+      "target_habit_id" integer,
       "free_item_id" varchar,
       "task_completions" integer DEFAULT 0 NOT NULL,
       "reward_np" integer DEFAULT 0 NOT NULL,
@@ -198,6 +199,7 @@ export async function runMigrations(): Promise<void> {
       "revealed_at" timestamp with time zone,
       "peeked_at" timestamp with time zone,
       "rerolled_at" timestamp with time zone,
+      "charge_claimed_at" timestamp with time zone,
       "settled_at" timestamp with time zone,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL,
       "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -207,6 +209,8 @@ export async function runMigrations(): Promise<void> {
       ON "daily_forecasts" ("user_id", "created_at");
   `);
   await db.execute(sql`ALTER TABLE "daily_forecasts" ADD COLUMN IF NOT EXISTS "settled_at" timestamp with time zone;`);
+  await db.execute(sql`ALTER TABLE "daily_forecasts" ADD COLUMN IF NOT EXISTS "target_habit_id" integer;`);
+  await db.execute(sql`ALTER TABLE "daily_forecasts" ADD COLUMN IF NOT EXISTS "charge_claimed_at" timestamp with time zone;`);
 
   // Create tasks table
   await db.execute(sql`

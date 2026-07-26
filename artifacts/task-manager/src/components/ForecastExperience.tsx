@@ -27,6 +27,9 @@ type ForecastDay = {
   headline: string;
   description: string;
   targetTaskId: number | null;
+  targetHabitId: number | null;
+  targetKind: "task" | "habit" | null;
+  targetTitle: string | null;
   targetTaskTitle: string | null;
   freeItemId: string | null;
   freeItemName: string | null;
@@ -159,7 +162,7 @@ export function ForecastExperience() {
             <div className="mt-12">
               <h2 className="max-w-2xl text-3xl font-black leading-[.95] tracking-[-.045em] sm:text-5xl">{today.headline}</h2>
               <p className="mt-4 max-w-xl text-sm leading-6 text-muted-foreground">{today.description}</p>
-              {today.targetTaskTitle && <p className="mt-4 rounded-xl border border-violet-400/25 bg-violet-400/10 px-4 py-3 text-sm font-black">Charged task: {today.targetTaskTitle}</p>}
+              {today.targetTitle && <p className="mt-4 rounded-xl border border-violet-400/25 bg-violet-400/10 px-4 py-3 text-sm font-black">Bonus-charged {today.targetKind}: {today.targetTitle}</p>}
               {today.freeItemName && <p className="mt-4 rounded-xl border border-fuchsia-400/25 bg-fuchsia-400/10 px-4 py-3 text-sm font-black">Rainbow unlock: {today.freeItemName}</p>}
             </div>
           </div>
@@ -212,7 +215,7 @@ export function ForecastExperience() {
                   <div className="flex items-center gap-2"><WeatherIcon className={`h-5 w-5 ${visual.accent}`} /><span className="text-sm font-black">{today.name} over Nimbus today</span></div>
                   <h2 id="forecast-title" className="mt-9 max-w-xl text-4xl font-black leading-[.92] tracking-[-.05em] sm:text-6xl">{today.headline}</h2>
                   <p className="mt-5 max-w-lg leading-7 text-muted-foreground">{today.description}</p>
-                  {today.targetTaskTitle && <p className="mt-5 text-sm font-black">Today’s charged task is “{today.targetTaskTitle}.”</p>}
+                  {today.targetTitle && <p className="mt-5 text-sm font-black">Today’s optional bonus is on the {today.targetKind} “{today.targetTitle}.” You never lose NP or BP for skipping it.</p>}
                   {today.freeItemName && <p className="mt-5 text-sm font-black">Your free unlock is {today.freeItemName}.</p>}
                   <button type="button" onClick={() => setOpen(false)} className="group mt-9 inline-flex h-12 items-center gap-2 rounded-xl bg-primary px-5 text-sm font-black text-primary-foreground">
                     Enter today <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

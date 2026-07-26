@@ -316,8 +316,8 @@ export function LandingPage() {
           <div className="relative mx-auto mt-20 max-w-4xl">
             <article data-stack-card className="sticky top-24 overflow-hidden rounded-[2rem] bg-[#201b31] p-7 text-white shadow-[0_35px_90px_rgba(42,32,86,.22)] sm:p-12">
               <div className="grid items-center gap-8 sm:grid-cols-2">
-                <div><Wind className="h-8 w-8 text-[#9c8cff]" /><h3 className="mt-7 text-5xl font-[620] leading-[.9] tracking-[-.055em]">Forecasts with consequences</h3><p className="mt-5 leading-7 text-white/60">Sunny multiplies NP. Stormy charges one task. Fog hides the result. Wind scatters BP. A rare rainbow unlocks something free.</p></div>
-                <div className="rounded-[1.75rem] bg-[#7765e3] p-8 text-center"><NimbusMascot state="stormy" className="mx-auto w-52" /><p className="mt-4 text-sm font-bold text-white/72">Storm front detected</p><p className="mt-2 text-2xl font-black">One task is carrying a charge</p></div>
+                <div><Wind className="h-8 w-8 text-[#9c8cff]" /><h3 className="mt-7 text-5xl font-[620] leading-[.9] tracking-[-.055em]">Forecasts that reward momentum</h3><p className="mt-5 leading-7 text-white/60">Sunny multiplies NP. Stormy highlights one doable bonus. Fog hides the result. Wind scatters BP. A rare rainbow unlocks something free.</p></div>
+                <div className="rounded-[1.75rem] bg-[#7765e3] p-8 text-center"><NimbusMascot state="stormy" className="mx-auto w-52" /><p className="mt-4 text-sm font-bold text-white/72">Storm front detected</p><p className="mt-2 text-2xl font-black">One doable action has a bonus charge</p></div>
               </div>
             </article>
             <article data-stack-card className="sticky top-28 mt-20 rounded-[2rem] border border-[#d9d3ea] bg-white p-7 shadow-[0_35px_90px_rgba(42,32,86,.16)] sm:p-12">

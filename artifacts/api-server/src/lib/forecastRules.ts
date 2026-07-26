@@ -27,8 +27,8 @@ export const FORECAST_DETAILS: Record<ForecastWeather, {
   },
   stormy: {
     name: "Stormy",
-    headline: "One task is carrying a charge.",
-    description: "Finish the charged task today for a 50 NP and 25 BP surge.",
+    headline: "One doable action is carrying a bonus charge.",
+    description: "Finish today's highlighted task or habit for a 50 NP and 25 BP surge. Missing it never costs you anything.",
   },
   foggy: {
     name: "Foggy",
@@ -50,4 +50,31 @@ export const FORECAST_DETAILS: Record<ForecastWeather, {
 export function windyReward(roll: number, amountRoll: number) {
   if (roll >= 45) return 0;
   return 6 + Math.max(0, Math.min(10, Math.floor(amountRoll)));
+}
+
+type ChargeableTask = {
+  title: string;
+  taskKind?: string | null;
+  blocked?: boolean;
+  archived?: boolean;
+  status?: string | null;
+  dueDate?: string | null;
+  calendarDate?: string | null;
+  externalSource?: string | null;
+};
+
+const ASSESSMENT_WORDS = /\b(test|exam|quiz|assessment|midterm|final)\b/i;
+const PREPARATION_WORDS = /\b(study|review|prepare|practice|revise|flashcards?|worksheet|notes?)\b/i;
+
+export function isChargeableTask(task: ChargeableTask, today: string) {
+  if (task.archived || task.blocked || task.status === "completed") return false;
+  if (task.externalSource === "canvas_event") return false;
+  if (task.dueDate !== today && task.calendarDate !== today) return false;
+  const assessmentLike = ASSESSMENT_WORDS.test(`${task.taskKind ?? ""} ${task.title}`);
+  return !assessmentLike || PREPARATION_WORDS.test(task.title);
+}
+
+export function isHabitScheduledToday(daysOfWeek: string, today: string) {
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  return daysOfWeek.split(",").map(Number).includes(weekday);
 }
