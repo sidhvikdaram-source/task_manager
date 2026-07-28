@@ -21,6 +21,7 @@ import {
   ISSUER_URL,
   type SessionData,
 } from "../lib/auth";
+import { isAdminEmail } from "../lib/adminAccess";
 
 const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 const scryptAsync = promisify(crypto.scrypt);
@@ -71,6 +72,17 @@ async function verifyPassword(password: string, storedHash: string | null) {
 }
 
 async function createLocalSession(res: Response, user: typeof usersTable.$inferSelect) {
+  const shouldBeAdmin = isAdminEmail(user.email);
+  if (user.isAdmin !== shouldBeAdmin) {
+    await db
+      .update(usersTable)
+      .set({
+        isAdmin: shouldBeAdmin,
+        ...(shouldBeAdmin ? {} : { adminModeEnabled: false, adminLoadout: {}, adminChestCount: 0 }),
+        updatedAt: new Date(),
+      })
+      .where(eq(usersTable.id, user.id));
+  }
   const sessionData: SessionData = {
     user: {
       id: user.id,
@@ -122,6 +134,7 @@ async function upsertUser(claims: Record<string, unknown>) {
     profileImageUrl: getClaim<string>(claims, "profile_image_url", "picture") as
       | string
       | null,
+    isAdmin: isAdminEmail(getClaim<string>(claims, "email")),
   };
 
   const [user] = await db
@@ -134,6 +147,8 @@ async function upsertUser(claims: Record<string, unknown>) {
         firstName: userData.firstName,
         lastName: userData.lastName,
         profileImageUrl: userData.profileImageUrl,
+        isAdmin: userData.isAdmin,
+        ...(userData.isAdmin ? {} : { adminModeEnabled: false, adminLoadout: {}, adminChestCount: 0 }),
         updatedAt: new Date(),
       },
     })
@@ -168,13 +183,15 @@ router.post("/auth/register", async (req: Request, res: Response): Promise<void>
         .set({
           passwordHash,
           firstName: firstName || existingUser.firstName,
+          isAdmin: isAdminEmail(email),
+          ...(isAdminEmail(email) ? {} : { adminModeEnabled: false, adminLoadout: {}, adminChestCount: 0 }),
           updatedAt: new Date(),
         })
         .where(eq(usersTable.id, existingUser.id))
         .returning()
       : await db
         .insert(usersTable)
-        .values({ id: crypto.randomUUID(), email, passwordHash, firstName: firstName || null })
+        .values({ id: crypto.randomUUID(), email, passwordHash, firstName: firstName || null, isAdmin: isAdminEmail(email) })
         .returning();
 
     const sessionUser = await createLocalSession(res, user);

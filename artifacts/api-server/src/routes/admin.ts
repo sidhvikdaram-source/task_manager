@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
+import { isAdminEmail } from "../lib/adminAccess";
 
 const router: IRouter = Router();
 
@@ -8,12 +9,22 @@ async function getAdminState(userId: string) {
   const [user] = await db
     .select({
       isAdmin: usersTable.isAdmin,
+      email: usersTable.email,
       adminModeEnabled: usersTable.adminModeEnabled,
       adminChestCount: usersTable.adminChestCount,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
   return user;
+}
+
+function publicAdminState(state: Awaited<ReturnType<typeof getAdminState>>) {
+  const isAdmin = isAdminEmail(state?.email);
+  return {
+    isAdmin,
+    adminModeEnabled: Boolean(isAdmin && state?.adminModeEnabled),
+    adminChestCount: isAdmin ? state?.adminChestCount ?? 0 : 0,
+  };
 }
 
 router.get("/admin", async (req, res): Promise<void> => {
@@ -26,7 +37,7 @@ router.get("/admin", async (req, res): Promise<void> => {
     res.status(404).json({ error: "User not found" });
     return;
   }
-  res.json(state);
+  res.json(publicAdminState(state));
 });
 
 router.patch("/admin/mode", async (req, res): Promise<void> => {
@@ -39,7 +50,7 @@ router.patch("/admin/mode", async (req, res): Promise<void> => {
     return;
   }
   const state = await getAdminState(req.user.id);
-  if (!state?.isAdmin) {
+  if (!state?.isAdmin || !isAdminEmail(state.email)) {
     res.status(403).json({ error: "Admin sandbox is not available for this account." });
     return;
   }
@@ -67,7 +78,7 @@ router.post("/admin/chests", async (req, res): Promise<void> => {
     return;
   }
   const state = await getAdminState(req.user.id);
-  if (!state?.isAdmin || !state.adminModeEnabled) {
+  if (!state?.isAdmin || !isAdminEmail(state.email) || !state.adminModeEnabled) {
     res.status(403).json({ error: "Turn on Admin sandbox before generating a test chest." });
     return;
   }

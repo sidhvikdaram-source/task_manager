@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable, userStatsTable } from "@workspace/db";
 import { normalizeTutorialStep } from "../lib/tutorialRules";
+import { isAdminEmail } from "../lib/adminAccess";
 
 const router: IRouter = Router();
 
@@ -26,11 +27,12 @@ router.get("/user/stats", async (req, res): Promise<void> => {
   const [user] = await db
     .select({
       isAdmin: usersTable.isAdmin,
+      email: usersTable.email,
       adminModeEnabled: usersTable.adminModeEnabled,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
-  const sandbox = Boolean(user?.isAdmin && user.adminModeEnabled);
+  const sandbox = Boolean(user?.isAdmin && isAdminEmail(user.email) && user.adminModeEnabled);
   res.json({
     totalVp: sandbox ? 999_999_999 : stats.totalVp,
     tier: sandbox ? 99 : stats.tier,

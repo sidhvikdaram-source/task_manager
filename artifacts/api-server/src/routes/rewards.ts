@@ -31,6 +31,7 @@ import {
 } from "../lib/economyConfig";
 import { purchaseEligibility } from "../lib/economyRules";
 import { loadForecastDashboard, purchaseForecastConsumable } from "../lib/forecastRewards";
+import { isAdminEmail } from "../lib/adminAccess";
 
 const router: IRouter = Router();
 
@@ -138,6 +139,7 @@ async function getRewardAdminUser(userId: string) {
   return db
     .select({
       isAdmin: usersTable.isAdmin,
+      email: usersTable.email,
       adminModeEnabled: usersTable.adminModeEnabled,
       adminLoadout: usersTable.adminLoadout,
       adminChestCount: usersTable.adminChestCount,
@@ -148,7 +150,7 @@ async function getRewardAdminUser(userId: string) {
 }
 
 function isAdminSandbox(user: Awaited<ReturnType<typeof getRewardAdminUser>>) {
-  return Boolean(user?.isAdmin && user.adminModeEnabled);
+  return Boolean(user?.isAdmin && isAdminEmail(user.email) && user.adminModeEnabled);
 }
 
 const equipUpdates: Partial<Record<RewardKind, (itemId: string) => Partial<typeof usersTable.$inferInsert>>> = {
@@ -180,11 +182,11 @@ router.get("/rewards", async (req, res): Promise<void> => {
   const [stats, ownedRows, user, tasks, chests] = await Promise.all([
     db.select().from(userStatsTable).where(eq(userStatsTable.userId, req.user.id)).then((rows) => rows[0]),
     db.select({ itemId: userCosmeticsTable.itemId }).from(userCosmeticsTable).where(eq(userCosmeticsTable.userId, req.user.id)),
-    db.select({ equippedFrame: usersTable.equippedFrame, equippedPet: usersTable.equippedPet, equippedTitle: usersTable.equippedTitle, equippedCompletionEffect: usersTable.equippedCompletionEffect, equippedTransition: usersTable.equippedTransition, equippedProfileTheme: usersTable.equippedProfileTheme, equippedFocusSound: usersTable.equippedFocusSound, equippedBadgeDisplay: usersTable.equippedBadgeDisplay, equippedMomentumCosmetic: usersTable.equippedMomentumCosmetic, profileImageUrl: usersTable.profileImageUrl, isAdmin: usersTable.isAdmin, adminModeEnabled: usersTable.adminModeEnabled, adminLoadout: usersTable.adminLoadout, adminChestCount: usersTable.adminChestCount }).from(usersTable).where(eq(usersTable.id, req.user.id)).then((rows) => rows[0]),
+    db.select({ equippedFrame: usersTable.equippedFrame, equippedPet: usersTable.equippedPet, equippedTitle: usersTable.equippedTitle, equippedCompletionEffect: usersTable.equippedCompletionEffect, equippedTransition: usersTable.equippedTransition, equippedProfileTheme: usersTable.equippedProfileTheme, equippedFocusSound: usersTable.equippedFocusSound, equippedBadgeDisplay: usersTable.equippedBadgeDisplay, equippedMomentumCosmetic: usersTable.equippedMomentumCosmetic, profileImageUrl: usersTable.profileImageUrl, isAdmin: usersTable.isAdmin, email: usersTable.email, adminModeEnabled: usersTable.adminModeEnabled, adminLoadout: usersTable.adminLoadout, adminChestCount: usersTable.adminChestCount }).from(usersTable).where(eq(usersTable.id, req.user.id)).then((rows) => rows[0]),
     db.select().from(tasksTable).where(eq(tasksTable.userId, req.user.id)),
     db.select().from(userRewardChestsTable).where(eq(userRewardChestsTable.userId, req.user.id)).orderBy(desc(userRewardChestsTable.awardedAt)),
   ]);
-  const sandbox = Boolean(user?.isAdmin && user.adminModeEnabled);
+  const sandbox = isAdminSandbox(user);
   const completed = tasks.filter((task) => task.status === "completed");
   const context: UnlockContext = {
     tier: stats?.tier ?? 1,
