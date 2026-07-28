@@ -33,6 +33,7 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "onboarding_completed" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "advanced_features_enabled" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "tutorial_completed" boolean DEFAULT false NOT NULL,
+      ADD COLUMN IF NOT EXISTS "tutorial_step" integer DEFAULT 0 NOT NULL,
       ADD COLUMN IF NOT EXISTS "social_enabled" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "timezone" varchar DEFAULT 'UTC' NOT NULL,
       ADD COLUMN IF NOT EXISTS "calendar_view" varchar DEFAULT 'month' NOT NULL,

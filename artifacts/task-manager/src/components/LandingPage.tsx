@@ -109,25 +109,6 @@ export function LandingPage() {
 
   useGSAP(() => {
     if (reduceMotion) return;
-    const media = gsap.matchMedia();
-    media.add("(min-width: 1024px)", () => {
-      ScrollTrigger.create({
-        trigger: "[data-story]",
-        start: "top 10%",
-        end: "bottom bottom",
-        pin: "[data-story-copy]",
-        pinSpacing: false,
-      });
-    });
-    gsap.utils.toArray<HTMLElement>("[data-product-shot]").forEach((shot) => {
-      gsap.fromTo(shot, { scale: 0.91, opacity: 0.35, y: 70 }, {
-        scale: 1,
-        opacity: 1,
-        y: 0,
-        ease: "none",
-        scrollTrigger: { trigger: shot, start: "top 92%", end: "top 36%", scrub: 0.7 },
-      });
-    });
     gsap.utils.toArray<HTMLElement>("[data-stack-card]").forEach((card, index) => {
       gsap.to(card, {
         scale: 1 - index * 0.018,
@@ -136,7 +117,6 @@ export function LandingPage() {
         scrollTrigger: { trigger: card, start: "top 18%", end: "bottom 18%", scrub: true },
       });
     });
-    return () => media.revert();
   }, { scope: pageRef, dependencies: [reduceMotion] });
 
   const submitLabel = useMemo(
@@ -238,16 +218,27 @@ export function LandingPage() {
         </motion.div>
       </div>
 
-      <section id="product" data-story className="px-5 py-28 sm:px-8 sm:py-40">
+      <section id="product" className="px-5 py-28 sm:px-8 sm:py-40">
         <div className="mx-auto grid max-w-[92rem] gap-16 lg:grid-cols-12 lg:gap-10">
-          <div data-story-copy className="self-start lg:col-span-5 lg:pt-8">
+          <motion.div
+            className="self-start lg:col-span-5 lg:pt-8"
+            initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+          >
             <h2 className="max-w-xl text-[clamp(3rem,5.5vw,6.5rem)] font-[630] leading-[.89] tracking-[-.065em]">One day.<br />Three clear views.</h2>
             <p className="mt-7 max-w-md text-lg leading-8 text-[#686177]">Real Nimbus screens, tightly framed around the moments that matter: deciding, learning, and focusing.</p>
-            <div className="mt-9 flex items-center gap-3 text-sm font-black text-[#50486a]"><Wind className="h-5 w-5 text-[#7c68ef]" />Scroll through a real Nimbus day</div>
-          </div>
-          <div className="space-y-24 lg:col-span-7 lg:space-y-32">
-            {productStories.map((story) => (
-              <article key={story.number} data-product-shot className="overflow-hidden rounded-[2rem] border border-[#d8d2e9] bg-white shadow-[0_28px_75px_rgba(51,39,100,.12)]">
+            <div className="mt-9 flex items-center gap-3 text-sm font-black text-[#50486a]"><Wind className="h-5 w-5 text-[#7c68ef]" />Three parts of the same focused day</div>
+          </motion.div>
+          <div className="space-y-12 lg:col-span-7 lg:space-y-16">
+            {productStories.map((story, index) => (
+              <motion.article
+                key={story.number}
+                initial={reduceMotion ? false : { opacity: 0, y: 42, scale: 0.975 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.7, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden rounded-[2rem] border border-[#d8d2e9] bg-white shadow-[0_28px_75px_rgba(51,39,100,.12)]"
+              >
                 <div className="grid gap-5 p-6 sm:grid-cols-[auto_1fr] sm:p-8">
                   <span className="text-sm font-black" style={{ color: story.accent }}>{story.number}</span>
                   <div>
@@ -258,7 +249,7 @@ export function LandingPage() {
                 <div className="aspect-[16/8.2] overflow-hidden border-t border-[#e7e2f0] bg-[#0a0d14] p-2 sm:p-3">
                   <img src={story.image} alt={story.alt} loading="lazy" decoding="async" className="h-full w-[116%] max-w-none -translate-x-[12%] rounded-xl object-cover object-left" />
                 </div>
-              </article>
+              </motion.article>
             ))}
           </div>
         </div>

@@ -423,7 +423,8 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                       type="button"
                       onClick={() => {
                         setAccountOpen(false);
-                        void updatePreferences({ tutorialCompleted: false });
+                        sessionStorage.removeItem("nimbus-tutorial-minimized");
+                        void updatePreferences({ tutorialCompleted: false, tutorialStep: 0 });
                       }}
                       className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                     >

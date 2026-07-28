@@ -146,13 +146,13 @@ export default function Settings() {
           <Volume2 className="h-4 w-4" /> Preview completion sound
         </button>
       )}
-      <section className="bento-card p-5">
+      <section data-tour="settings-tutorial" className="bento-card p-5">
         <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 text-primary" /><div><h2 className="font-black">Privacy by default</h2><p className="mt-1 text-sm leading-6 text-muted-foreground">Turning Social off keeps existing friendships and messages stored, but blocks Social access and removes your profile from search until you turn it on again.</p></div></div>
       </section>
       <section className="bento-card p-5">
         <div className="flex items-center gap-2"><Settings2 className="h-5 w-5 text-primary" /><h2 className="font-black">Tutorial</h2></div>
         <p className="mt-1 text-sm text-muted-foreground">Replay the workspace tour, including where to find these settings.</p>
-        <button type="button" onClick={() => void updatePreferences({ tutorialCompleted: false })} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-black text-primary-foreground"><Check className="h-3.5 w-3.5" /> Replay tutorial</button>
+        <button type="button" onClick={() => { sessionStorage.removeItem("nimbus-tutorial-minimized"); void updatePreferences({ tutorialCompleted: false, tutorialStep: 0 }); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-black text-primary-foreground"><Check className="h-3.5 w-3.5" /> Replay tutorial</button>
       </section>
     </div>
   );

@@ -286,7 +286,7 @@ export default function Calendar() {
   }
 
   return (
-    <div className="page-stack space-y-5">
+    <div data-tour="calendar" className="page-stack space-y-5">
       <section className="border-b border-border/70 pb-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable, userStatsTable } from "@workspace/db";
+import { normalizeTutorialStep } from "../lib/tutorialRules";
 
 const router: IRouter = Router();
 
@@ -53,6 +54,7 @@ router.get("/user/preferences", async (req, res): Promise<void> => {
       onboardingCompleted: usersTable.onboardingCompleted,
       advancedFeaturesEnabled: usersTable.advancedFeaturesEnabled,
       tutorialCompleted: usersTable.tutorialCompleted,
+      tutorialStep: usersTable.tutorialStep,
       socialEnabled: usersTable.socialEnabled,
       timezone: usersTable.timezone,
       calendarView: usersTable.calendarView,
@@ -81,6 +83,8 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
     update.advancedFeaturesEnabled = req.body.advancedFeaturesEnabled;
   if (typeof req.body?.tutorialCompleted === "boolean")
     update.tutorialCompleted = req.body.tutorialCompleted;
+  const tutorialStep = normalizeTutorialStep(req.body?.tutorialStep);
+  if (tutorialStep !== null) update.tutorialStep = tutorialStep;
   if (typeof req.body?.socialEnabled === "boolean")
     update.socialEnabled = req.body.socialEnabled;
   if (["month", "week", "day", "agenda"].includes(req.body?.calendarView))
@@ -109,6 +113,7 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
       onboardingCompleted: usersTable.onboardingCompleted,
       advancedFeaturesEnabled: usersTable.advancedFeaturesEnabled,
       tutorialCompleted: usersTable.tutorialCompleted,
+      tutorialStep: usersTable.tutorialStep,
       socialEnabled: usersTable.socialEnabled,
       timezone: usersTable.timezone,
       calendarView: usersTable.calendarView,

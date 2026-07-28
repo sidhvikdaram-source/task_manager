@@ -312,6 +312,7 @@ export function VelocityAssistantCard() {
     <AnimatePresence>
       {isOpen ? (
         <motion.section
+          data-tour="nimbo"
           key="assistant-panel"
           initial={{ opacity: 0, y: 16, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -369,6 +370,7 @@ export function VelocityAssistantCard() {
         </motion.section>
       ) : (
         <motion.button
+          data-tour="nimbo"
           key="assistant-launcher"
           initial={{ opacity: 0, scale: 0.85 }}
           animate={{ opacity: 1, scale: 1 }}

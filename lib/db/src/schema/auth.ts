@@ -47,6 +47,7 @@ export const usersTable = pgTable("users", {
     .notNull()
     .default(false),
   tutorialCompleted: boolean("tutorial_completed").notNull().default(false),
+  tutorialStep: integer("tutorial_step").notNull().default(0),
   socialEnabled: boolean("social_enabled").notNull().default(false),
   timezone: varchar("timezone").notNull().default("UTC"),
   calendarView: varchar("calendar_view").notNull().default("month"),

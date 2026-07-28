@@ -426,7 +426,7 @@ export default function Profile() {
 
   return (
     <div className="page-stack space-y-5">
-      <section className={`bento-card p-5 transition-colors sm:p-7 ${profileThemeClass}`}>
+      <section data-tour="profile-rewards" className={`bento-card p-5 transition-colors sm:p-7 ${profileThemeClass}`}>
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <motion.div
             key={`${rewards?.equipped.frame}-${rewards?.equipped.pet}`}

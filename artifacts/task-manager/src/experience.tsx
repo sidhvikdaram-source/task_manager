@@ -14,6 +14,7 @@ export type ExperiencePreferences = {
   onboardingCompleted: boolean;
   advancedFeaturesEnabled: boolean;
   tutorialCompleted: boolean;
+  tutorialStep: number;
   socialEnabled: boolean;
   timezone: string;
   calendarView: "month" | "week" | "day" | "agenda";
@@ -25,6 +26,7 @@ const defaults: ExperiencePreferences = {
   onboardingCompleted: false,
   advancedFeaturesEnabled: false,
   tutorialCompleted: false,
+  tutorialStep: 0,
   socialEnabled: false,
   timezone: "UTC",
   calendarView: "month",

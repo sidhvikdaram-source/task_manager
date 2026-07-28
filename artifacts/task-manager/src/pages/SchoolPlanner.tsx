@@ -128,7 +128,7 @@ export default function SchoolPlanner() {
   );
   return (
     <div className="page-stack space-y-5">
-      <section className="bento-card p-5 sm:p-6">
+      <section data-tour="academics" className="bento-card p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-black uppercase text-primary">

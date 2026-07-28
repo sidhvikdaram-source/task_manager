@@ -215,7 +215,7 @@ export default function Today() {
                   {visibleTasks.length}
                 </span>
               </div>
-              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <div data-tour="recommend-next" className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 <select
                   aria-label="Available time"
                   value={availableMinutes}
