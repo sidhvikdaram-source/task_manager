@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { useCompletionFeedback } from "@/hooks/useCompletionFeedback";
+import { publishForecastReward, type ForecastReward } from "@/lib/forecastRewardEvents";
 
 type CompletableTask = Pick<Task, "id" | "title" | "status" | "externalSource">;
 type CompletionResult = Awaited<ReturnType<typeof requestTaskCompletion>> & {
@@ -16,13 +17,7 @@ type CompletionResult = Awaited<ReturnType<typeof requestTaskCompletion>> & {
   streakDays?: number | null;
   bpAwarded?: number;
   momentumRewards?: Array<{ days: number; bp: number }>;
-  forecastReward?: {
-    weather: "sunny" | "stormy" | "foggy" | "windy" | "rainbow" | null;
-    triggered: boolean;
-    bonusNp: number;
-    bonusBp: number;
-    hidden: boolean;
-  };
+  forecastReward?: ForecastReward;
 };
 type CompletionHandlers = {
   onOptimistic?: () => void;
@@ -111,9 +106,7 @@ export function useReliableTaskCompletion() {
         });
       }
       if (result.forecastReward?.triggered) {
-        window.dispatchEvent(new CustomEvent("nimbus:forecast-reward", {
-          detail: result.forecastReward,
-        }));
+        publishForecastReward(result.forecastReward);
         if (result.forecastReward.hidden) {
           toast("The fog kept something back", {
             description: "Your hidden forecast reward will clear after midnight.",

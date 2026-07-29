@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, CloudFog, CloudLightning, Sparkles, Sun, Wind, X } from "lucide-react";
 import { NimbusMascot, type NimbusMascotState } from "@/components/NimbusMascot";
-
-type WeatherReward = {
-  weather: "sunny" | "stormy" | "foggy" | "windy" | "rainbow" | null;
-  triggered: boolean;
-  bonusNp: number;
-  bonusBp: number;
-  hidden?: boolean;
-};
+import { subscribeToForecastRewards, type ForecastReward } from "@/lib/forecastRewardEvents";
 
 const WEATHER_COPY = {
   sunny: {
@@ -45,21 +39,18 @@ const WEATHER_COPY = {
 } as const;
 
 export function WeatherRewardCelebration() {
-  const [reward, setReward] = useState<WeatherReward | null>(null);
+  const [reward, setReward] = useState<ForecastReward | null>(null);
   const dismissTimer = useRef<number | null>(null);
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
-    const showReward = (event: Event) => {
-      const detail = (event as CustomEvent<WeatherReward>).detail;
-      if (!detail?.triggered || !detail.weather) return;
-      setReward(detail);
+    const unsubscribe = subscribeToForecastRewards((nextReward) => {
+      setReward(nextReward);
       if (dismissTimer.current) window.clearTimeout(dismissTimer.current);
       dismissTimer.current = window.setTimeout(() => setReward(null), 5200);
-    };
-    window.addEventListener("nimbus:forecast-reward", showReward);
+    });
     return () => {
-      window.removeEventListener("nimbus:forecast-reward", showReward);
+      unsubscribe();
       if (dismissTimer.current) window.clearTimeout(dismissTimer.current);
     };
   }, []);
@@ -70,7 +61,9 @@ export function WeatherRewardCelebration() {
   const hidden = reward?.hidden || weather === "foggy";
   const mascotState = (weather ?? "ready") as NimbusMascotState;
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <AnimatePresence>
       {reward && copy && (
         <motion.div
@@ -140,7 +133,7 @@ export function WeatherRewardCelebration() {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
-

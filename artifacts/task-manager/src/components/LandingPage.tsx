@@ -23,7 +23,16 @@ gsap.registerPlugin(ScrollTrigger);
 
 type AuthMode = "login" | "register";
 
-const productStories = [
+type ProductStory = {
+  title: string;
+  description: string;
+  accent: string;
+  proof: string;
+  image?: string;
+  imageAlt?: string;
+};
+
+const productStories: ProductStory[] = [
   {
     title: "Pick what fits now.",
     description: "Tell Nimbus how much time and energy you have. Recommend next weighs both against priority and the work implied by each task.",
@@ -35,12 +44,16 @@ const productStories = [
     description: "Canvas sync, subject views, assignments, projects, and focus history live together without turning your planner into a spreadsheet.",
     accent: "#7c68ef",
     proof: "Canvas + subjects + projects",
+    image: "/brand/landing/nimbus-academics.webp",
+    imageAlt: "Nimbus Academics organizing Canvas coursework by subject",
   },
   {
     title: "Turn intention into focus.",
     description: "Start a session against a real task, choose a duration and sound, then let the rest of the interface get quiet.",
     accent: "#ff7a24",
     proof: "25 min on one real task",
+    image: "/brand/landing/nimbus-focus.webp",
+    imageAlt: "Nimbus Focus timer with task, duration, and ambient sound controls",
   },
 ];
 
@@ -251,15 +264,27 @@ export function LandingPage() {
                 data-reveal
                 whileHover={reduceMotion ? undefined : { x: 8 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="group relative overflow-hidden rounded-[2rem] border border-[#d8d2e9] bg-white p-7 shadow-[0_28px_75px_rgba(51,39,100,.1)] sm:p-9"
+                className="group relative overflow-hidden rounded-[2rem] border border-[#d8d2e9] bg-white shadow-[0_28px_75px_rgba(51,39,100,.1)]"
               >
                 <motion.div className="absolute -right-14 -top-14 h-40 w-40 rounded-full opacity-15 blur-3xl" style={{ backgroundColor: story.accent }} animate={reduceMotion ? undefined : { scale: [1, 1.2, 1], x: [0, -8, 0] }} transition={{ duration: 4.5, repeat: Infinity }} />
-                <div className="relative">
+                <div className="relative p-7 sm:p-9">
                   <div className="mb-12 h-1.5 w-16 rounded-full transition-[width] duration-500 group-hover:w-28" style={{ backgroundColor: story.accent }} />
                   <h3 className="text-3xl font-[620] tracking-[-.045em] sm:text-4xl">{story.title}</h3>
                   <p className="mt-3 max-w-xl leading-7 text-[#6c657d]">{story.description}</p>
                   <p className="mt-8 text-sm font-black" style={{ color: story.accent }}>{story.proof}</p>
                 </div>
+                {story.image && (
+                  <div className="relative mx-3 mb-3 overflow-hidden rounded-[1.4rem] border border-[#d8d2e9] bg-[#080d17] sm:mx-4 sm:mb-4">
+                    <motion.img
+                      src={story.image}
+                      alt={story.imageAlt ?? ""}
+                      className="block h-auto w-full"
+                      loading="lazy"
+                      whileHover={reduceMotion ? undefined : { scale: 1.018 }}
+                      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                    />
+                  </div>
+                )}
               </motion.article>
             ))}
           </div>
