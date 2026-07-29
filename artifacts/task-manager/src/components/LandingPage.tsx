@@ -18,44 +18,11 @@ import {
   Wind,
 } from "lucide-react";
 import { NimbusMascot } from "@/components/NimbusMascot";
+import { LandingThreeViewStory, LandingWorkflowStory } from "@/components/LandingStoryMotion";
 
 gsap.registerPlugin(ScrollTrigger);
 
 type AuthMode = "login" | "register";
-
-type ProductStory = {
-  title: string;
-  description: string;
-  accent: string;
-  proof: string;
-  image?: string;
-  imageAlt?: string;
-};
-
-const productStories: ProductStory[] = [
-  {
-    title: "Pick what fits now.",
-    description: "Tell Nimbus how much time and energy you have. Recommend next weighs both against priority and the work implied by each task.",
-    accent: "#13c7ea",
-    proof: "10 min + medium energy",
-  },
-  {
-    title: "Keep school in one orbit.",
-    description: "Canvas sync, subject views, assignments, projects, and focus history live together without turning your planner into a spreadsheet.",
-    accent: "#7c68ef",
-    proof: "Canvas + subjects + projects",
-    image: "/brand/landing/nimbus-academics.webp",
-    imageAlt: "Nimbus Academics organizing Canvas coursework by subject",
-  },
-  {
-    title: "Turn intention into focus.",
-    description: "Start a session against a real task, choose a duration and sound, then let the rest of the interface get quiet.",
-    accent: "#ff7a24",
-    proof: "25 min on one real task",
-    image: "/brand/landing/nimbus-focus.webp",
-    imageAlt: "Nimbus Focus timer with task, duration, and ambient sound controls",
-  },
-];
 
 const featureGroups = [
   {
@@ -82,13 +49,6 @@ const featureGroups = [
     title: "Stay motivated",
     items: ["Momentum without streak guilt", "Nimbus Points and tiers", "Daily weather forecasts", "Forecast rerolls and early peeks", "Reward chests"],
   },
-];
-
-const accordionFeatures = [
-  { title: "Choose", detail: "A next task matched to your energy and available minutes.", color: "#13c7ea" },
-  { title: "Learn", detail: "Canvas work sorted into subjects instead of one endless feed.", color: "#8b7cf6" },
-  { title: "Focus", detail: "A calm timer tied to the work you chose.", color: "#ff7a24" },
-  { title: "Return", detail: "A new mascot forecast changes how progress pays out each day.", color: "#72d6c5" },
 ];
 
 export function LandingPage() {
@@ -181,7 +141,7 @@ export function LandingPage() {
   }
 
   return (
-    <main ref={pageRef} className="nimbus-marketing w-full max-w-full overflow-x-hidden bg-[#f4f1ff] text-[#171522] selection:bg-[#8b7cf6]/25">
+    <main ref={pageRef} className="nimbus-marketing w-full max-w-full overflow-x-clip bg-[#f4f1ff] text-[#171522] selection:bg-[#8b7cf6]/25">
       <nav className="fixed inset-x-0 top-0 z-50 px-3 py-3 sm:px-5 sm:py-4">
         <div className="mx-auto flex max-w-[92rem] items-center justify-between rounded-[1.35rem] border border-white/70 bg-white/88 px-2.5 py-2 shadow-[0_12px_42px_rgba(54,42,110,.11)] backdrop-blur-xl sm:px-3">
           <a href="#top" className="flex items-center gap-2.5 px-1" aria-label="Nimbus home">
@@ -250,46 +210,7 @@ export function LandingPage() {
         </motion.div>
       </div>
 
-      <section id="product" className="px-5 py-28 sm:px-8 sm:py-40">
-        <div className="mx-auto grid max-w-[92rem] gap-16 lg:grid-cols-12 lg:gap-10">
-          <div data-reveal className="self-start lg:col-span-5 lg:pt-8">
-            <h2 className="max-w-xl text-[clamp(3rem,5.5vw,6.5rem)] font-[630] leading-[.89] tracking-[-.065em]">One day.<br />Three clear views.</h2>
-            <p className="mt-7 max-w-md text-lg leading-8 text-[#686177]">Decide what fits, bring schoolwork into view, and protect enough quiet to finish.</p>
-            <div className="mt-9 flex items-center gap-3 text-sm font-black text-[#50486a]"><Wind className="h-5 w-5 text-[#7c68ef]" />Three parts of the same focused day</div>
-          </div>
-          <div className="space-y-12 lg:col-span-7 lg:space-y-16">
-            {productStories.map((story) => (
-              <motion.article
-                key={story.title}
-                data-reveal
-                whileHover={reduceMotion ? undefined : { x: 8 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="group relative overflow-hidden rounded-[2rem] border border-[#d8d2e9] bg-white shadow-[0_28px_75px_rgba(51,39,100,.1)]"
-              >
-                <motion.div className="absolute -right-14 -top-14 h-40 w-40 rounded-full opacity-15 blur-3xl" style={{ backgroundColor: story.accent }} animate={reduceMotion ? undefined : { scale: [1, 1.2, 1], x: [0, -8, 0] }} transition={{ duration: 4.5, repeat: Infinity }} />
-                <div className="relative p-7 sm:p-9">
-                  <div className="mb-12 h-1.5 w-16 rounded-full transition-[width] duration-500 group-hover:w-28" style={{ backgroundColor: story.accent }} />
-                  <h3 className="text-3xl font-[620] tracking-[-.045em] sm:text-4xl">{story.title}</h3>
-                  <p className="mt-3 max-w-xl leading-7 text-[#6c657d]">{story.description}</p>
-                  <p className="mt-8 text-sm font-black" style={{ color: story.accent }}>{story.proof}</p>
-                </div>
-                {story.image && (
-                  <div className="relative mx-3 mb-3 overflow-hidden rounded-[1.4rem] border border-[#d8d2e9] bg-[#080d17] sm:mx-4 sm:mb-4">
-                    <motion.img
-                      src={story.image}
-                      alt={story.imageAlt ?? ""}
-                      className="block h-auto w-full"
-                      loading="lazy"
-                      whileHover={reduceMotion ? undefined : { scale: 1.018 }}
-                      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                    />
-                  </div>
-                )}
-              </motion.article>
-            ))}
-          </div>
-        </div>
-      </section>
+      <LandingThreeViewStory />
 
       <section id="different" className="bg-[#171522] px-5 py-28 text-white sm:px-8 sm:py-40">
         <div className="mx-auto max-w-[92rem]">
@@ -363,23 +284,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="bg-[#ded7ff] px-5 py-28 sm:px-8 sm:py-40">
-        <div className="mx-auto max-w-[92rem]">
-          <h2 className="max-w-5xl text-[clamp(3rem,5.6vw,6.4rem)] font-[630] leading-[.89] tracking-[-.065em]">From "what now?" to done.</h2>
-          <div className="mt-16 flex min-h-[34rem] flex-col gap-2 lg:flex-row">
-            {accordionFeatures.map((feature) => (
-              <motion.article key={feature.title} className="group relative min-h-72 flex-1 overflow-hidden rounded-[1.5rem] bg-[#171522] text-white lg:min-w-24" whileHover={reduceMotion ? undefined : { flexGrow: 3 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}>
-                <motion.div className="absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-30 blur-3xl" style={{ backgroundColor: feature.color }} animate={reduceMotion ? undefined : { x: [0, -20, 0], y: [0, 18, 0], scale: [1, 1.18, 1] }} transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }} />
-                <div className="absolute inset-x-0 bottom-0 p-7">
-                  <div className="mb-5 h-1 w-10 rounded-full" style={{ backgroundColor: feature.color }} />
-                  <h3 className="text-4xl font-[620] tracking-[-.05em]">{feature.title}</h3>
-                  <p className="mt-3 max-w-md text-sm leading-6 text-white/68 opacity-100 lg:opacity-0 lg:transition-opacity lg:group-hover:opacity-100">{feature.detail}</p>
-                </div>
-              </motion.article>
-            ))}
-          </div>
-        </div>
-      </section>
+      <LandingWorkflowStory />
 
       <section id="features" className="bg-white px-5 py-28 sm:px-8 sm:py-40">
         <div className="mx-auto max-w-[92rem]">
