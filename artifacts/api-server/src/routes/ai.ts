@@ -4,6 +4,7 @@ import { Router, type IRouter } from "express";
 import { checklistItemsTable, db, directMessagesTable, friendshipsTable, projectsTable, subjectsTable, tasksTable, usersTable, userStatsTable } from "@workspace/db";
 import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { addCalendarDays, localDateKey } from "../lib/localDate";
+import { hasWorkspaceMutationIntent } from "../lib/assistantIntent";
 
 const router: IRouter = Router();
 
@@ -944,6 +945,36 @@ async function generateStrictWorkspaceDecision(instruction: string, history: Cha
   return parsed;
 }
 
+async function generateGeminiWorkspaceDecision(instruction: string, history: ChatHistoryMessage[]) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
+
+  const client = new GoogleGenAI({ apiKey });
+  let lastError: unknown;
+
+  for (const model of velocityGeminiModels) {
+    try {
+      const response = await scheduleGeminiRequest(() => client.models.generateContent({
+        model,
+        contents: formatConversationForGemini(history, instruction),
+        config: {
+          systemInstruction: "You are Nimbo's workspace action planner. Return only the schema-enforced decision. Never claim an action already happened.",
+          maxOutputTokens: 5000,
+          temperature: 0.1,
+          responseMimeType: "application/json",
+          responseJsonSchema: workspaceDecisionSchema,
+        },
+      }));
+      if (!response.text) throw new Error(`Gemini returned an empty workspace decision for ${model}`);
+      return JSON.parse(response.text) as Record<string, unknown>;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Gemini workspace decision failed");
+}
+
 function extractJsonObject(text: string) {
   const match = text.replace(/```(?:json)?/gi, "").match(/\{[\s\S]*\}/);
   if (!match) return null;
@@ -1184,6 +1215,14 @@ async function loadAcceptedFriends(userId: string): Promise<AssistantFriend[]> {
 }
 
 async function generateWorkspaceActionPlan(userId: string, message: string, history: ChatHistoryMessage[], log?: AssistantLogger) {
+  if (!hasWorkspaceMutationIntent(message)) {
+    return {
+      intent: isVelocityProductivityRequest(message, history) ? "workspace_query" as const : "general" as const,
+      plan: null,
+      provider: "velocity" as const,
+    };
+  }
+
   const [tasks, projects, subjects, friends, user] = await Promise.all([
     db.select().from(tasksTable).where(and(eq(tasksTable.userId, userId), eq(tasksTable.archived, false))),
     db.select().from(projectsTable).where(eq(projectsTable.userId, userId)),
@@ -1227,7 +1266,25 @@ async function generateWorkspaceActionPlan(userId: string, message: string, hist
     if (!plan) throw new Error("The structured workspace decision was not actionable");
     return { intent: "workspace_changes" as const, plan, provider: "groq" as const };
   } catch (groqError) {
-    log?.warn?.({ err: groqError }, "Strict Groq workspace planning failed; using provider fallback");
+    log?.warn?.({ err: groqError }, "Strict Groq workspace planning failed; trying Gemini structured output");
+    try {
+      let value = await generateGeminiWorkspaceDecision(instruction, history);
+      if (value.intent === "general" || value.intent === "workspace_query") {
+        return { intent: value.intent, plan: null, provider: "gemini" as const };
+      }
+      let plan = value.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
+      if (!plan) {
+        value = await generateGeminiWorkspaceDecision(
+          `${instruction} Your previous decision could not be safely validated. Rebuild it with valid IDs, exact project names, complete dependency ordering, and at least one valid operation.`,
+          history,
+        );
+        plan = value.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
+      }
+      if (plan) return { intent: "workspace_changes" as const, plan, provider: "gemini" as const };
+    } catch (geminiDecisionError) {
+      log?.warn?.({ err: geminiDecisionError }, "Structured Gemini workspace planning failed; using text fallback");
+    }
+
     const fallback = await generateAssistantReply(
       `${instruction} Return JSON only using {"intent":"workspace_changes"|"workspace_query"|"general","summary":string,"operations":array}.`,
       "This is a semantic intent and workspace planning call. Output one JSON object only.",
@@ -1256,7 +1313,10 @@ async function generateWorkspaceActionPlan(userId: string, message: string, hist
       if (value?.intent === "general" || value?.intent === "workspace_query") return { intent: value.intent, plan: null, provider: repair.provider };
       plan = value?.intent === "workspace_changes" ? validateWorkspacePlan(value, current) : null;
     }
-    if (!plan) throw new Error("The assistant could not produce a safe workspace preview. Please retry the request.");
+    if (!plan) {
+      log?.warn?.({ value }, "Provider output could not produce a safe workspace preview; continuing without mutations");
+      return { intent: "general" as const, plan: null, provider: fallback.provider };
+    }
     return { intent: "workspace_changes" as const, plan, provider: fallback.provider };
   }
 }
