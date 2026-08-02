@@ -142,10 +142,8 @@ export default function SchoolPlanner() {
           </div>
           <div className="flex flex-wrap gap-2">
             {preferences.advancedFeaturesEnabled && (
-              <Link href="/projects">
-                <button className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold">
-                  <FolderKanban className="h-4 w-4" /> Projects
-                </button>
+              <Link href="/projects" className="flex min-h-11 touch-manipulation items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold">
+                <FolderKanban className="h-4 w-4" /> Projects
               </Link>
             )}
             <button

@@ -454,7 +454,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               type="button"
               aria-label="Close navigation"
               onClick={onClose}
-              className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/45"
             />
             <motion.aside
               initial={{ x: "-100%" }}
@@ -476,7 +476,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 type="button"
                 onClick={onClose}
                 aria-label="Close navigation"
-                className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
+                className="absolute right-3 top-3 z-10 flex h-11 w-11 touch-manipulation items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"
               >
                 <X className="h-4 w-4" />
               </button>

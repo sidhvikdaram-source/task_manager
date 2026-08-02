@@ -192,17 +192,13 @@ export default function WeeklyReview() {
               <CalendarClock className="h-4 w-4" />
               Move {data.unfinished.length} unfinished
             </button>
-            <Link href="/calendar">
-              <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-3 py-2 text-xs font-bold text-background">
-                <CalendarClock className="h-4 w-4" />
-                Schedule blocks
-              </button>
+            <Link href="/calendar" className="flex min-h-11 w-full touch-manipulation items-center justify-center gap-2 rounded-lg bg-foreground px-3 py-2 text-xs font-bold text-background">
+              <CalendarClock className="h-4 w-4" />
+              Schedule blocks
             </Link>
-            <Link href="/workspace">
-              <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground">
-                <Inbox className="h-4 w-4" />
-                Inbox {data.inboxCount}
-              </button>
+            <Link href="/workspace" className="flex min-h-11 w-full touch-manipulation items-center justify-center gap-2 rounded-lg bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground">
+              <Inbox className="h-4 w-4" />
+              Inbox {data.inboxCount}
             </Link>
           </div>
         </section>

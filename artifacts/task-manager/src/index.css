@@ -459,12 +459,27 @@
   }
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
     background: var(--app-body-background);
+    min-height: 100vh;
     min-height: 100dvh;
     overflow-x: hidden;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
   }
 
   h1,
@@ -501,6 +516,33 @@
   textarea:focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
+  }
+}
+
+.app-main {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+@media (max-width: 767px) {
+  .mobile-solid-surface {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: hsl(var(--background) / 0.99) !important;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  button:not(:disabled):active,
+  a:active {
+    opacity: 0.88;
+    transform: none;
   }
 }
 

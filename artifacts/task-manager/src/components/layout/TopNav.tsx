@@ -107,7 +107,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const themesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function handlePointerDown(e: PointerEvent) {
       if (
         accountRef.current &&
         !accountRef.current.contains(e.target as Node)
@@ -124,8 +124,8 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
         setThemesOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
   useEffect(() => {
@@ -159,7 +159,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background/92 px-3 py-2.5 backdrop-blur-xl sm:px-6">
+      <header className="mobile-solid-surface sticky top-0 z-40 flex min-h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background/92 px-3 py-2.5 backdrop-blur-xl sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <button
             type="button"
@@ -234,17 +234,14 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
             </AnimatePresence>
           </div>
 
-          <Link href="/profile">
-            <motion.button
-              type="button"
-              aria-label={`${rewards?.unopenedChestCount ?? 0} unopened reward chests`}
-              title="Reward chests"
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground"
-              whileTap={{ scale: 0.92 }}
-            >
-              <Gift className="h-4 w-4" />
-              {(rewards?.unopenedChestCount ?? 0) > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-black text-secondary-foreground">{rewards?.unopenedChestCount}</span>}
-            </motion.button>
+          <Link
+            href="/profile"
+            aria-label={`${rewards?.unopenedChestCount ?? 0} unopened reward chests`}
+            title="Reward chests"
+            className="relative flex h-10 w-10 touch-manipulation items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground sm:h-9 sm:w-9"
+          >
+            <Gift className="h-4 w-4" />
+            {(rewards?.unopenedChestCount ?? 0) > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-black text-secondary-foreground">{rewards?.unopenedChestCount}</span>}
           </Link>
 
           <div className="relative" ref={notificationsRef}>
@@ -252,7 +249,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
               type="button"
               aria-label="Open notifications"
               onClick={() => setNotificationsOpen((open) => !open)}
-              className="relative w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors border border-border/70"
+              className="relative flex h-10 w-10 touch-manipulation items-center justify-center rounded-xl border border-border/70 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-9 sm:w-9"
               data-testid="button-notifications"
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.92 }}
@@ -272,7 +269,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.96 }}
                   transition={{ duration: 0.13 }}
-                  className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-xl border bg-popover shadow-2xl"
+                  className="absolute right-0 top-11 z-50 w-[min(20rem,calc(100vw-1rem))] overflow-hidden rounded-xl border bg-popover shadow-2xl"
                 >
                   <div className="border-b px-3 py-2">
                     <p className="text-sm font-bold text-foreground">
@@ -289,27 +286,26 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                       </p>
                     ) : (
                       upcomingNotifications.map(({ task, days }) => (
-                        <Link key={task.id} href="/calendar">
-                          <button
-                            type="button"
-                            onClick={() => setNotificationsOpen(false)}
-                            className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted"
-                          >
-                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-semibold text-foreground">
-                                {task.title}
-                              </span>
-                              <span className="block text-xs text-muted-foreground">
-                                {notificationLabel(task)}{" "}
-                                {days === 0
-                                  ? "today"
-                                  : days === 1
-                                    ? "tomorrow"
-                                    : `in ${days} days`}
-                              </span>
+                        <Link
+                          key={task.id}
+                          href="/calendar"
+                          onClick={() => setNotificationsOpen(false)}
+                          className="flex min-h-12 w-full touch-manipulation items-start gap-2 rounded-lg px-2 py-2 text-left hover:bg-muted"
+                        >
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-foreground">
+                              {task.title}
                             </span>
-                          </button>
+                            <span className="block text-xs text-muted-foreground">
+                              {notificationLabel(task)}{" "}
+                              {days === 0
+                                ? "today"
+                                : days === 1
+                                  ? "tomorrow"
+                                  : `in ${days} days`}
+                            </span>
+                          </span>
                         </Link>
                       ))
                     )}
@@ -328,7 +324,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
               onClick={() => setAccountOpen((o) => !o)}
               whileHover={{ scale: 1.06 }}
               whileTap={{ scale: 0.94 }}
-              className="h-9 w-9 rounded-full ring-2 ring-transparent transition-all hover:ring-primary/40"
+              className="h-10 w-10 touch-manipulation rounded-full ring-2 ring-transparent transition-all hover:ring-primary/40 sm:h-9 sm:w-9"
               title="Account"
             >
               <ProfilePhoto
@@ -346,7 +342,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.95 }}
                   transition={{ duration: 0.13 }}
-                  className="absolute right-0 top-11 w-64 bg-popover border rounded-xl shadow-2xl z-50 py-1 overflow-hidden"
+                  className="absolute right-0 top-11 z-50 w-[min(16rem,calc(100vw-1rem))] overflow-hidden rounded-xl border bg-popover py-1 shadow-2xl"
                 >
                   {user && (
                     <div className="px-3 py-2 border-b">
@@ -367,22 +363,12 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                       )}
                     </div>
                   )}
-                  <Link href="/profile">
-                    <button
-                      onClick={() => setAccountOpen(false)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    >
-                      <UserRound className="w-3.5 h-3.5" />
-                      Profile
-                    </button>
+                  <Link href="/profile" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    <UserRound className="h-3.5 w-3.5" />
+                    Profile
                   </Link>
-                  <Link href="/settings">
-                    <button
-                      onClick={() => setAccountOpen(false)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      <Settings2 className="h-3.5 w-3.5" /> Settings
-                    </button>
+                  <Link href="/settings" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    <Settings2 className="h-3.5 w-3.5" /> Settings
                   </Link>
                   <div className="border-t px-2 py-2">
                     <button
@@ -433,29 +419,14 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                   </div>
                   {preferences.advancedFeaturesEnabled && (
                     <div className="border-t py-1">
-                      <Link href="/projects">
-                        <button
-                          onClick={() => setAccountOpen(false)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          <FolderKanban className="h-3.5 w-3.5" /> Projects
-                        </button>
+                      <Link href="/projects" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <FolderKanban className="h-3.5 w-3.5" /> Projects
                       </Link>
-                      <Link href="/analytics">
-                        <button
-                          onClick={() => setAccountOpen(false)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          <LineChart className="h-3.5 w-3.5" /> Insights
-                        </button>
+                      <Link href="/analytics" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <LineChart className="h-3.5 w-3.5" /> Insights
                       </Link>
-                      {preferences.socialEnabled && <Link href="/social">
-                        <button
-                          onClick={() => setAccountOpen(false)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          <Users className="h-3.5 w-3.5" /> Social
-                        </button>
+                      {preferences.socialEnabled && <Link href="/social" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <Users className="h-3.5 w-3.5" /> Social
                       </Link>}
                     </div>
                   )}
@@ -490,7 +461,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
           <motion.button
             onClick={() => setIsCreateModalOpen(true)}
             data-testid="button-new-task-nav"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-secondary-foreground shadow-[0_0_26px_rgba(255,111,26,0.24)]"
+            className="flex h-10 w-10 touch-manipulation items-center justify-center rounded-xl bg-secondary text-secondary-foreground shadow-[0_0_26px_rgba(255,111,26,0.24)] sm:h-9 sm:w-9"
             aria-label="Create task"
             title="Create task"
             whileHover={{ scale: 1.03 }}

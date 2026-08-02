@@ -93,3 +93,51 @@ test("navigation and writes avoid persistent observers and global refetch storms
   assert.doesNotMatch(canvas, /queryClient\.invalidateQueries\(\)/);
   assert.doesNotMatch(createTask, /refetchQueries|refetchType:\s*['"]all['"]/);
 });
+
+test("mobile navigation uses Safari-safe tap targets and safe-area layout", () => {
+  const mobileNav = readFileSync(
+    new URL("../src/components/layout/MobileBottomNav.tsx", import.meta.url),
+    "utf8",
+  );
+  const topNav = readFileSync(
+    new URL("../src/components/layout/TopNav.tsx", import.meta.url),
+    "utf8",
+  );
+  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/index.css", import.meta.url), "utf8");
+
+  assert.doesNotMatch(`${mobileNav}\n${topNav}`, /<Link[^>]*>\s*<(?:motion\.)?button/);
+  assert.match(mobileNav, /aria-label=\{item\.label\}[\s\S]*touch-manipulation/);
+  assert.match(html, /viewport-fit=cover/);
+  assert.match(css, /touch-action:\s*manipulation/);
+  assert.match(css, /-webkit-overflow-scrolling:\s*touch/);
+  assert.match(css, /\.mobile-solid-surface[\s\S]*backdrop-filter:\s*none/);
+});
+
+test("startup work is cached and deferred without weakening AI actions", () => {
+  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const experience = readFileSync(
+    new URL("../src/experience.tsx", import.meta.url),
+    "utf8",
+  );
+  const canvas = readFileSync(
+    new URL("../src/hooks/useCanvasSync.ts", import.meta.url),
+    "utf8",
+  );
+  const assistant = readFileSync(
+    new URL("../src/components/VelocityAssistantCard.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(app, /staleTime:\s*30_000/);
+  assert.match(experience, /velocity-preferences:/);
+  assert.match(experience, /AbortController/);
+  assert.match(canvas, /requestIdleCallback/);
+  assert.match(canvas, /enabled:\s*statusEnabled/);
+  assert.match(assistant, /fetch\('\/api\/ai\/chat'/);
+  assert.match(assistant, /history/);
+  assert.match(assistant, /AbortController/);
+  assert.match(assistant, /\/api\/ai\/plans\/confirm/);
+  assert.match(assistant, /\/api\/ai\/workspace\/confirm/);
+  assert.doesNotMatch(assistant, /i \+= 8|setTimeout\(resolve, 4\)/);
+});

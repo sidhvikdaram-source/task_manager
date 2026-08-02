@@ -2,8 +2,6 @@ import React, { lazy, Suspense, useEffect, useState } from "react";
 import { TopNav } from "./TopNav";
 import { Loader2 } from "lucide-react";
 import { useExperience } from "@/experience";
-import { OnboardingFlow } from "@/components/OnboardingFlow";
-import { TutorialTour } from "@/components/TutorialTour";
 import { Sidebar } from "./Sidebar";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { ConsecutiveMomentumCelebration } from "@/components/ConsecutiveMomentumCelebration";
@@ -12,6 +10,16 @@ import { WeatherRewardCelebration } from "@/components/WeatherRewardCelebration"
 const VelocityAssistantCard = lazy(() =>
   import("@/components/VelocityAssistantCard").then((module) => ({
     default: module.VelocityAssistantCard,
+  })),
+);
+const OnboardingFlow = lazy(() =>
+  import("@/components/OnboardingFlow").then((module) => ({
+    default: module.OnboardingFlow,
+  })),
+);
+const TutorialTour = lazy(() =>
+  import("@/components/TutorialTour").then((module) => ({
+    default: module.TutorialTour,
   })),
 );
 
@@ -34,7 +42,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   return (
-    <div className="tech-shell flex h-[100dvh] w-full overflow-hidden bg-background">
+    <div className="tech-shell flex h-screen h-[100dvh] w-full overflow-hidden bg-background">
       <a
         href="#main-content"
         className="fixed left-4 top-3 z-[120] -translate-y-20 rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground shadow-xl transition-transform focus:translate-y-0"
@@ -60,8 +68,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <VelocityAssistantCard />
         </Suspense>
       )}
-      {!preferences.onboardingCompleted && <OnboardingFlow />}
-      {preferences.onboardingCompleted && <TutorialTour />}
+      {!preferences.onboardingCompleted && (
+        <Suspense fallback={null}><OnboardingFlow /></Suspense>
+      )}
+      {preferences.onboardingCompleted && (
+        <Suspense fallback={null}><TutorialTour /></Suspense>
+      )}
       <ConsecutiveMomentumCelebration />
       <WeatherRewardCelebration />
     </div>

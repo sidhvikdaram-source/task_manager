@@ -12,7 +12,6 @@ import { useCanvasSync } from "@/hooks/useCanvasSync";
 import { ExperienceProvider, useExperience } from "@/experience";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LandingPage } from "@/components/LandingPage";
 
 const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
@@ -26,12 +25,19 @@ const Projects = lazy(() => import("@/pages/Projects"));
 const WeeklyReview = lazy(() => import("@/pages/WeeklyReview"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const NotFound = lazy(() => import("@/pages/not-found"));
+const LandingPage = lazy(() =>
+  import("@/components/LandingPage").then((module) => ({
+    default: module.LandingPage,
+  })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 0,
-      gcTime: 1000 * 60 * 5,
+      staleTime: 30_000,
+      gcTime: 1000 * 60 * 10,
+      retry: 1,
+      retryDelay: 750,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
     },
@@ -250,7 +256,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return <LandingPage />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background" />}>
+        <LandingPage />
+      </Suspense>
+    );
   }
 
   return <>{children}</>;
@@ -264,7 +274,7 @@ function SocialRoute() {
       <Users className="mx-auto h-7 w-7 text-primary" />
       <h1 className="mt-3 text-xl font-black">Social is optional</h1>
       <p className="mt-2 text-sm text-muted-foreground">Turn it on when you want friends, messages, and shared challenges.</p>
-      <Link href="/settings"><button className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Open settings</button></Link>
+      <Link href="/settings" className="mt-5 inline-flex min-h-11 touch-manipulation items-center rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Open settings</Link>
     </div>
   );
 }

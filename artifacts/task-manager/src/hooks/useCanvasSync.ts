@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   useQuery,
   useQueryClient,
@@ -80,9 +80,22 @@ export function invalidateCanvasData(queryClient: QueryClient) {
 
 export function useCanvasSync(autoSync = false) {
   const queryClient = useQueryClient();
+  const [statusEnabled, setStatusEnabled] = useState(!autoSync);
+
+  useEffect(() => {
+    if (!autoSync || statusEnabled) return;
+    const requestIdle = window.requestIdleCallback ??
+      ((callback: IdleRequestCallback) => window.setTimeout(callback, 1_200));
+    const cancelIdle = window.cancelIdleCallback ?? window.clearTimeout;
+    const id = requestIdle(() => setStatusEnabled(true), { timeout: 2_000 });
+    return () => cancelIdle(id);
+  }, [autoSync, statusEnabled]);
+
   const statusQuery = useQuery({
     queryKey: ["canvas-status"],
     queryFn: () => json<CanvasStatus>("/api/canvas/status"),
+    enabled: statusEnabled,
+    staleTime: 60_000,
     refetchInterval: (query) =>
       query.state.data?.latestRun &&
       ["queued", "running"].includes(query.state.data.latestRun.status)

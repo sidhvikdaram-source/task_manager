@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Check, FolderKanban, Loader2, Send, Sparkles, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -141,6 +141,7 @@ function seedCreatedTask(queryClient: ReturnType<typeof useQueryClient>, task: T
 
 export function VelocityAssistantCard() {
   const queryClient = useQueryClient();
+  const reduceMotion = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -154,29 +155,43 @@ export function VelocityAssistantCard() {
   const [isFocused, setIsFocused] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
 
   const canSend = input.trim().length > 0 && !isSending;
   const placeholder = useMemo(() => isSending ? 'Nimbo is thinking...' : 'Create, sort, schedule, or review work...', [isSending]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    const frame = window.requestAnimationFrame(() => {
+      const element = scrollRef.current;
+      if (element) element.scrollTop = element.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [messages]);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   async function animateAssistantMessage(id: string, content: string) {
-    if (content.length > 1200) {
+    if (reduceMotion || content.length > 1600) {
       setMessages((current) => current.map((message) => (
         message.id === id ? { ...message, content, typing: false } : message
       )));
       return;
     }
 
-    for (let i = 1; i <= content.length; i += 8) {
+    for (let i = 24; i < content.length; i += 24) {
+      if (!mountedRef.current) return;
       const partial = content.slice(0, i);
       setMessages((current) => current.map((message) => (
-        message.id === id ? { ...message, content: partial, typing: i < content.length } : message
+        message.id === id ? { ...message, content: partial, typing: true } : message
       )));
-      await new Promise((resolve) => setTimeout(resolve, 4));
+      await new Promise((resolve) => window.setTimeout(resolve, 16));
     }
+    if (!mountedRef.current) return;
     setMessages((current) => current.map((message) => (
       message.id === id ? { ...message, content, typing: false } : message
     )));
@@ -269,15 +284,18 @@ export function VelocityAssistantCard() {
       { id: assistantId, role: 'assistant', content: '', typing: true },
     ]);
 
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 60_000);
     try {
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, history }),
+        signal: controller.signal,
       });
 
-      const data = await response.json() as AssistantResponse;
+      const data = await response.json().catch(() => ({})) as AssistantResponse;
       if (!response.ok) throw new Error(data.error || 'Assistant request failed');
 
       const createdTasks = data.tasks?.length ? data.tasks : data.task ? [data.task] : [];
@@ -301,9 +319,12 @@ export function VelocityAssistantCard() {
         setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, workspacePreview: data.workspacePreview ?? undefined } : message));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Nimbo hit a snag. Please try again.';
+      const message = error instanceof DOMException && error.name === 'AbortError'
+        ? 'Nimbo took too long to respond. Please try that request again.'
+        : error instanceof Error ? error.message : 'Nimbo hit a snag. Please try again.';
       await animateAssistantMessage(assistantId, message);
     } finally {
+      window.clearTimeout(timeout);
       setIsSending(false);
     }
   }
@@ -319,7 +340,7 @@ export function VelocityAssistantCard() {
           exit={{ opacity: 0, y: 12, scale: 0.97 }}
           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
           className={cn(
-            'bento-card fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-2 right-2 z-[70] flex h-[min(42rem,calc(100dvh-6rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:w-[28rem] sm:p-5',
+            'bento-card fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-2 right-2 z-[70] flex h-[min(42rem,calc(100vh-6rem-env(safe-area-inset-bottom)))] h-[min(42rem,calc(100dvh-6rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:w-[28rem] sm:p-5',
             isFocused && 'ring-2 ring-primary/35 shadow-[0_0_42px_hsl(var(--primary)/0.18)]',
           )}
           aria-label="Nimbo assistant"
@@ -362,7 +383,7 @@ export function VelocityAssistantCard() {
 
           <form onSubmit={sendMessage} className="mt-3 flex shrink-0 items-center gap-2 rounded-2xl border border-primary/25 bg-black/20 p-2 focus-within:border-primary/60">
             <span className="px-2 font-mono text-xs font-bold text-primary">$</span>
-            <input value={input} onFocus={() => setIsFocused(true)} onBlur={() => setIsFocused(false)} onChange={(event) => setInput(event.target.value)} placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+            <input value={input} onFocus={() => setIsFocused(true)} onBlur={() => setIsFocused(false)} onChange={(event) => setInput(event.target.value)} placeholder={placeholder} className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm" />
             <motion.button type="submit" disabled={!canSend} whileHover={canSend ? { scale: 1.04 } : undefined} whileTap={canSend ? { scale: 0.96 } : undefined} className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40" aria-label="Send assistant command">
               <Send className="h-4 w-4" />
             </motion.button>
