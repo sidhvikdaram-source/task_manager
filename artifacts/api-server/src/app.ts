@@ -36,7 +36,21 @@ app.use(
     },
   }),
 );
-app.use(cors({ credentials: true, origin: true }));
+const allowedOrigins = new Set([
+  "https://nimbusdo.firebaseapp.com",
+  "https://nimbusdo.web.app",
+  "https://nimbusdo.onrender.com",
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+  ...(process.env.CORS_ALLOWED_ORIGINS ?? "").split(",").map((origin) => origin.trim()).filter(Boolean),
+]);
+app.use(cors({
+  credentials: true,
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) callback(null, true);
+    else callback(new Error("Origin is not allowed"));
+  },
+}));
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

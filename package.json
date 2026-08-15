@@ -10,6 +10,7 @@
   "scripts": {
     "preinstall": "node scripts/ensure-pnpm.mjs",
     "build": "corepack pnpm run typecheck && corepack pnpm -r --if-present run build",
+    "deploy:firebase": "corepack pnpm --filter @workspace/task-manager run build && corepack pnpm dlx firebase-tools deploy --only hosting",
     "render-build": "corepack pnpm --filter @workspace/task-manager run build && corepack pnpm --filter @workspace/api-server run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "corepack pnpm run typecheck:libs && corepack pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"

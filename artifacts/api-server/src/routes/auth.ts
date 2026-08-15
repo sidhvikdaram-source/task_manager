@@ -97,7 +97,7 @@ async function createLocalSession(res: Response, user: typeof usersTable.$inferS
 
   const sid = await createSession(sessionData);
   setSessionCookie(res, sid);
-  return sessionData.user;
+  return { user: sessionData.user, token: sid };
 }
 
 function setOidcCookie(res: Response, name: string, value: string) {
@@ -194,8 +194,8 @@ router.post("/auth/register", async (req: Request, res: Response): Promise<void>
         .values({ id: crypto.randomUUID(), email, passwordHash, firstName: firstName || null, isAdmin: isAdminEmail(email) })
         .returning();
 
-    const sessionUser = await createLocalSession(res, user);
-    res.json({ user: sessionUser });
+    const { user: sessionUser, token } = await createLocalSession(res, user);
+    res.json({ user: sessionUser, token });
   } catch (err) {
     req.log?.error({ err }, "Local registration failed");
     res.status(500).json({ error: "Could not create that account. Please try again." });
@@ -218,8 +218,8 @@ router.post("/auth/login", async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const sessionUser = await createLocalSession(res, user);
-    res.json({ user: sessionUser });
+    const { user: sessionUser, token } = await createLocalSession(res, user);
+    res.json({ user: sessionUser, token });
   } catch (err) {
     req.log?.error({ err }, "Local login failed");
     res.status(500).json({ error: "Could not sign in. Please try again." });

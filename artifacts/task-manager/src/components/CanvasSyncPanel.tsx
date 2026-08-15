@@ -54,6 +54,7 @@ export function CanvasSyncPanel({
     [],
   );
   const [search, setSearch] = useState("");
+  const [connectingOAuth, setConnectingOAuth] = useState(false);
   const [courseDraft, setCourseDraft] = useState<
     Record<number, { enabled: boolean; subjectId: number | null }>
   >({});
@@ -102,6 +103,20 @@ export function CanvasSyncPanel({
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not connect feed",
+      );
+    }
+  };
+  const connectOAuth = async () => {
+    setConnectingOAuth(true);
+    try {
+      const result = await json<{ url: string }>("/api/canvas/oauth/start", {
+        headers: { Accept: "application/json" },
+      });
+      window.location.assign(result.url);
+    } catch (error) {
+      setConnectingOAuth(false);
+      toast.error(
+        error instanceof Error ? error.message : "Could not start Canvas connection",
       );
     }
   };
@@ -295,13 +310,19 @@ export function CanvasSyncPanel({
                   OAuth imports courses, assignments, quizzes, submission
                   status, and project relationships.
                 </p>
-                <a
-                  href="/api/canvas/oauth/start"
-                  className={`mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground ${!status?.oauthAvailable ? "pointer-events-none opacity-45" : ""}`}
+                <button
+                  type="button"
+                  onClick={() => void connectOAuth()}
+                  disabled={!status?.oauthAvailable || connectingOAuth}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-bold text-primary-foreground disabled:pointer-events-none disabled:opacity-45"
                 >
-                  <Link2 className="h-4 w-4" />
-                  Connect Canvas
-                </a>
+                  {connectingOAuth ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Link2 className="h-4 w-4" />
+                  )}
+                  {connectingOAuth ? "Opening Canvas…" : "Connect Canvas"}
+                </button>
                 {!status?.oauthAvailable && (
                   <p className="mt-2 text-xs text-muted-foreground">
                     OAuth needs a Canvas developer key. Calendar feed remains

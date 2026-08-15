@@ -13,8 +13,7 @@ import {
   subjectsTable,
   tasksTable,
 } from "@workspace/db";
-import { getSession, getSessionId, updateSession } from "../lib/auth";
-import { validateCanvasUrl, validateOAuthState } from "../lib/canvasClient";
+import { validateCanvasUrl } from "../lib/canvasClient";
 import { discoverCanvasCourses, runCanvasSync } from "../lib/canvasSync";
 import {
   encryptIntegrationSecret,
@@ -35,6 +34,64 @@ const allowedCategories = new Set([
   "Other",
 ]);
 const activeRuns = new Set<number>();
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+
+function oauthStateSecret() {
+  const secret =
+    process.env.CANVAS_INTEGRATION_ENCRYPTION_KEY ?? process.env.SESSION_SECRET;
+  if (!secret) throw new Error("Canvas OAuth state signing is not configured");
+  return secret;
+}
+
+function createOAuthState(userId: string, baseUrl: string) {
+  const payload = Buffer.from(
+    JSON.stringify({ userId, baseUrl, issuedAt: Date.now() }),
+  ).toString("base64url");
+  const signature = crypto
+    .createHmac("sha256", oauthStateSecret())
+    .update(payload)
+    .digest("base64url");
+  return `${payload}.${signature}`;
+}
+
+function readOAuthState(value: unknown) {
+  if (typeof value !== "string") return null;
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+  const expected = crypto
+    .createHmac("sha256", oauthStateSecret())
+    .update(payload)
+    .digest();
+  const supplied = Buffer.from(signature, "base64url");
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString()) as {
+      userId?: unknown;
+      baseUrl?: unknown;
+      issuedAt?: unknown;
+    };
+    if (
+      typeof parsed.userId !== "string" ||
+      typeof parsed.baseUrl !== "string" ||
+      typeof parsed.issuedAt !== "number" ||
+      Date.now() - parsed.issuedAt > OAUTH_STATE_TTL_MS ||
+      parsed.issuedAt > Date.now() + 30_000
+    ) return null;
+    return {
+      userId: parsed.userId,
+      baseUrl: validateCanvasUrl(parsed.baseUrl, "base"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function appUrl(path: string) {
+  const base = (process.env.PUBLIC_APP_URL ?? "https://nimbusdo.firebaseapp.com").replace(/\/+$/, "");
+  return `${base}${path}`;
+}
 
 function configuredBaseUrl() {
   return validateCanvasUrl(
@@ -150,49 +207,27 @@ router.get("/canvas/oauth/start", async (req, res): Promise<void> => {
     });
     return;
   }
-  const sid = getSessionId(req);
-  if (!sid) {
-    res.status(401).json({ error: "Session required" });
-    return;
-  }
-  const session = await getSession(sid);
-  if (!session) {
-    res.status(401).json({ error: "Session expired" });
-    return;
-  }
-  const state = crypto.randomBytes(32).toString("base64url");
   const baseUrl = configuredBaseUrl();
-  await updateSession(sid, {
-    ...session,
-    canvas_oauth_state: state,
-    canvas_oauth_base_url: baseUrl,
-  });
+  const state = createOAuthState(userId, baseUrl);
   const url = new URL("/login/oauth2/auth", baseUrl);
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("response_type", "code");
   url.searchParams.set("redirect_uri", callbackUrl(req));
   url.searchParams.set("state", state);
+  if (req.accepts(["json", "html"]) === "json") {
+    res.json({ url: url.toString() });
+    return;
+  }
   res.redirect(url.toString());
 });
 
 router.get("/canvas/oauth/callback", async (req, res): Promise<void> => {
-  const userId = requireUser(req, res);
-  if (!userId) return;
-  const sid = getSessionId(req);
-  const session = sid ? await getSession(sid) : null;
-  if (
-    !sid ||
-    !session ||
-    !validateOAuthState(session.canvas_oauth_state, req.query.state) ||
-    typeof req.query.code !== "string"
-  ) {
+  const state = readOAuthState(req.query.state);
+  if (!state || typeof req.query.code !== "string") {
     res.status(400).send("Invalid or expired Canvas OAuth state.");
     return;
   }
-  const baseUrl = validateCanvasUrl(
-    session.canvas_oauth_base_url ?? configuredBaseUrl(),
-    "base",
-  );
+  const { userId, baseUrl } = state;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
@@ -265,13 +300,8 @@ router.get("/canvas/oauth/callback", async (req, res): Promise<void> => {
         },
       })
       .returning();
-    await updateSession(sid, {
-      ...session,
-      canvas_oauth_state: undefined,
-      canvas_oauth_base_url: undefined,
-    });
     await discoverCanvasCourses(integration);
-    res.redirect("/school?canvas=connected");
+    res.redirect(appUrl("/school?canvas=connected"));
   } catch (error) {
     res
       .status(502)

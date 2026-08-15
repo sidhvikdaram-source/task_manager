@@ -227,10 +227,19 @@ function LoginScreen() {
             </div>
 
             <Button
-              onClick={login}
+              onClick={() => {
+                setAuthError("");
+                setIsSubmitting(true);
+                void login()
+                  .catch((error) => {
+                    setAuthError(error instanceof Error ? error.message : "Google sign-in failed.");
+                  })
+                  .finally(() => setIsSubmitting(false));
+              }}
               size="lg"
               variant="outline"
               className="w-full gap-2"
+              disabled={isSubmitting}
             >
               <span className="flex h-5 w-5 items-center justify-center rounded-md bg-foreground text-[11px] font-black text-background">
                 G
