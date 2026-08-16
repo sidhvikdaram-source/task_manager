@@ -11,6 +11,7 @@ import {
 export type { AuthUser };
 
 const AUTH_CHANGED_EVENT = "velocity-auth-changed";
+const API_RETRY_DELAYS_MS = [0, 1_200, 2_500, 5_000, 8_000, 12_000, 16_000];
 
 interface AuthState {
   user: AuthUser | null;
@@ -22,11 +23,46 @@ interface AuthState {
   logout: () => void;
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function fetchApiWithRecovery(path: string, init: RequestInit = {}) {
+  let lastNetworkError: unknown;
+
+  for (let attempt = 0; attempt < API_RETRY_DELAYS_MS.length; attempt += 1) {
+    const delay = API_RETRY_DELAYS_MS[attempt];
+    if (delay) await wait(delay);
+
+    try {
+      const response = await fetch(apiUrl(path), init);
+      const canRetry = [502, 503, 504].includes(response.status);
+      if (!canRetry || attempt === API_RETRY_DELAYS_MS.length - 1) {
+        return response;
+      }
+    } catch (error) {
+      lastNetworkError = error;
+      if (attempt === API_RETRY_DELAYS_MS.length - 1) break;
+    }
+  }
+
+  throw new Error(
+    lastNetworkError instanceof TypeError
+      ? "Nimbus could not reach its server. The connection was retried automatically; check whether your network blocks nimbusdo.onrender.com."
+      : "Nimbus could not reach its server. Please try again.",
+  );
+}
+
 async function fetchUser(): Promise<AuthUser | null> {
-  const res = await fetch(apiUrl("/api/auth/user"), { credentials: "include" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = (await res.json()) as { user: AuthUser | null };
-  return data.user ?? null;
+  const res = await fetchApiWithRecovery("/api/auth/user", { credentials: "include" });
+  const data = await res.json().catch(() => null) as {
+    user?: AuthUser | null;
+    error?: string;
+  } | null;
+  if (!res.ok) {
+    throw new Error(data?.error ?? `Nimbus's server returned HTTP ${res.status}.`);
+  }
+  return data?.user ?? null;
 }
 
 export function useAuth(): AuthState {
@@ -66,15 +102,22 @@ export function useAuth(): AuthState {
         });
     };
 
-    const unsubscribe = onAuthStateChanged(firebaseAuth, () => check());
-    if (getLegacySessionToken()) check();
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
+      // The public landing page is static. Do not wake or wait for Render until
+      // this browser actually has a Nimbus session to restore.
+      if (!firebaseUser && !getLegacySessionToken()) {
+        publishUser(null);
+        return;
+      }
+      check();
+    });
 
     return () => {
       cancelled = true;
       unsubscribe();
       if (pollTimer) clearTimeout(pollTimer);
     };
-  }, []);
+  }, [publishUser]);
 
   const isEmbedded = window.self !== window.top;
 
@@ -95,16 +138,25 @@ export function useAuth(): AuthState {
     firstName?: string,
   ) => {
     await signOut(firebaseAuth).catch(() => undefined);
-    const res = await fetch(apiUrl(path), {
+    const res = await fetchApiWithRecovery(path, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, firstName }),
     });
 
-    const data = await res.json() as { user?: AuthUser; token?: string; error?: string };
-    if (!res.ok || !data.user || !data.token) {
-      throw new Error(data.error ?? "Authentication failed.");
+    const data = await res.json().catch(() => null) as {
+      user?: AuthUser;
+      token?: string;
+      error?: string;
+    } | null;
+    if (!res.ok || !data?.user || !data.token) {
+      throw new Error(
+        data?.error ??
+          (res.ok
+            ? "Nimbus received an incomplete sign-in response. Please retry."
+            : `Nimbus's server returned HTTP ${res.status}.`),
+      );
     }
 
     setLegacySessionToken(data.token);
