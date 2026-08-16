@@ -170,7 +170,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
           >
             <Menu className="h-4 w-4" />
           </button>
-          <Link href="/" className="lg:hidden">
+          <Link href="/today" className="lg:hidden">
             <div className="flex cursor-pointer items-center gap-2.5">
               <NimbusMascot state={hasOverdue ? "overdue" : "ready"} variant="mark" className="h-12 w-14 shrink-0 drop-shadow-[0_7px_12px_hsl(var(--primary)/.16)]" />
               <span className="hidden text-lg font-black tracking-tight text-foreground sm:inline">
@@ -178,7 +178,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
               </span>
             </div>
           </Link>
-          {location === "/" ? (
+          {location === "/today" ? (
             <div className="hidden min-w-0 sm:block">
               <p className="truncate text-lg font-black leading-tight">{greeting}, {user?.firstName || user?.email?.split("@")[0] || "there"}.</p>
               <p className="mt-0.5 flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">

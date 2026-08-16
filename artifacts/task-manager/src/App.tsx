@@ -255,6 +255,15 @@ function LoginScreen() {
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoading, isAuthenticated } = useAuth();
+  const [location, navigate] = useLocation();
+
+  if (location === "/") {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#f4f1ff]" />}>
+        <LandingPage onOpenApp={() => navigate("/today")} />
+      </Suspense>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -267,7 +276,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (!isAuthenticated) {
     return (
       <Suspense fallback={<div className="min-h-screen bg-background" />}>
-        <LandingPage />
+        <LandingPage onOpenApp={() => navigate("/today")} />
       </Suspense>
     );
   }
@@ -315,7 +324,7 @@ function AnimatedRoutes() {
         <PageErrorBoundary>
           <Suspense fallback={<PageLoadingSkeleton />}>
             <Switch>
-              <Route path="/" component={Today} />
+              <Route path="/today" component={Today} />
               <Route path="/calendar" component={Calendar} />
               <Route path="/workspace" component={Workspace} />
               <Route path="/school" component={SchoolPlanner} />

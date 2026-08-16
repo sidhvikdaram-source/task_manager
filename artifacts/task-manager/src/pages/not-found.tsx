@@ -14,7 +14,7 @@ export default function NotFound() {
         <p className="mt-4 max-w-lg text-base leading-7 text-muted-foreground">
           The address does not point to an active Nimbus screen. Return to My Day and continue from your current plan.
         </p>
-        <Link href="/" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground">
+        <Link href="/today" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground">
           <ArrowLeft className="h-4 w-4" />
           Return to My Day
         </Link>

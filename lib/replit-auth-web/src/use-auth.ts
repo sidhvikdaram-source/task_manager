@@ -11,7 +11,7 @@ import {
 export type { AuthUser };
 
 const AUTH_CHANGED_EVENT = "velocity-auth-changed";
-const API_RETRY_DELAYS_MS = [0, 1_200, 2_500, 5_000, 8_000, 12_000, 16_000];
+const API_RETRY_DELAYS_MS = [0, 1_000, 2_000, 3_000, 4_000, 5_000, 5_000, 5_000, 5_000, 5_000, 5_000];
 
 interface AuthState {
   user: AuthUser | null;
@@ -118,6 +118,16 @@ export function useAuth(): AuthState {
       if (pollTimer) clearTimeout(pollTimer);
     };
   }, [publishUser]);
+
+  useEffect(() => {
+    const syncPublishedUser = (event: Event) => {
+      const nextUser = (event as CustomEvent<AuthUser | null>).detail;
+      setUser(nextUser ?? null);
+      setIsLoading(false);
+    };
+    window.addEventListener(AUTH_CHANGED_EVENT, syncPublishedUser);
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, syncPublishedUser);
+  }, []);
 
   const isEmbedded = window.self !== window.top;
 

@@ -9,12 +9,12 @@ import {
   Loader2,
   Repeat2,
   Sparkles,
-  Zap,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 import { type MainGoal, useExperience } from "@/experience";
+import { NimbusMascot } from "@/components/NimbusMascot";
 
 const goals: Array<{
   id: MainGoal;
@@ -79,8 +79,8 @@ export function OnboardingFlow() {
           );
       }
       await updatePreferences({ mainGoal: goal, onboardingCompleted: true });
-      await queryClient.invalidateQueries();
-      navigate("/");
+      void queryClient.invalidateQueries();
+      navigate("/today", { replace: true });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Setup could not be saved",
@@ -99,9 +99,7 @@ export function OnboardingFlow() {
       >
         <header className="flex items-center justify-between border-b px-5 py-4 sm:px-7">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[0.82rem] bg-[#141414] text-white">
-              <Zap className="h-5 w-5 fill-white" />
-            </div>
+            <NimbusMascot variant="mark" className="h-10 w-12" />
             <div>
               <p className="font-black">Set up Nimbus</p>
               <p className="text-xs text-muted-foreground">About 30 seconds</p>

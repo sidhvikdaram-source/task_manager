@@ -51,6 +51,23 @@ test("page navigation renders without reward-driven route animation", () => {
   assert.doesNotMatch(routes, /key=\{location\}/);
 });
 
+test("public home and authenticated My Day use distinct routes", () => {
+  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  const onboarding = readFileSync(
+    new URL("../src/components/OnboardingFlow.tsx", import.meta.url),
+    "utf8",
+  );
+  const sidebar = readFileSync(
+    new URL("../src/components/layout/Sidebar.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(app, /location === "\/"[\s\S]*<LandingPage/);
+  assert.match(app, /<Route path="\/today" component=\{Today\}/);
+  assert.match(onboarding, /navigate\("\/today", \{ replace: true \}\)/);
+  assert.match(sidebar, /href: "\/today", label: "My Day"/);
+});
+
 test("Quick Capture uses one visible, forward-only trace and pauses off-page", () => {
   const css = readFileSync(
     new URL("../src/index.css", import.meta.url),

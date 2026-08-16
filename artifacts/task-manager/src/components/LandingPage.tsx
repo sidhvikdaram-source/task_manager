@@ -51,8 +51,8 @@ const featureGroups = [
   },
 ];
 
-export function LandingPage() {
-  const { login, loginWithPassword, registerWithPassword } = useAuth();
+export function LandingPage({ onOpenApp }: { onOpenApp?: () => void }) {
+  const { isAuthenticated, login, loginWithPassword, registerWithPassword } = useAuth();
   const [mode, setMode] = useState<AuthMode>("register");
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -76,6 +76,12 @@ export function LandingPage() {
     setAuthError("Google sign-in is temporarily unavailable. You can still sign in with email and password.");
     url.searchParams.delete("authError");
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
+  useEffect(() => {
+    // Render hosts the API on a free service that may sleep. Wake it while the
+    // visitor reads the public page instead of making the first auth action wait.
+    void fetch("/api/healthz", { credentials: "include" }).catch(() => undefined);
   }, []);
 
   useGSAP(() => {
@@ -109,6 +115,10 @@ export function LandingPage() {
   );
 
   function moveToAuth(nextMode: AuthMode) {
+    if (isAuthenticated) {
+      onOpenApp?.();
+      return;
+    }
     setMode(nextMode);
     setAuthError("");
     window.requestAnimationFrame(() => authRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }));
@@ -133,6 +143,7 @@ export function LandingPage() {
       if (mode === "register") await registerWithPassword(email, password, firstName);
       else await loginWithPassword(email, password);
       await offerCredentialSave();
+      onOpenApp?.();
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : "Authentication failed.");
     } finally {
@@ -154,8 +165,8 @@ export function LandingPage() {
             <a href="#features" className="rounded-xl px-4 py-2 text-sm font-bold text-[#6a647c] hover:bg-[#f0edfb] hover:text-[#211d36]">Features</a>
           </div>
           <div className="flex items-center gap-1">
-            <button type="button" onClick={() => moveToAuth("login")} className="rounded-xl px-3 py-2 text-xs font-black text-[#211d36] hover:bg-[#eeeaff] sm:text-sm">Log in</button>
-            <button type="button" onClick={() => moveToAuth("register")} className="rounded-xl bg-[#171522] px-3.5 py-2 text-xs font-black text-white transition-transform hover:-translate-y-0.5 sm:px-4 sm:text-sm">Register</button>
+            {!isAuthenticated && <button type="button" onClick={() => moveToAuth("login")} className="rounded-xl px-3 py-2 text-xs font-black text-[#211d36] hover:bg-[#eeeaff] sm:text-sm">Log in</button>}
+            <button type="button" onClick={() => isAuthenticated ? onOpenApp?.() : moveToAuth("register")} className="rounded-xl bg-[#171522] px-3.5 py-2 text-xs font-black text-white transition-transform hover:-translate-y-0.5 sm:px-4 sm:text-sm">{isAuthenticated ? "Open Nimbus" : "Register"}</button>
           </div>
         </div>
       </nav>
@@ -172,8 +183,8 @@ export function LandingPage() {
               Nimbus turns your time, energy, priorities, and schoolwork into one clear next move, then helps you stay with it.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <button type="button" onClick={() => moveToAuth("register")} className="group inline-flex h-13 items-center justify-center gap-3 rounded-2xl bg-[#7c68ef] px-7 text-sm font-black text-white shadow-[0_18px_45px_rgba(124,104,239,.28)] transition-transform hover:-translate-y-1">
-                Build my first clear day <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              <button type="button" onClick={() => isAuthenticated ? onOpenApp?.() : moveToAuth("register")} className="group inline-flex h-13 items-center justify-center gap-3 rounded-2xl bg-[#7c68ef] px-7 text-sm font-black text-white shadow-[0_18px_45px_rgba(124,104,239,.28)] transition-transform hover:-translate-y-1">
+                {isAuthenticated ? "Open Nimbus" : "Build my first clear day"} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </button>
               <a href="#product" className="inline-flex h-13 items-center justify-center rounded-2xl border border-[#d5cfeb] bg-white/65 px-7 text-sm font-black text-[#211d36] hover:bg-white">See Nimbus in action</a>
             </div>
@@ -314,7 +325,16 @@ export function LandingPage() {
             <NimbusMascot state="assistant" className="relative mt-10 w-full max-w-md" />
           </div>
           <div className="bg-white p-6 sm:p-10 lg:p-14">
-            {isEmbedded ? (
+              {isAuthenticated ? (
+                <div className="flex min-h-[25rem] flex-col items-center justify-center text-center">
+                  <NimbusMascot state="ready" className="w-40" />
+                  <h3 className="mt-5 text-2xl font-black">Your Nimbus is ready.</h3>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-[#6a647c]">Continue to My Day with your tasks, forecasts, and progress right where you left them.</p>
+                  <button type="button" onClick={onOpenApp} className="mt-6 flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#7c68ef] px-6 text-sm font-black text-white shadow-[0_15px_35px_rgba(124,104,239,.22)] transition-transform hover:-translate-y-0.5">
+                    Open Nimbus <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : isEmbedded ? (
               <div className="flex h-full min-h-96 flex-col items-start justify-center">
                 <h3 className="text-3xl font-[620]">Open Nimbus securely</h3>
                 <p className="mt-3 text-sm leading-6 text-[#655f77]">Authentication opens in the full browser, then this view updates automatically.</p>
@@ -349,7 +369,14 @@ export function LandingPage() {
                   </button>
                 </form>
                 <div className="my-5 flex items-center gap-3"><div className="h-px flex-1 bg-[#e5e1ec]" /><span className="text-xs font-bold text-[#9a94a6]">or</span><div className="h-px flex-1 bg-[#e5e1ec]" /></div>
-                <button type="button" onClick={login} className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d8d3e5] text-sm font-black text-[#211d36] transition-colors hover:bg-[#f5f2ff]">
+                <button type="button" onClick={() => {
+                  setAuthError("");
+                  setIsSubmitting(true);
+                  void login()
+                    .then(() => onOpenApp?.())
+                    .catch((error) => setAuthError(error instanceof Error ? error.message : "Google sign-in failed."))
+                    .finally(() => setIsSubmitting(false));
+                }} disabled={isSubmitting} className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d8d3e5] text-sm font-black text-[#211d36] transition-colors hover:bg-[#f5f2ff] disabled:opacity-60">
                   <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#171522] text-[10px] text-white">G</span>Continue with Google
                 </button>
               </>

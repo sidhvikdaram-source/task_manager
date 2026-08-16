@@ -22,7 +22,7 @@ import { themes, useTheme, type ThemeId } from "@/theme";
 import { cn } from "@/lib/utils";
 
 const primary = [
-  { href: "/", label: "Today", icon: ListChecks },
+  { href: "/today", label: "Today", icon: ListChecks },
   { href: "/school", label: "Academics", icon: GraduationCap },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/focus", label: "Focus", icon: Timer },

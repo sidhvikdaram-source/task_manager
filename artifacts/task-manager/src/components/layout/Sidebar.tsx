@@ -35,7 +35,7 @@ type SidebarProps = {
 };
 
 const navLinks = [
-  { href: "/", label: "My Day", icon: ListChecks },
+  { href: "/today", label: "My Day", icon: ListChecks },
   { href: "/school", label: "Academics", icon: GraduationCap },
   { href: "/focus", label: "Focus", icon: Timer },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
@@ -202,7 +202,7 @@ function SidebarBody({
             </span>
           </motion.button>
         ) : (
-          <Link href="/" onClick={onNavigate}>
+          <Link href="/today" onClick={onNavigate}>
             <motion.div
               className="flex cursor-pointer items-center gap-2.5"
               whileHover={reduceMotion ? undefined : { scale: 1.03 }}
