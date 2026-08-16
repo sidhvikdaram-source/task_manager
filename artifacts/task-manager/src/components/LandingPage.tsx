@@ -166,7 +166,11 @@ export function LandingPage({ onOpenApp }: { onOpenApp?: () => void }) {
           </div>
           <div className="flex items-center gap-1">
             {!isAuthenticated && <button type="button" onClick={() => moveToAuth("login")} className="rounded-xl px-3 py-2 text-xs font-black text-[#211d36] hover:bg-[#eeeaff] sm:text-sm">Log in</button>}
-            <button type="button" onClick={() => isAuthenticated ? onOpenApp?.() : moveToAuth("register")} className="rounded-xl bg-[#171522] px-3.5 py-2 text-xs font-black text-white transition-transform hover:-translate-y-0.5 sm:px-4 sm:text-sm">{isAuthenticated ? "Open Nimbus" : "Register"}</button>
+            {isAuthenticated ? (
+              <a href="/today" className="rounded-xl bg-[#171522] px-3.5 py-2 text-xs font-black text-white transition-transform hover:-translate-y-0.5 sm:px-4 sm:text-sm">Open Nimbus</a>
+            ) : (
+              <button type="button" onClick={() => moveToAuth("register")} className="rounded-xl bg-[#171522] px-3.5 py-2 text-xs font-black text-white transition-transform hover:-translate-y-0.5 sm:px-4 sm:text-sm">Register</button>
+            )}
           </div>
         </div>
       </nav>
@@ -183,9 +187,15 @@ export function LandingPage({ onOpenApp }: { onOpenApp?: () => void }) {
               Nimbus turns your time, energy, priorities, and schoolwork into one clear next move, then helps you stay with it.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <button type="button" onClick={() => isAuthenticated ? onOpenApp?.() : moveToAuth("register")} className="group inline-flex h-13 items-center justify-center gap-3 rounded-2xl bg-[#7c68ef] px-7 text-sm font-black text-white shadow-[0_18px_45px_rgba(124,104,239,.28)] transition-transform hover:-translate-y-1">
-                {isAuthenticated ? "Open Nimbus" : "Build my first clear day"} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </button>
+              {isAuthenticated ? (
+                <a href="/today" className="group inline-flex h-13 items-center justify-center gap-3 rounded-2xl bg-[#7c68ef] px-7 text-sm font-black text-white shadow-[0_18px_45px_rgba(124,104,239,.28)] transition-transform hover:-translate-y-1">
+                  Open Nimbus <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </a>
+              ) : (
+                <button type="button" onClick={() => moveToAuth("register")} className="group inline-flex h-13 items-center justify-center gap-3 rounded-2xl bg-[#7c68ef] px-7 text-sm font-black text-white shadow-[0_18px_45px_rgba(124,104,239,.28)] transition-transform hover:-translate-y-1">
+                  Build my first clear day <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </button>
+              )}
               <a href="#product" className="inline-flex h-13 items-center justify-center rounded-2xl border border-[#d5cfeb] bg-white/65 px-7 text-sm font-black text-[#211d36] hover:bg-white">See Nimbus in action</a>
             </div>
           </motion.div>
@@ -330,9 +340,9 @@ export function LandingPage({ onOpenApp }: { onOpenApp?: () => void }) {
                   <NimbusMascot state="ready" className="w-40" />
                   <h3 className="mt-5 text-2xl font-black">Your Nimbus is ready.</h3>
                   <p className="mt-2 max-w-sm text-sm leading-6 text-[#6a647c]">Continue to My Day with your tasks, forecasts, and progress right where you left them.</p>
-                  <button type="button" onClick={onOpenApp} className="mt-6 flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#7c68ef] px-6 text-sm font-black text-white shadow-[0_15px_35px_rgba(124,104,239,.22)] transition-transform hover:-translate-y-0.5">
+                  <a href="/today" className="mt-6 flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#7c68ef] px-6 text-sm font-black text-white shadow-[0_15px_35px_rgba(124,104,239,.22)] transition-transform hover:-translate-y-0.5">
                     Open Nimbus <ArrowRight className="h-4 w-4" />
-                  </button>
+                  </a>
                 </div>
               ) : isEmbedded ? (
               <div className="flex h-full min-h-96 flex-col items-start justify-center">
