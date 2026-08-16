@@ -67,6 +67,7 @@ test("public home and authenticated My Day use distinct routes", () => {
   );
 
   assert.match(app, /location === "\/"[\s\S]*<LandingPage/);
+  assert.match(app, /window\.location\.assign\("\/today"\)/);
   assert.match(app, /<Route path="\/today" component=\{Today\}/);
   assert.match(onboarding, /navigate\("\/today", \{ replace: true \}\)/);
   assert.match(sidebar, /href: "\/today", label: "My Day"/);
