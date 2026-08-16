@@ -20,7 +20,7 @@ import { useExperience } from "@/experience";
 
 const chapters = [
   {
-    path: "/",
+    path: "/today",
     target: "[data-tour='quick-capture']",
     title: "Capture what is on your mind",
     detail: "Write naturally. Nimbus recognizes dates, subjects, projects, priority, and useful details without making you fill out a form first.",
@@ -28,7 +28,7 @@ const chapters = [
     icon: ListChecks,
   },
   {
-    path: "/",
+    path: "/today",
     target: "[data-tour='recommend-next']",
     title: "Choose work that fits the moment",
     detail: "Set the time and energy you actually have. Recommend next balances both with priority, urgency, and the effort implied by the task.",
@@ -36,7 +36,7 @@ const chapters = [
     icon: Sparkles,
   },
   {
-    path: "/",
+    path: "/today",
     target: "[data-tour='daily-habits']",
     title: "Keep routines separate from tasks",
     detail: "Habits repeat on the days you choose and build a visible rhythm. Tasks remain finite work with a clear finish.",
@@ -76,7 +76,7 @@ const chapters = [
     icon: Store,
   },
   {
-    path: "/",
+    path: "/today",
     target: "[data-tour='nimbo']",
     title: "Ask Nimbo for planning help",
     detail: "Nimbo can clarify, organize, break down, and reschedule work. Meaningful workspace changes always appear as a preview before you confirm.",

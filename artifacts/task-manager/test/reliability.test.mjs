@@ -61,11 +61,17 @@ test("public home and authenticated My Day use distinct routes", () => {
     new URL("../src/components/layout/Sidebar.tsx", import.meta.url),
     "utf8",
   );
+  const tutorial = readFileSync(
+    new URL("../src/components/TutorialTour.tsx", import.meta.url),
+    "utf8",
+  );
 
   assert.match(app, /location === "\/"[\s\S]*<LandingPage/);
   assert.match(app, /<Route path="\/today" component=\{Today\}/);
   assert.match(onboarding, /navigate\("\/today", \{ replace: true \}\)/);
   assert.match(sidebar, /href: "\/today", label: "My Day"/);
+  assert.doesNotMatch(tutorial, /path: "\/",/);
+  assert.match(tutorial, /path: "\/today",/);
 });
 
 test("Quick Capture uses one visible, forward-only trace and pauses off-page", () => {
