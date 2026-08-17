@@ -398,7 +398,11 @@ export function LandingPage({ onOpenApp }: { onOpenApp?: () => void }) {
       <footer className="border-t border-[#ddd7f1] bg-[#171522] px-5 py-8 text-white sm:px-8">
         <div className="mx-auto flex max-w-[92rem] flex-col gap-4 text-sm text-white/52 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2"><NimbusMascot variant="mark" animated={false} interactive={false} className="h-9 w-11" /><span className="nimbus-wordmark text-lg text-white">nimbus</span></div>
-          <p>Plan what fits. Finish what matters.</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <p>Plan what fits. Finish what matters.</p>
+            <a href="/privacy" className="font-bold text-white/72 transition-colors hover:text-white">Privacy</a>
+            <a href="/terms" className="font-bold text-white/72 transition-colors hover:text-white">Terms</a>
+          </div>
         </div>
       </footer>
     </main>

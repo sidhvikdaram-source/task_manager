@@ -55,6 +55,24 @@ const weekdays = [
 function parseDate(text: string, referenceDate: string) {
   const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
   if (iso) return { value: iso[1], matched: iso[0] };
+  const numeric = text.match(/\b(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])(?:\/(\d{2}|20\d{2}))?\b/);
+  if (numeric) {
+    const month = Number(numeric[1]);
+    const day = Number(numeric[2]);
+    const referenceYear = calendarDateToUtc(referenceDate).getUTCFullYear();
+    let year = numeric[3]
+      ? numeric[3].length === 2
+        ? 2000 + Number(numeric[3])
+        : Number(numeric[3])
+      : referenceYear;
+    const formatCandidate = () => `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    if (!numeric[3] && formatCandidate() < referenceDate) year += 1;
+    const candidate = formatCandidate();
+    const parsed = calendarDateToUtc(candidate);
+    if (parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day) {
+      return { value: candidate, matched: numeric[0] };
+    }
+  }
   if (/\btoday\b/i.test(text))
     return { value: referenceDate, matched: text.match(/\btoday\b/i)![0] };
   if (/\btomorrow\b/i.test(text))
@@ -191,7 +209,9 @@ export function parseQuickCapture(
   subjects: NamedRecord[],
   referenceDate = localDateKey(new Date(), "UTC"),
 ): QuickCaptureResult {
-  const lines = text.split(/\r?\n/).map(cleanLine).filter(Boolean);
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  // A leading number may be meaningful task text (for example "8. Practice set").
+  // Only normalize list markers on the subsequent checklist lines.
   const sourceTitle = lines[0] ?? "";
   const checklist = lines.slice(1).map(cleanLine).filter(Boolean).slice(0, 20);
   const projectToken = sourceTitle.match(/(?:^|\s)#([\w-]+)/)?.[1];

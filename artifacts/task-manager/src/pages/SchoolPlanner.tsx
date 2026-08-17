@@ -41,6 +41,9 @@ type SchoolProject = {
   status: string;
 };
 
+const subjectKey = (value: string | null | undefined) =>
+  (value ?? "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
 export default function SchoolPlanner() {
   const { preferences } = useExperience();
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -64,6 +67,11 @@ export default function SchoolPlanner() {
     void load();
   }, []);
   useEffect(() => {
+    const refresh = () => void load();
+    window.addEventListener("nimbus:workspace-changed", refresh);
+    return () => window.removeEventListener("nimbus:workspace-changed", refresh);
+  }, []);
+  useEffect(() => {
     if (
       subjects.length &&
       !subjects.some((subject) => subject.name === selectedSubject)
@@ -71,7 +79,7 @@ export default function SchoolPlanner() {
       setSelectedSubject(subjects[0].name);
   }, [subjects]);
   const subjectTasks = useMemo(
-    () => tasks.filter((task) => task.subject === selectedSubject),
+    () => tasks.filter((task) => subjectKey(task.subject) === subjectKey(selectedSubject)),
     [tasks, selectedSubject],
   );
   const active = subjectTasks.filter((task) => task.status !== "completed");
@@ -123,7 +131,7 @@ export default function SchoolPlanner() {
   };
   const subjectProjects = projects.filter(
     (project) =>
-      project.subject === selectedSubject &&
+      subjectKey(project.subject) === subjectKey(selectedSubject) &&
       !["completed"].includes(project.status),
   );
   return (
@@ -173,7 +181,7 @@ export default function SchoolPlanner() {
               {
                 tasks.filter(
                   (task) =>
-                    task.subject === subject.name &&
+                    subjectKey(task.subject) === subjectKey(subject.name) &&
                     task.status !== "completed",
                 ).length
               }

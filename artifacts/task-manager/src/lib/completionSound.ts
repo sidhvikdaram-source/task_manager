@@ -195,7 +195,9 @@ export function playCompletionEffect(
   origin: CompletionOrigin,
 ) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const base = { origin, disableForReducedMotion: true, zIndex: 120 };
+  // Reward cards sit above the app at z-170. Keep completion particles above
+  // them so the reward and its affirmation arrive as one immediate moment.
+  const base = { origin, disableForReducedMotion: true, zIndex: 190, ticks: 90 };
   if (effectId === "signal-finish") {
     const layer = effectLayer(effectId, origin);
     ring(layer, origin, { size: 76, color: "#22d3ee", width: 3 });
@@ -210,7 +212,7 @@ export function playCompletionEffect(
     return;
   }
   if (effectId === "prism-pop") {
-    void confetti({ ...base, particleCount: 72, spread: 112, startVelocity: 36, gravity: 1.08, scalar: 0.92, ticks: 150, colors: ["#22d3ee", "#a78bfa", "#fb7185", "#facc15"] });
+    void confetti({ ...base, particleCount: 72, spread: 112, startVelocity: 38, gravity: 1.18, scalar: 0.92, ticks: 105, colors: ["#22d3ee", "#a78bfa", "#fb7185", "#facc15"] });
     return;
   }
   if (effectId === "prism-check") {
@@ -241,7 +243,7 @@ export function playCompletionEffect(
   }
   if (effectId === "paper-stream") {
     const paperOrigin = { x: origin.x, y: Math.max(0, origin.y - 0.32) };
-    void confetti({ ...base, origin: paperOrigin, particleCount: 72, angle: 270, spread: 74, startVelocity: 14, gravity: 0.48, scalar: 1.28, drift: 0.65, ticks: 260, shapes: ["square"], colors: ["#f8fafc", "#fdba74", "#60a5fa", "#34d399"] });
+    void confetti({ ...base, origin: paperOrigin, particleCount: 72, angle: 270, spread: 74, startVelocity: 18, gravity: 0.72, scalar: 1.16, drift: 0.65, ticks: 135, shapes: ["square"], colors: ["#f8fafc", "#fdba74", "#60a5fa", "#34d399"] });
     return;
   }
   if (effectId === "aurora-finish") {
@@ -310,7 +312,7 @@ export function playCompletionEffect(
       gravity: 0.32,
       drift: -0.2,
       scalar: 0.72,
-      ticks: 190,
+      ticks: 115,
       colors: ["#67e8f9", "#c4b5fd", "#fda4af", "#ffffff"],
     });
     return;

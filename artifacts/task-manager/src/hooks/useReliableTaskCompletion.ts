@@ -91,7 +91,7 @@ export function useReliableTaskCompletion() {
         ),
       );
       feedback.celebrate(preparedFeedback);
-      if (result.consecutiveMomentum && result.streakDays) {
+      if (result.firstCompletionToday && result.streakDays) {
         window.dispatchEvent(new CustomEvent("velocity:consecutive-momentum", {
           detail: { momentumDays: result.streakDays },
         }));

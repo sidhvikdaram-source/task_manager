@@ -1,17 +1,23 @@
 import { useState, useEffect, useCallback } from "react";
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  updateProfile,
+  type User,
+} from "firebase/auth";
 import type { AuthUser } from "@workspace/api-client-react";
 import {
-  apiUrl,
   firebaseAuth,
-  getLegacySessionToken,
   setLegacySessionToken,
 } from "./runtime";
 
 export type { AuthUser };
 
 const AUTH_CHANGED_EVENT = "velocity-auth-changed";
-const API_RETRY_DELAYS_MS = [0, 1_000, 2_000, 3_000, 4_000, 5_000, 5_000, 5_000, 5_000, 5_000, 5_000];
 
 interface AuthState {
   user: AuthUser | null;
@@ -23,46 +29,16 @@ interface AuthState {
   logout: () => void;
 }
 
-function wait(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-async function fetchApiWithRecovery(path: string, init: RequestInit = {}) {
-  let lastNetworkError: unknown;
-
-  for (let attempt = 0; attempt < API_RETRY_DELAYS_MS.length; attempt += 1) {
-    const delay = API_RETRY_DELAYS_MS[attempt];
-    if (delay) await wait(delay);
-
-    try {
-      const response = await fetch(apiUrl(path), init);
-      const canRetry = [502, 503, 504].includes(response.status);
-      if (!canRetry || attempt === API_RETRY_DELAYS_MS.length - 1) {
-        return response;
-      }
-    } catch (error) {
-      lastNetworkError = error;
-      if (attempt === API_RETRY_DELAYS_MS.length - 1) break;
-    }
-  }
-
-  throw new Error(
-    lastNetworkError instanceof TypeError
-      ? "Nimbus could not reach its server. The connection was retried automatically; check whether your network blocks nimbusdo.onrender.com."
-      : "Nimbus could not reach its server. Please try again.",
-  );
-}
-
-async function fetchUser(): Promise<AuthUser | null> {
-  const res = await fetchApiWithRecovery("/api/auth/user", { credentials: "include" });
-  const data = await res.json().catch(() => null) as {
-    user?: AuthUser | null;
-    error?: string;
-  } | null;
-  if (!res.ok) {
-    throw new Error(data?.error ?? `Nimbus's server returned HTTP ${res.status}.`);
-  }
-  return data?.user ?? null;
+function toAuthUser(user: User | null): AuthUser | null {
+  if (!user) return null;
+  const names = user.displayName?.trim().split(/\s+/) ?? [];
+  return {
+    id: user.uid,
+    email: user.email ?? null,
+    firstName: names[0] ?? null,
+    lastName: names.slice(1).join(" ") || null,
+    profileImageUrl: user.photoURL ?? null,
+  };
 }
 
 export function useAuth(): AuthState {
@@ -76,46 +52,21 @@ export function useAuth(): AuthState {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const nextUser = await fetchUser();
+    await firebaseAuth.authStateReady();
+    const nextUser = toAuthUser(firebaseAuth.currentUser);
     publishUser(nextUser);
     return nextUser;
   }, [publishUser]);
 
   useEffect(() => {
     let cancelled = false;
-    let pollTimer: ReturnType<typeof setTimeout> | null = null;
-    const isEmbedded = window.self !== window.top;
-
-    const check = () => {
-      fetchUser()
-        .then((nextUser) => {
-          if (cancelled) return;
-          setUser(nextUser);
-          setIsLoading(false);
-          if (!nextUser && isEmbedded) pollTimer = setTimeout(check, 3000);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setUser(null);
-          setIsLoading(false);
-          if (isEmbedded) pollTimer = setTimeout(check, 3000);
-        });
-    };
-
     const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
-      // The public landing page is static. Do not wake or wait for Render until
-      // this browser actually has a Nimbus session to restore.
-      if (!firebaseUser && !getLegacySessionToken()) {
-        publishUser(null);
-        return;
-      }
-      check();
+      if (!cancelled) publishUser(toAuthUser(firebaseUser));
     });
 
     return () => {
       cancelled = true;
       unsubscribe();
-      if (pollTimer) clearTimeout(pollTimer);
     };
   }, [publishUser]);
 
@@ -141,56 +92,25 @@ export function useAuth(): AuthState {
     await refreshUser();
   }, [isEmbedded, refreshUser]);
 
-  const submitLocalAuth = useCallback(async (
-    path: "/api/auth/login" | "/api/auth/register",
-    email: string,
-    password: string,
-    firstName?: string,
-  ) => {
-    await signOut(firebaseAuth).catch(() => undefined);
-    const res = await fetchApiWithRecovery(path, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, firstName }),
-    });
-
-    const data = await res.json().catch(() => null) as {
-      user?: AuthUser;
-      token?: string;
-      error?: string;
-    } | null;
-    if (!res.ok || !data?.user || !data.token) {
-      throw new Error(
-        data?.error ??
-          (res.ok
-            ? "Nimbus received an incomplete sign-in response. Please retry."
-            : `Nimbus's server returned HTTP ${res.status}.`),
-      );
-    }
-
-    setLegacySessionToken(data.token);
-    publishUser(data.user);
+  const loginWithPassword = useCallback(async (email: string, password: string) => {
+    setLegacySessionToken(null);
+    const credential = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+    publishUser(toAuthUser(credential.user));
   }, [publishUser]);
 
-  const loginWithPassword = useCallback((email: string, password: string) => (
-    submitLocalAuth("/api/auth/login", email, password)
-  ), [submitLocalAuth]);
-
-  const registerWithPassword = useCallback((email: string, password: string, firstName?: string) => (
-    submitLocalAuth("/api/auth/register", email, password, firstName)
-  ), [submitLocalAuth]);
+  const registerWithPassword = useCallback(async (email: string, password: string, firstName?: string) => {
+    setLegacySessionToken(null);
+    const credential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
+    if (firstName?.trim()) await updateProfile(credential.user, { displayName: firstName.trim() });
+    publishUser(toAuthUser(credential.user));
+  }, [publishUser]);
 
   const logout = useCallback(() => {
-    void fetch(apiUrl("/api/session-logout"), { method: "POST", credentials: "include" })
-      .catch(() => undefined)
-      .finally(() => {
-        setLegacySessionToken(null);
-        void signOut(firebaseAuth).finally(() => {
-          publishUser(null);
-          if (!isEmbedded) window.location.href = "/";
-        });
-      });
+    setLegacySessionToken(null);
+    void signOut(firebaseAuth).finally(() => {
+      publishUser(null);
+      if (!isEmbedded) window.location.href = "/";
+    });
   }, [isEmbedded, publishUser]);
 
   return {

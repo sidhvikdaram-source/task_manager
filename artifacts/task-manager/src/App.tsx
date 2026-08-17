@@ -30,6 +30,9 @@ const LandingPage = lazy(() =>
     default: module.LandingPage,
   })),
 );
+const LegalPage = lazy(() =>
+  import("@/components/LegalPage").then((module) => ({ default: module.LegalPage })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -257,6 +260,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoading, isAuthenticated } = useAuth();
   const [location] = useLocation();
   const openApp = () => window.location.assign("/today");
+
+  if (location === "/privacy" || location === "/terms") {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#f4f1ff]" />}>
+        <LegalPage kind={location === "/privacy" ? "privacy" : "terms"} />
+      </Suspense>
+    );
+  }
 
   if (location === "/") {
     return (

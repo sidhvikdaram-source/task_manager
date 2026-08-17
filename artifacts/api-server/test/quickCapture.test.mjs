@@ -158,6 +158,38 @@ test("dates are removed from task titles", () => {
   assert.equal(result.dueDate, "2026-08-01");
 });
 
+test("parses slash dates and rolls dates without a year forward", () => {
+  const thisYear = parseQuickCapture(
+    "Finish AMC review 9/21 #Math",
+    projects,
+    subjects,
+    "2026-07-21",
+  );
+  const nextYear = parseQuickCapture(
+    "Submit lab 2/1",
+    projects,
+    subjects,
+    "2026-07-21",
+  );
+
+  assert.equal(thisYear.title, "Finish AMC review");
+  assert.equal(thisYear.dueDate, "2026-09-21");
+  assert.equal(nextYear.title, "Submit lab");
+  assert.equal(nextYear.dueDate, "2027-02-01");
+});
+
+test("preserves a meaningful leading number on the task title", () => {
+  const result = parseQuickCapture(
+    "8. Practice problems 9/21",
+    projects,
+    subjects,
+    "2026-07-21",
+  );
+
+  assert.equal(result.title, "8. Practice problems");
+  assert.equal(result.dueDate, "2026-09-21");
+});
+
 test("weekday parsing stays anchored to the supplied date", () => {
   const result = parseQuickCapture(
     "Practice vocabulary next Monday",

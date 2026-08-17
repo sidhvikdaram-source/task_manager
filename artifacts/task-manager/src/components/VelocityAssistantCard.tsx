@@ -25,7 +25,7 @@ interface ChatMessage {
   workspacePreview?: WorkspaceActionPlan;
 }
 
-type TaskPreview = { title: string; date?: string; time?: string; scheduleLabel?: string; taskType: string; priority: Task['priority']; keywords: string[] };
+type TaskPreview = { title: string; date?: string; dueDate?: string; time?: string; scheduleLabel?: string; subject?: string | null; estimatedMinutes?: number | null; taskType: string; priority: Task['priority']; keywords: string[] };
 type ActionPlan = { summary: string; project: { name: string; subject: string | null; description: string | null; dueDate: string | null } | null; tasks: Array<{ title: string; description: string | null; subject: string | null; dueDate: string | null; priority: Task['priority']; estimatedMinutes: number | null; taskKind: string }> };
 type WorkspaceActionPlan = { summary: string; operations: Array<{ type: string; label: string; [key: string]: unknown }> };
 
@@ -183,13 +183,13 @@ export function VelocityAssistantCard() {
       return;
     }
 
-    for (let i = 24; i < content.length; i += 24) {
+    for (let i = 72; i < content.length; i += 72) {
       if (!mountedRef.current) return;
       const partial = content.slice(0, i);
       setMessages((current) => current.map((message) => (
         message.id === id ? { ...message, content: partial, typing: true } : message
       )));
-      await new Promise((resolve) => window.setTimeout(resolve, 16));
+      await new Promise((resolve) => window.setTimeout(resolve, 8));
     }
     if (!mountedRef.current) return;
     setMessages((current) => current.map((message) => (
@@ -206,6 +206,7 @@ export function VelocityAssistantCard() {
       data.tasks.forEach((task) => seedCreatedTask(queryClient, task));
       queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
       queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
+      window.dispatchEvent(new Event('nimbus:workspace-changed'));
       setMessages((current) => current.map((message) => message.id === messageId ? { ...message, previewConfirmed: true } : message));
     } catch (error) {
       setMessages((current) => [...current, { id: `assistant-error-${Date.now()}`, role: 'assistant', content: error instanceof Error ? error.message : 'Could not create those tasks.' }]);
@@ -233,6 +234,7 @@ export function VelocityAssistantCard() {
       if (!response.ok || !data.tasks) throw new Error(data.error || 'Could not create the plan');
       data.tasks.forEach((task) => seedCreatedTask(queryClient, task));
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['/api/tasks'] }), queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() })]);
+      window.dispatchEvent(new Event('nimbus:workspace-changed'));
       const confirmation = data.project && data.tasks.length > 0
         ? `${data.project.name} and ${data.tasks.length} tasks`
         : data.project?.name ?? `${data.tasks.length} tasks`;
@@ -254,6 +256,7 @@ export function VelocityAssistantCard() {
         queryClient.invalidateQueries({ queryKey: ['/api/subjects'] }),
         queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() }),
       ]);
+      window.dispatchEvent(new Event('nimbus:workspace-changed'));
       setMessages((current) => current.map((message) => message.id === messageId ? { ...message, previewConfirmed: true, content: `${message.content}\n\n**Applied ${data.count ?? plan.operations.length} changes.**` } : message));
     } catch (error) {
       setMessages((current) => [...current, { id: `assistant-error-${Date.now()}`, role: 'assistant', content: error instanceof Error ? error.message : 'Could not apply those changes.' }]);

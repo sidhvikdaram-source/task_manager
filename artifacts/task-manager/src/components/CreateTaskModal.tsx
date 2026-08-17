@@ -102,7 +102,11 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
   React.useEffect(() => { if (open) fetch('/api/subjects', { credentials: 'include' }).then((response) => response.ok ? response.json() : []).then(setSubjects).catch(() => setSubjects([])); }, [open]);
 
   const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+    // @hookform/resolvers' published type can resolve against Zod 4 in a
+    // pnpm workspace even though Nimbus intentionally uses Zod 3. The runtime
+    // resolver supports this schema; the cast keeps that package-only type
+    // mismatch from leaking into the form's otherwise inferred value type.
+    resolver: zodResolver(formSchema as never),
     defaultValues: {
       title: '',
       description: '',

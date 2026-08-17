@@ -1,5 +1,16 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  type AppCheck,
+} from "firebase/app-check";
 import { getAuth } from "firebase/auth";
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 
 const FIREBASE_CONFIG = {
@@ -12,18 +23,48 @@ const FIREBASE_CONFIG = {
   measurementId: "G-CY9Q6179MC",
 };
 
+const NIMBUS_APP_CHECK_SITE_KEY = "6LdIeIktAAAAAJw1myCo9Ed7A5cEu4JnrbiO_Ubp";
+
 const LEGACY_SESSION_KEY = "nimbus-api-session";
-const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(FIREBASE_CONFIG);
+const firebaseWasInitialized = getApps().length > 0;
+export const firebaseApp = firebaseWasInitialized ? getApp() : initializeApp(FIREBASE_CONFIG);
+
+declare global {
+  interface Window {
+    __nimbusFirebaseAppCheck?: AppCheck;
+  }
+}
+
+export const firebaseAppCheck = (() => {
+  if (typeof window === "undefined") return null;
+  if (window.__nimbusFirebaseAppCheck) return window.__nimbusFirebaseAppCheck;
+  window.__nimbusFirebaseAppCheck = initializeAppCheck(firebaseApp, {
+    provider: new ReCaptchaEnterpriseProvider(NIMBUS_APP_CHECK_SITE_KEY),
+    isTokenAutoRefreshEnabled: true,
+  });
+  return window.__nimbusFirebaseAppCheck;
+})();
 
 export const firebaseAuth = getAuth(firebaseApp);
+export const firebaseDb = firebaseWasInitialized
+  ? getFirestore(firebaseApp)
+  : initializeFirestore(firebaseApp, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+
+export type NimbusApiHandler = (request: Request) => Promise<Response>;
+let firebaseApiHandler: NimbusApiHandler | null = null;
+
+export function setNimbusApiHandler(handler: NimbusApiHandler) {
+  firebaseApiHandler = handler;
+}
 
 function configuredApiBaseUrl() {
   const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
   const explicit = env?.VITE_API_BASE_URL?.trim();
   if (explicit) return explicit.replace(/\/+$/, "");
-  if (typeof window !== "undefined" && /(?:firebaseapp\.com|web\.app)$/i.test(window.location.hostname)) {
-    return "https://nimbusdo.onrender.com";
-  }
   return "";
 }
 
@@ -52,9 +93,10 @@ export function apiUrl(path: string) {
 
 let configured = false;
 
-export function configureNimbusApiRuntime() {
+export function configureNimbusApiRuntime(handler?: NimbusApiHandler) {
   if (configured || typeof window === "undefined") return;
   configured = true;
+  if (handler) setNimbusApiHandler(handler);
 
   setBaseUrl(apiBaseUrl || null);
   setAuthTokenGetter(getNimbusAuthToken);
@@ -70,6 +112,16 @@ export function configureNimbusApiRuntime() {
     if (!headers.has("authorization")) {
       const token = await getNimbusAuthToken();
       if (token) headers.set("authorization", `Bearer ${token}`);
+    }
+
+    if (firebaseApiHandler && originalUrl.startsWith("/api")) {
+      const request = new Request(new URL(originalUrl, window.location.origin), {
+        ...init,
+        method: init.method ?? (input instanceof Request ? input.method : "GET"),
+        headers,
+        body: init.body ?? (input instanceof Request ? input.body : undefined),
+      });
+      return firebaseApiHandler(request);
     }
 
     const resolvedInput = originalUrl.startsWith("/api") ? apiUrl(originalUrl) : input;
