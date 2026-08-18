@@ -20,4 +20,5 @@
 ## GitHub Delivery
 
 - After making repository changes, run appropriate verification, commit the completed changes, and push the current branch to GitHub.
+- After every successful GitHub push that includes deployable Nimbus changes, deploy the matching build to the `nimbusdo` Firebase project and verify the live `https://nimbusdo.web.app` release before reporting completion.
 - Confirm that the push succeeded before reporting the work as finished.
