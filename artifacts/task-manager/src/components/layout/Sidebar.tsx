@@ -12,6 +12,7 @@ import {
   FolderKanban,
   GraduationCap,
   ListChecks,
+  Rows3,
   PanelLeftClose,
   PanelLeftOpen,
   Settings2,
@@ -25,7 +26,12 @@ import {
   useListTasks,
 } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import {
+  AnimatePresence,
+  LayoutGroup,
+  motion,
+  useReducedMotion,
+} from "framer-motion";
 import { NimbusMascot } from "@/components/NimbusMascot";
 import { localDateKey } from "@/lib/localDate";
 
@@ -36,6 +42,7 @@ type SidebarProps = {
 
 const navLinks = [
   { href: "/today", label: "My Day", icon: ListChecks },
+  { href: "/tasks", label: "Task workspace", icon: Rows3 },
   { href: "/school", label: "Academics", icon: GraduationCap },
   { href: "/focus", label: "Focus", icon: Timer },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
@@ -93,7 +100,11 @@ function NavItem({
 }) {
   const reduceMotion = useReducedMotion();
   return (
-    <Link href={href} onClick={onClick} aria-current={active ? "page" : undefined}>
+    <Link
+      href={href}
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+    >
       <div
         className={cn(
           "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
@@ -174,146 +185,137 @@ function SidebarBody({
         data-tour="primary-navigation"
         className="relative flex h-full min-w-0 flex-col overflow-x-hidden bg-background text-foreground"
       >
-      {/* Logo header */}
-      <div
-        className={cn(
-          "relative z-10 flex h-16 shrink-0 items-center border-b border-border/70 bg-background",
-          collapsed ? "justify-center px-1.5" : "gap-3 px-3",
-        )}
-      >
-        {collapsed && onToggle ? (
-          <motion.button
-            type="button"
-            onClick={onToggle}
-            aria-label="Expand sidebar"
-            title="Expand sidebar"
-            whileHover={reduceMotion ? undefined : { scale: 1.05 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.94 }}
-            transition={{ type: "spring", stiffness: 400, damping: 22 }}
-            className="group relative flex h-13 w-13 items-center justify-center rounded-[1rem] transition-colors hover:bg-primary/8"
-          >
-            <NimbusMascot
-              state={hasOverdue ? "overdue" : "ready"}
-              variant="mark"
-              className="h-12 w-13 drop-shadow-[0_7px_12px_hsl(var(--primary)/.2)]"
-            />
-            <span className="absolute -right-0.5 bottom-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-              <PanelLeftOpen className="h-3 w-3" />
-            </span>
-          </motion.button>
-        ) : (
-          <Link href="/today" onClick={onNavigate}>
-            <motion.div
-              className="flex cursor-pointer items-center gap-2.5"
-              whileHover={reduceMotion ? undefined : { scale: 1.03 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              transition={{ type: "spring", stiffness: 400, damping: 22 }}
-              title="Nimbus"
-            >
-              <NimbusMascot state={hasOverdue ? "overdue" : "ready"} variant="mark" className="h-13 w-15 shrink-0 drop-shadow-[0_8px_14px_hsl(var(--primary)/.18)]" />
-              <SlidingLabel
-                show={!collapsed}
-                className="whitespace-nowrap text-lg font-black tracking-tight"
-              >
-                Nimbus
-              </SlidingLabel>
-            </motion.div>
-          </Link>
-        )}
-        {onToggle && !collapsed && (
-          <motion.button
-            type="button"
-            onClick={onToggle}
-            aria-label="Collapse sidebar"
-            title="Collapse sidebar"
-            whileHover={reduceMotion ? undefined : { scale: 1.08 }}
-            whileTap={reduceMotion ? undefined : { scale: 0.92 }}
-            className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <PanelLeftClose className="h-4 w-4" />
-          </motion.button>
-        )}
-      </div>
-
-      {/* Navigation */}
-      <div
-        className={cn(
-          "min-h-0 flex-1 overflow-y-auto py-3",
-          collapsed ? "px-2" : "px-3",
-        )}
-      >
-        <SlidingLabel
-          show={!collapsed}
-          className="mb-2 block px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70"
+        {/* Logo header */}
+        <div
+          className={cn(
+            "relative z-10 flex h-16 shrink-0 items-center border-b border-border/70 bg-background",
+            collapsed ? "justify-center px-1.5" : "gap-3 px-3",
+          )}
         >
-          Navigate
-        </SlidingLabel>
-        <nav className="space-y-0.5" aria-label="Primary navigation">
-          {navLinks.map((item) => (
-            <NavItem
-              key={item.href}
-              href={item.href}
-              label={item.label}
-              icon={item.icon}
-              active={location === item.href}
-              collapsed={collapsed}
-              onClick={onNavigate}
-              indicatorId={indicatorId}
-            />
-          ))}
-        </nav>
-      </div>
-
-      {/* Bottom: Settings */}
-      <div className={cn("shrink-0 border-t border-border/70", collapsed ? "p-2" : "px-3 py-2")}>
-        <Link href="/settings" onClick={onNavigate} aria-current={location === "/settings" ? "page" : undefined}>
-          <motion.div
-            whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 3, transition: { type: "spring", stiffness: 400, damping: 28 } }}
-            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-            data-sidebar-active={location === "/settings"}
-            className={cn(
-              "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
-              location === "/settings" ? "text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              collapsed ? "h-10 justify-center" : "gap-3 px-2.5 py-2",
-            )}
-            title={collapsed ? "Settings" : undefined}
-          >
-            {location === "/settings" && (
-              <motion.span
-                layoutId={`sidebar-active-${indicatorId}`}
-                aria-hidden="true"
-                className="absolute inset-0 rounded-lg bg-primary shadow-sm"
-                initial={false}
-                transition={activeTransition}
+          {collapsed && onToggle ? (
+            <motion.button
+              type="button"
+              onClick={onToggle}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+              whileHover={reduceMotion ? undefined : { scale: 1.05 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+              transition={{ type: "spring", stiffness: 400, damping: 22 }}
+              className="group relative flex h-13 w-13 items-center justify-center rounded-[1rem] transition-colors hover:bg-primary/8"
+            >
+              <NimbusMascot
+                state={hasOverdue ? "overdue" : "ready"}
+                variant="mark"
+                className="h-12 w-13 drop-shadow-[0_7px_12px_hsl(var(--primary)/.2)]"
               />
-            )}
-            <Settings2 className="relative z-10 h-4 w-4" />
-            <SlidingLabel
-              show={!collapsed}
-              className="relative z-10 whitespace-nowrap"
+              <span className="absolute -right-0.5 bottom-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-background text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                <PanelLeftOpen className="h-3 w-3" />
+              </span>
+            </motion.button>
+          ) : (
+            <Link href="/today" onClick={onNavigate}>
+              <motion.div
+                className="flex cursor-pointer items-center gap-2.5"
+                whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                transition={{ type: "spring", stiffness: 400, damping: 22 }}
+                title="Nimbus"
+              >
+                <NimbusMascot
+                  state={hasOverdue ? "overdue" : "ready"}
+                  variant="mark"
+                  className="h-13 w-15 shrink-0 drop-shadow-[0_8px_14px_hsl(var(--primary)/.18)]"
+                />
+                <SlidingLabel
+                  show={!collapsed}
+                  className="whitespace-nowrap text-lg font-black tracking-tight"
+                >
+                  Nimbus
+                </SlidingLabel>
+              </motion.div>
+            </Link>
+          )}
+          {onToggle && !collapsed && (
+            <motion.button
+              type="button"
+              onClick={onToggle}
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+              whileHover={reduceMotion ? undefined : { scale: 1.08 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.92 }}
+              className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
             >
-              Settings
-            </SlidingLabel>
-          </motion.div>
-        </Link>
-      </div>
+              <PanelLeftClose className="h-4 w-4" />
+            </motion.button>
+          )}
+        </div>
 
-      {/* Bottom: Profile / Tier */}
-      {stats && (
-        <div className={cn("shrink-0 border-t border-border/70", collapsed ? "p-2" : "p-3")}>
-          <Link href="/profile" onClick={onNavigate} aria-current={location === "/profile" ? "page" : undefined}>
+        {/* Navigation */}
+        <div
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto py-3",
+            collapsed ? "px-2" : "px-3",
+          )}
+        >
+          <SlidingLabel
+            show={!collapsed}
+            className="mb-2 block px-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground/70"
+          >
+            Navigate
+          </SlidingLabel>
+          <nav className="space-y-0.5" aria-label="Primary navigation">
+            {navLinks.map((item) => (
+              <NavItem
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                active={location === item.href}
+                collapsed={collapsed}
+                onClick={onNavigate}
+                indicatorId={indicatorId}
+              />
+            ))}
+          </nav>
+        </div>
+
+        {/* Bottom: Settings */}
+        <div
+          className={cn(
+            "shrink-0 border-t border-border/70",
+            collapsed ? "p-2" : "px-3 py-2",
+          )}
+        >
+          <Link
+            href="/settings"
+            onClick={onNavigate}
+            aria-current={location === "/settings" ? "page" : undefined}
+          >
             <motion.div
-              whileHover={reduceMotion ? undefined : { x: collapsed ? 0 : 3, transition: { type: "spring", stiffness: 400, damping: 28 } }}
+              whileHover={
+                reduceMotion
+                  ? undefined
+                  : {
+                      x: collapsed ? 0 : 3,
+                      transition: {
+                        type: "spring",
+                        stiffness: 400,
+                        damping: 28,
+                      },
+                    }
+              }
               whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-              data-sidebar-active={location === "/profile"}
+              data-sidebar-active={location === "/settings"}
               className={cn(
-                "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg transition-colors",
-                location === "/profile" ? "text-primary-foreground" : "hover:bg-muted",
-                collapsed ? "justify-center p-2" : "gap-3 px-2 py-2.5",
+                "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg text-sm font-bold transition-colors",
+                location === "/settings"
+                  ? "text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                collapsed ? "h-10 justify-center" : "gap-3 px-2.5 py-2",
               )}
-              title={collapsed ? `Tier ${stats.tier} · ${100 - stats.tierProgress} NP to next` : undefined}
+              title={collapsed ? "Settings" : undefined}
             >
-              {location === "/profile" && (
+              {location === "/settings" && (
                 <motion.span
                   layoutId={`sidebar-active-${indicatorId}`}
                   aria-hidden="true"
@@ -322,38 +324,106 @@ function SidebarBody({
                   transition={activeTransition}
                 />
               )}
-              <div className={cn(
-                "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                location === "/profile" ? "bg-primary-foreground/15 text-primary-foreground" : "bg-primary/10 text-primary",
-              )}>
-                <Zap className="h-4 w-4 fill-current" />
-              </div>
-              {!collapsed && (
-                <>
-                  <div className="relative z-10 min-w-0 flex-1">
-                    <p className="text-xs font-black">Tier {stats.tier}</p>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <motion.div
-                        className="h-full rounded-full bg-primary"
-                        initial={false}
-                        animate={{ width: `${stats.tierProgress}%` }}
-                        transition={{ duration: 0.6, ease: "easeOut" }}
-                      />
-                    </div>
-                  </div>
-                  <span className={cn(
-                    "relative z-10 text-[10px] font-bold",
-                    location === "/profile" ? "text-primary-foreground/75" : "text-muted-foreground",
-                  )}>
-                    {100 - stats.tierProgress} left
-                  </span>
-                </>
-              )}
+              <Settings2 className="relative z-10 h-4 w-4" />
+              <SlidingLabel
+                show={!collapsed}
+                className="relative z-10 whitespace-nowrap"
+              >
+                Settings
+              </SlidingLabel>
             </motion.div>
           </Link>
         </div>
-      )}
 
+        {/* Bottom: Profile / Tier */}
+        {stats && (
+          <div
+            className={cn(
+              "shrink-0 border-t border-border/70",
+              collapsed ? "p-2" : "p-3",
+            )}
+          >
+            <Link
+              href="/profile"
+              onClick={onNavigate}
+              aria-current={location === "/profile" ? "page" : undefined}
+            >
+              <motion.div
+                whileHover={
+                  reduceMotion
+                    ? undefined
+                    : {
+                        x: collapsed ? 0 : 3,
+                        transition: {
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 28,
+                        },
+                      }
+                }
+                whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+                data-sidebar-active={location === "/profile"}
+                className={cn(
+                  "relative z-10 flex cursor-pointer items-center overflow-hidden rounded-lg transition-colors",
+                  location === "/profile"
+                    ? "text-primary-foreground"
+                    : "hover:bg-muted",
+                  collapsed ? "justify-center p-2" : "gap-3 px-2 py-2.5",
+                )}
+                title={
+                  collapsed
+                    ? `Tier ${stats.tier} · ${100 - stats.tierProgress} NP to next`
+                    : undefined
+                }
+              >
+                {location === "/profile" && (
+                  <motion.span
+                    layoutId={`sidebar-active-${indicatorId}`}
+                    aria-hidden="true"
+                    className="absolute inset-0 rounded-lg bg-primary shadow-sm"
+                    initial={false}
+                    transition={activeTransition}
+                  />
+                )}
+                <div
+                  className={cn(
+                    "relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                    location === "/profile"
+                      ? "bg-primary-foreground/15 text-primary-foreground"
+                      : "bg-primary/10 text-primary",
+                  )}
+                >
+                  <Zap className="h-4 w-4 fill-current" />
+                </div>
+                {!collapsed && (
+                  <>
+                    <div className="relative z-10 min-w-0 flex-1">
+                      <p className="text-xs font-black">Tier {stats.tier}</p>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <motion.div
+                          className="h-full rounded-full bg-primary"
+                          initial={false}
+                          animate={{ width: `${stats.tierProgress}%` }}
+                          transition={{ duration: 0.6, ease: "easeOut" }}
+                        />
+                      </div>
+                    </div>
+                    <span
+                      className={cn(
+                        "relative z-10 text-[10px] font-bold",
+                        location === "/profile"
+                          ? "text-primary-foreground/75"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {100 - stats.tierProgress} left
+                    </span>
+                  </>
+                )}
+              </motion.div>
+            </Link>
+          </div>
+        )}
       </div>
     </LayoutGroup>
   );
@@ -375,7 +445,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   }, [width]);
 
   useEffect(() => {
-    window.localStorage.setItem("velocity-sidebar-collapsed", String(collapsed));
+    window.localStorage.setItem(
+      "velocity-sidebar-collapsed",
+      String(collapsed),
+    );
   }, [collapsed]);
 
   function startResize(event: ReactPointerEvent<HTMLDivElement>) {
@@ -384,7 +457,9 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     const startX = event.clientX;
     const startWidth = width;
     const move = (moveEvent: PointerEvent) => {
-      setWidth(Math.min(288, Math.max(184, startWidth + moveEvent.clientX - startX)));
+      setWidth(
+        Math.min(288, Math.max(184, startWidth + moveEvent.clientX - startX)),
+      );
     };
     const stop = () => {
       setResizing(false);
@@ -433,8 +508,10 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             tabIndex={0}
             onPointerDown={startResize}
             onKeyDown={(event) => {
-              if (event.key === "ArrowLeft") setWidth((v) => Math.max(184, v - 8));
-              if (event.key === "ArrowRight") setWidth((v) => Math.min(288, v + 8));
+              if (event.key === "ArrowLeft")
+                setWidth((v) => Math.max(184, v - 8));
+              if (event.key === "ArrowRight")
+                setWidth((v) => Math.min(288, v + 8));
             }}
             className="absolute inset-y-0 -right-1 z-20 w-2 cursor-col-resize transition-colors hover:bg-primary/20 focus-visible:bg-primary/25 focus-visible:outline-none"
           />

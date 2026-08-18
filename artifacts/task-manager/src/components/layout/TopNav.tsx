@@ -154,8 +154,21 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
     [tasks],
   );
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const pageTitles: Record<string, string> = { "/calendar": "Calendar", "/school": "Academics", "/projects": "Projects", "/focus": "Focus", "/analytics": "Insights", "/social": "Social", "/profile": "Profile", "/settings": "Settings", "/review": "Weekly review", "/workspace": "Workspace" };
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const pageTitles: Record<string, string> = {
+    "/calendar": "Calendar",
+    "/tasks": "Task workspace",
+    "/school": "Academics",
+    "/projects": "Projects",
+    "/focus": "Focus",
+    "/analytics": "Insights",
+    "/social": "Social",
+    "/profile": "Profile",
+    "/settings": "Settings",
+    "/review": "Weekly review",
+    "/workspace": "Workspace",
+  };
 
   return (
     <>
@@ -172,7 +185,11 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
           </button>
           <Link href="/today" className="lg:hidden">
             <div className="flex cursor-pointer items-center gap-2.5">
-              <NimbusMascot state={hasOverdue ? "overdue" : "ready"} variant="mark" className="h-12 w-14 shrink-0 drop-shadow-[0_7px_12px_hsl(var(--primary)/.16)]" />
+              <NimbusMascot
+                state={hasOverdue ? "overdue" : "ready"}
+                variant="mark"
+                className="h-12 w-14 shrink-0 drop-shadow-[0_7px_12px_hsl(var(--primary)/.16)]"
+              />
               <span className="hidden text-lg font-black tracking-tight text-foreground sm:inline">
                 Nimbus
               </span>
@@ -180,15 +197,22 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
           </Link>
           {location === "/today" ? (
             <div className="hidden min-w-0 sm:block">
-              <p className="truncate text-lg font-black leading-tight">{greeting}, {user?.firstName || user?.email?.split("@")[0] || "there"}.</p>
+              <p className="truncate text-lg font-black leading-tight">
+                {greeting},{" "}
+                {user?.firstName || user?.email?.split("@")[0] || "there"}.
+              </p>
               <p className="mt-0.5 flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
                 <span>{stats?.streakDays ?? 0} Momentum days</span>
                 <span aria-hidden="true">/</span>
-                <span>Tier {stats?.tier ?? 1}, {stats?.tierProgress ?? 0}/100 NP</span>
+                <span>
+                  Tier {stats?.tier ?? 1}, {stats?.tierProgress ?? 0}/100 NP
+                </span>
               </p>
             </div>
           ) : (
-            <h1 className="truncate text-base font-black sm:text-lg">{pageTitles[location] ?? "Nimbus"}</h1>
+            <h1 className="truncate text-base font-black sm:text-lg">
+              {pageTitles[location] ?? "Nimbus"}
+            </h1>
           )}
         </div>
 
@@ -241,7 +265,11 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
             className="relative flex h-10 w-10 touch-manipulation items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:bg-muted hover:text-foreground sm:h-9 sm:w-9"
           >
             <Gift className="h-4 w-4" />
-            {(rewards?.unopenedChestCount ?? 0) > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-black text-secondary-foreground">{rewards?.unopenedChestCount}</span>}
+            {(rewards?.unopenedChestCount ?? 0) > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-black text-secondary-foreground">
+                {rewards?.unopenedChestCount}
+              </span>
+            )}
           </Link>
 
           <div className="relative" ref={notificationsRef}>
@@ -329,7 +357,9 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
             >
               <ProfilePhoto
                 frameId={rewards?.equipped.frame}
-                profileImageUrl={rewards?.profileImageUrl ?? user?.profileImageUrl}
+                profileImageUrl={
+                  rewards?.profileImageUrl ?? user?.profileImageUrl
+                }
                 name={user?.firstName ?? user?.email ?? "Account"}
                 className="w-9"
               />
@@ -354,20 +384,40 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                           {user.email}
                         </p>
                       )}
-                      {equippedTitle && <p className="mt-1 truncate text-[10px] font-black uppercase text-primary">{equippedTitle}</p>}
+                      {equippedTitle && (
+                        <p className="mt-1 truncate text-[10px] font-black uppercase text-primary">
+                          {equippedTitle}
+                        </p>
+                      )}
                       {stats && (
                         <div className="mt-2 rounded-lg bg-primary/10 px-2 py-1.5 text-[11px] font-bold text-primary">
-                          <div className="flex items-center justify-between"><span>Tier {stats.tier}</span><span>{100 - stats.tierProgress} NP to next</span></div>
-                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-primary/15"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${stats.tierProgress}%` }} /></div>
+                          <div className="flex items-center justify-between">
+                            <span>Tier {stats.tier}</span>
+                            <span>{100 - stats.tierProgress} NP to next</span>
+                          </div>
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-primary/15">
+                            <div
+                              className="h-full rounded-full bg-primary transition-[width]"
+                              style={{ width: `${stats.tierProgress}%` }}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
                   )}
-                  <Link href="/profile" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  <Link
+                    href="/profile"
+                    onClick={() => setAccountOpen(false)}
+                    className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
                     <UserRound className="h-3.5 w-3.5" />
                     Profile
                   </Link>
-                  <Link href="/settings" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                  <Link
+                    href="/settings"
+                    onClick={() => setAccountOpen(false)}
+                    className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
                     <Settings2 className="h-3.5 w-3.5" /> Settings
                   </Link>
                   <div className="border-t px-2 py-2">
@@ -410,7 +460,10 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                       onClick={() => {
                         setAccountOpen(false);
                         sessionStorage.removeItem("nimbus-tutorial-minimized");
-                        void updatePreferences({ tutorialCompleted: false, tutorialStep: 0 });
+                        void updatePreferences({
+                          tutorialCompleted: false,
+                          tutorialStep: 0,
+                        });
                       }}
                       className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
@@ -419,15 +472,29 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                   </div>
                   {preferences.advancedFeaturesEnabled && (
                     <div className="border-t py-1">
-                      <Link href="/projects" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+                      <Link
+                        href="/projects"
+                        onClick={() => setAccountOpen(false)}
+                        className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
                         <FolderKanban className="h-3.5 w-3.5" /> Projects
                       </Link>
-                      <Link href="/analytics" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
+                      <Link
+                        href="/analytics"
+                        onClick={() => setAccountOpen(false)}
+                        className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
                         <LineChart className="h-3.5 w-3.5" /> Insights
                       </Link>
-                      {preferences.socialEnabled && <Link href="/social" onClick={() => setAccountOpen(false)} className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
-                        <Users className="h-3.5 w-3.5" /> Social
-                      </Link>}
+                      {preferences.socialEnabled && (
+                        <Link
+                          href="/social"
+                          onClick={() => setAccountOpen(false)}
+                          className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                        >
+                          <Users className="h-3.5 w-3.5" /> Social
+                        </Link>
+                      )}
                     </div>
                   )}
                   {isAuthenticated ? (

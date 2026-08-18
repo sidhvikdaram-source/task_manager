@@ -8,6 +8,7 @@ import {
   FolderKanban,
   GraduationCap,
   ListChecks,
+  Rows3,
   Palette,
   Settings2,
   Timer,
@@ -15,7 +16,12 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import {
+  AnimatePresence,
+  LayoutGroup,
+  motion,
+  useReducedMotion,
+} from "framer-motion";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
 import { themes, useTheme, type ThemeId } from "@/theme";
@@ -29,6 +35,7 @@ const primary = [
 ] as const;
 
 const moreLinks = [
+  { href: "/tasks", label: "Task workspace", icon: Rows3 },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/social", label: "Social", icon: Users },
   { href: "/analytics", label: "Insights", icon: BarChart3 },
@@ -60,46 +67,55 @@ export function MobileBottomNav() {
         className="mobile-solid-surface fixed inset-x-0 bottom-0 z-[60] border-t border-border/80 bg-background/95 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <LayoutGroup id="velocity-mobile-navigation">
-        <div className="mx-auto grid h-16 max-w-lg grid-cols-5 px-2">
-          {primary.map((item) => {
-            const Icon = item.icon;
-            const active = location === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-label={item.label}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "relative flex h-16 w-full touch-manipulation select-none items-center justify-center text-muted-foreground transition-colors",
-                  active && "text-primary",
-                )}
-              >
-                {active && (
-                  <motion.span
-                    layoutId="mobile-nav-active"
-                    className="absolute top-1 h-1 w-7 rounded-full bg-primary"
-                    transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 480, damping: 38, mass: 0.65 }}
-                  />
-                )}
-                <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
-                <span className="sr-only">{item.label}</span>
-              </Link>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => setMoreOpen(true)}
-            aria-label="More navigation"
-            aria-expanded={moreOpen}
-            className={cn(
-              "relative flex h-16 touch-manipulation items-center justify-center text-muted-foreground",
-              moreOpen && "text-primary",
-            )}
-          >
-            <Ellipsis className="h-5 w-5" />
-          </button>
-        </div>
+          <div className="mx-auto grid h-16 max-w-lg grid-cols-5 px-2">
+            {primary.map((item) => {
+              const Icon = item.icon;
+              const active = location === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-label={item.label}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "relative flex h-16 w-full touch-manipulation select-none items-center justify-center text-muted-foreground transition-colors",
+                    active && "text-primary",
+                  )}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="mobile-nav-active"
+                      className="absolute top-1 h-1 w-7 rounded-full bg-primary"
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : {
+                              type: "spring",
+                              stiffness: 480,
+                              damping: 38,
+                              mass: 0.65,
+                            }
+                      }
+                    />
+                  )}
+                  <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
+                  <span className="sr-only">{item.label}</span>
+                </Link>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setMoreOpen(true)}
+              aria-label="More navigation"
+              aria-expanded={moreOpen}
+              className={cn(
+                "relative flex h-16 touch-manipulation items-center justify-center text-muted-foreground",
+                moreOpen && "text-primary",
+              )}
+            >
+              <Ellipsis className="h-5 w-5" />
+            </button>
+          </div>
         </LayoutGroup>
       </nav>
 
@@ -139,10 +155,28 @@ export function MobileBottomNav() {
                 {moreLinks.map((item) => {
                   const Icon = item.icon;
                   const locked =
-                    item.href !== "/profile" && item.href !== "/settings" &&
+                    item.href !== "/profile" &&
+                    item.href !== "/settings" &&
                     !preferences.advancedFeaturesEnabled;
                   if (item.href === "/social" && !preferences.socialEnabled) {
-                    return <Link key={item.href} href="/settings" onClick={() => setMoreOpen(false)} className="flex min-h-14 w-full touch-manipulation items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted"><Users className="h-4 w-4 text-muted-foreground" /><span><span className="block text-sm font-bold">Social</span><span className="block text-[10px] text-muted-foreground">Turn on in Settings</span></span></Link>;
+                    return (
+                      <Link
+                        key={item.href}
+                        href="/settings"
+                        onClick={() => setMoreOpen(false)}
+                        className="flex min-h-14 w-full touch-manipulation items-center gap-3 rounded-lg border p-3 text-left hover:bg-muted"
+                      >
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span>
+                          <span className="block text-sm font-bold">
+                            Social
+                          </span>
+                          <span className="block text-[10px] text-muted-foreground">
+                            Turn on in Settings
+                          </span>
+                        </span>
+                      </Link>
+                    );
                   }
                   return locked ? (
                     <button

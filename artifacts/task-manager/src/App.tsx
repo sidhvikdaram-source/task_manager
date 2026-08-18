@@ -1,5 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { Link, Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import {
+  Link,
+  Switch,
+  Route,
+  Router as WouterRouter,
+  useLocation,
+} from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +20,7 @@ import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Today = lazy(() => import("@/pages/Today"));
+const Tasks = lazy(() => import("@/pages/Tasks"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
 const FocusArena = lazy(() => import("@/pages/FocusArena"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
@@ -31,7 +38,9 @@ const LandingPage = lazy(() =>
   })),
 );
 const LegalPage = lazy(() =>
-  import("@/components/LegalPage").then((module) => ({ default: module.LegalPage })),
+  import("@/components/LegalPage").then((module) => ({
+    default: module.LegalPage,
+  })),
 );
 
 const queryClient = new QueryClient({
@@ -59,11 +68,25 @@ function LoginScreen() {
   const appUrl = window.location.origin + (import.meta.env.BASE_URL ?? "/");
 
   async function offerCredentialSave() {
-    type PasswordCredentialConstructor = new (data: { id: string; password: string; name?: string }) => Credential;
-    const PasswordCredentialApi = (window as typeof window & { PasswordCredential?: PasswordCredentialConstructor }).PasswordCredential;
+    type PasswordCredentialConstructor = new (data: {
+      id: string;
+      password: string;
+      name?: string;
+    }) => Credential;
+    const PasswordCredentialApi = (
+      window as typeof window & {
+        PasswordCredential?: PasswordCredentialConstructor;
+      }
+    ).PasswordCredential;
     if (!PasswordCredentialApi || !navigator.credentials?.store) return;
     try {
-      await navigator.credentials.store(new PasswordCredentialApi({ id: email, password, name: firstName || email }));
+      await navigator.credentials.store(
+        new PasswordCredentialApi({
+          id: email,
+          password,
+          name: firstName || email,
+        }),
+      );
     } catch {
       // Password managers may decline silently; the semantic form still offers native saving.
     }
@@ -150,7 +173,11 @@ function LoginScreen() {
               </button>
             </div>
 
-            <form onSubmit={submitLocalAuth} autoComplete="on" className="space-y-3">
+            <form
+              onSubmit={submitLocalAuth}
+              autoComplete="on"
+              className="space-y-3"
+            >
               {mode === "register" && (
                 <label className="flex items-center gap-3 rounded-2xl border border-border bg-background px-3 py-2.5">
                   <User className="h-4 w-4 text-muted-foreground" />
@@ -235,7 +262,11 @@ function LoginScreen() {
                 setIsSubmitting(true);
                 void login()
                   .catch((error) => {
-                    setAuthError(error instanceof Error ? error.message : "Google sign-in failed.");
+                    setAuthError(
+                      error instanceof Error
+                        ? error.message
+                        : "Google sign-in failed.",
+                    );
                   })
                   .finally(() => setIsSubmitting(false));
               }}
@@ -303,8 +334,15 @@ function SocialRoute() {
     <div className="bento-card mx-auto max-w-xl p-6 text-center">
       <Users className="mx-auto h-7 w-7 text-primary" />
       <h1 className="mt-3 text-xl font-black">Social is optional</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Turn it on when you want friends, messages, and shared challenges.</p>
-      <Link href="/settings" className="mt-5 inline-flex min-h-11 touch-manipulation items-center rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Open settings</Link>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Turn it on when you want friends, messages, and shared challenges.
+      </p>
+      <Link
+        href="/settings"
+        className="mt-5 inline-flex min-h-11 touch-manipulation items-center rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground"
+      >
+        Open settings
+      </Link>
     </div>
   );
 }
@@ -318,7 +356,13 @@ function PageLoadingSkeleton() {
         <Skeleton className="mt-3 h-3 w-72 max-w-full" />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        {[0, 1].map((item) => <div key={item} className="bento-card space-y-3 p-5"><Skeleton className="h-4 w-32" /><Skeleton className="h-16 rounded-lg" /><Skeleton className="h-16 rounded-lg" /></div>)}
+        {[0, 1].map((item) => (
+          <div key={item} className="bento-card space-y-3 p-5">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-16 rounded-lg" />
+            <Skeleton className="h-16 rounded-lg" />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -333,24 +377,25 @@ function AnimatedRoutes() {
 
   return (
     <div className="app-page min-h-full">
-        <PageErrorBoundary>
-          <Suspense fallback={<PageLoadingSkeleton />}>
-            <Switch>
-              <Route path="/today" component={Today} />
-              <Route path="/calendar" component={Calendar} />
-              <Route path="/workspace" component={Workspace} />
-              <Route path="/school" component={SchoolPlanner} />
-              <Route path="/projects" component={Projects} />
-              <Route path="/review" component={WeeklyReview} />
-              <Route path="/focus" component={FocusArena} />
-              <Route path="/social" component={SocialRoute} />
-              <Route path="/analytics" component={Analytics} />
-              <Route path="/profile" component={Profile} />
-              <Route path="/settings" component={Settings} />
-              <Route component={NotFound} />
-            </Switch>
-          </Suspense>
-        </PageErrorBoundary>
+      <PageErrorBoundary>
+        <Suspense fallback={<PageLoadingSkeleton />}>
+          <Switch>
+            <Route path="/today" component={Today} />
+            <Route path="/tasks" component={Tasks} />
+            <Route path="/calendar" component={Calendar} />
+            <Route path="/workspace" component={Workspace} />
+            <Route path="/school" component={SchoolPlanner} />
+            <Route path="/projects" component={Projects} />
+            <Route path="/review" component={WeeklyReview} />
+            <Route path="/focus" component={FocusArena} />
+            <Route path="/social" component={SocialRoute} />
+            <Route path="/analytics" component={Analytics} />
+            <Route path="/profile" component={Profile} />
+            <Route path="/settings" component={Settings} />
+            <Route component={NotFound} />
+          </Switch>
+        </Suspense>
+      </PageErrorBoundary>
     </div>
   );
 }

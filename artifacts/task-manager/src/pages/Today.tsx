@@ -26,7 +26,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DailyChecklist } from "@/components/DailyChecklist";
 import { QuickCapture } from "@/components/QuickCapture";
+import { TaskInlineNotes } from "@/components/TaskInlineNotes";
 import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
+import { subjectColor, useSubjects } from "@/hooks/useSubjects";
 import { localDateKey } from "@/lib/localDate";
 
 const TaskDetailsModal = lazy(() =>
@@ -78,6 +80,7 @@ export default function Today() {
     { sortBy: "dueDate" },
     { query: { queryKey: getListTasksQueryKey({ sortBy: "dueDate" }) } },
   );
+  const { data: subjects = [] } = useSubjects();
   const [view, setView] = useState<View>("today");
   const [enabledViews, setEnabledViews] = useState<OptionalView[]>(() => {
     try {
@@ -164,7 +167,6 @@ export default function Today() {
     });
   }, [highlighted, tasks, today, view]);
 
-
   async function recommendNext() {
     setRecommendationLoading(true);
     try {
@@ -204,7 +206,7 @@ export default function Today() {
         <QuickCapture onCreated={() => void refresh()} />
       </section>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.65fr)]">
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section data-tour="today-list" className="bento-card overflow-hidden">
           <header className="border-b px-4 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -215,7 +217,10 @@ export default function Today() {
                   {visibleTasks.length}
                 </span>
               </div>
-              <div data-tour="recommend-next" className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <div
+                data-tour="recommend-next"
+                className="flex w-full flex-wrap items-center gap-2 sm:w-auto"
+              >
                 <select
                   aria-label="Available time"
                   value={availableMinutes}
@@ -270,38 +275,51 @@ export default function Today() {
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                   <AnimatePresence>
-                  {viewsOpen && (
-                    <motion.div initial={reduceMotion ? false : { opacity: 0, y: -5, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.98 }} transition={{ duration: 0.14 }} className="absolute right-0 top-10 z-30 w-52 rounded-lg border bg-popover p-2 shadow-xl">
-                      <p className="px-2 pb-1 text-[10px] font-black uppercase text-muted-foreground">
-                        Add task views
-                      </p>
-                      {optionalViews.map((item) => {
-                        const enabled = enabledViews.includes(item.id);
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setEnabledViews((current) =>
-                                enabled
-                                  ? current.filter((value) => value !== item.id)
-                                  : [...current, item.id],
-                              );
-                              if (enabled && view === item.id) setView("today");
-                            }}
-                            className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs font-semibold hover:bg-muted"
-                          >
-                            <span
-                              className={`flex h-4 w-4 items-center justify-center rounded border ${enabled ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}
+                    {viewsOpen && (
+                      <motion.div
+                        initial={
+                          reduceMotion
+                            ? false
+                            : { opacity: 0, y: -5, scale: 0.98 }
+                        }
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -3, scale: 0.98 }}
+                        transition={{ duration: 0.14 }}
+                        className="absolute right-0 top-10 z-30 w-52 rounded-lg border bg-popover p-2 shadow-xl"
+                      >
+                        <p className="px-2 pb-1 text-[10px] font-black uppercase text-muted-foreground">
+                          Add task views
+                        </p>
+                        {optionalViews.map((item) => {
+                          const enabled = enabledViews.includes(item.id);
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                setEnabledViews((current) =>
+                                  enabled
+                                    ? current.filter(
+                                        (value) => value !== item.id,
+                                      )
+                                    : [...current, item.id],
+                                );
+                                if (enabled && view === item.id)
+                                  setView("today");
+                              }}
+                              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs font-semibold hover:bg-muted"
                             >
-                              {enabled && <Check className="h-3 w-3" />}
-                            </span>
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </motion.div>
-                  )}
+                              <span
+                                className={`flex h-4 w-4 items-center justify-center rounded border ${enabled ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}
+                              >
+                                {enabled && <Check className="h-3 w-3" />}
+                              </span>
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </div>
               </div>
@@ -316,7 +334,17 @@ export default function Today() {
                     whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                     className={`relative shrink-0 rounded-md px-2.5 py-1.5 text-xs font-bold ${view === item ? "text-foreground" : "text-muted-foreground"}`}
                   >
-                    {view === item && <motion.span layoutId="today-view-active" className="absolute inset-0 rounded-md bg-background shadow-sm" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                    {view === item && (
+                      <motion.span
+                        layoutId="today-view-active"
+                        className="absolute inset-0 rounded-md bg-background shadow-sm"
+                        transition={{
+                          type: "spring",
+                          stiffness: 420,
+                          damping: 34,
+                        }}
+                      />
+                    )}
                     <span className="relative">{viewLabel(item)}</span>
                   </motion.button>
                 ),
@@ -371,71 +399,133 @@ export default function Today() {
                     initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: 10 }}
-                    whileHover={reduceMotion ? undefined : { x: 2 }}
                     onClick={() => setSelectedTask(task.id)}
-                    className={`flex cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/35 ${isHighlighted ? "bg-primary/10 ring-2 ring-inset ring-primary/45" : ""}`}
+                    className={`cursor-pointer px-4 py-3.5 transition-colors hover:bg-muted/35 ${isHighlighted ? "bg-primary/10 ring-2 ring-inset ring-primary/45" : ""}`}
                   >
-                    <button
-                      type="button"
-                      disabled={isComplete || taskCompletion.isPending(task.id)}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        complete(task, event.currentTarget);
-                      }}
-                      aria-label={
-                        isComplete ? "Task completed" : "Complete task"
-                      }
-                      aria-busy={taskCompletion.isPending(task.id)}
-                      className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-70"
-                    >
-                      <AnimatePresence mode="wait" initial={false}>
-                        <motion.span key={taskCompletion.isPending(task.id) ? "pending" : isComplete ? "complete" : "open"} initial={reduceMotion ? false : { opacity: 0, scale: 0.72, rotate: -10 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} exit={reduceMotion ? undefined : { opacity: 0, scale: 0.72 }} transition={{ duration: 0.14 }}>
-                          {taskCompletion.isPending(task.id) ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : isComplete ? <CheckCircle2 className="h-6 w-6 text-primary" /> : <Circle className="h-6 w-6" />}
-                        </motion.span>
-                      </AnimatePresence>
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate text-sm font-bold ${isComplete ? "text-muted-foreground line-through" : ""}`}
+                    <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        disabled={
+                          isComplete || taskCompletion.isPending(task.id)
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          complete(task, event.currentTarget);
+                        }}
+                        aria-label={
+                          isComplete ? "Task completed" : "Complete task"
+                        }
+                        aria-busy={taskCompletion.isPending(task.id)}
+                        className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:opacity-70"
                       >
-                        {task.title}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
-                        {date ? (
-                          <span
-                            className={`inline-flex items-center gap-1 ${date < today && !isComplete ? "text-destructive" : ""}`}
+                        <AnimatePresence mode="wait" initial={false}>
+                          <motion.span
+                            key={
+                              taskCompletion.isPending(task.id)
+                                ? "pending"
+                                : isComplete
+                                  ? "complete"
+                                  : "open"
+                            }
+                            initial={
+                              reduceMotion
+                                ? false
+                                : { opacity: 0, scale: 0.72, rotate: -10 }
+                            }
+                            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                            exit={
+                              reduceMotion
+                                ? undefined
+                                : { opacity: 0, scale: 0.72 }
+                            }
+                            transition={{ duration: 0.14 }}
                           >
-                            <CalendarClock className="h-3 w-3" />
-                            {date < today && !isComplete
-                              ? "Overdue - "
-                              : date === today
-                                ? "Today - "
-                                : ""}
-                            {new Date(`${date}T12:00:00`).toLocaleDateString()}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1">
-                            <Clock3 className="h-3 w-3" /> No due date
-                          </span>
-                        )}
-                        {task.subject && <span>{task.subject}</span>}
-                        {task.priority !== "medium" && (
-                          <span className="capitalize">{task.priority}</span>
-                        )}
+                            {taskCompletion.isPending(task.id) ? (
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                            ) : isComplete ? (
+                              <CheckCircle2 className="h-6 w-6 text-primary" />
+                            ) : (
+                              <Circle className="h-6 w-6" />
+                            )}
+                          </motion.span>
+                        </AnimatePresence>
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`truncate text-sm font-bold ${isComplete ? "text-muted-foreground line-through" : ""}`}
+                          style={{
+                            color: isComplete
+                              ? undefined
+                              : subjectColor(task.subject, subjects),
+                          }}
+                        >
+                          {task.title}
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+                          {date ? (
+                            <span
+                              className={`inline-flex items-center gap-1 ${date < today && !isComplete ? "text-destructive" : ""}`}
+                            >
+                              <CalendarClock className="h-3 w-3" />
+                              {date < today && !isComplete
+                                ? "Overdue - "
+                                : date === today
+                                  ? "Today - "
+                                  : ""}
+                              {new Date(
+                                `${date}T12:00:00`,
+                              ).toLocaleDateString()}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1">
+                              <Clock3 className="h-3 w-3" /> No due date
+                            </span>
+                          )}
+                          {task.subject && (
+                            <span
+                              style={{
+                                color: subjectColor(task.subject, subjects),
+                              }}
+                            >
+                              {task.subject}
+                            </span>
+                          )}
+                          {task.priority !== "medium" && (
+                            <span className="capitalize">{task.priority}</span>
+                          )}
+                        </div>
+                        <TaskInlineNotes
+                          taskId={task.id}
+                          taskTitle={task.title}
+                          notes={task.notes}
+                        />
                       </div>
+                      {isHighlighted && (
+                        <span className="inline-flex items-center gap-1 text-xs font-black text-primary">
+                          <Check className="h-3.5 w-3.5" /> Added
+                        </span>
+                      )}
                     </div>
-                    {isHighlighted && (
-                      <span className="inline-flex items-center gap-1 text-xs font-black text-primary">
-                        <Check className="h-3.5 w-3.5" /> Added
-                      </span>
-                    )}
                   </motion.div>
                 );
               })}
             </AnimatePresence>
-            {isLoading && [0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 px-4 py-3.5"><Skeleton className="h-7 w-7 rounded-full" /><div className="flex-1 space-y-2"><Skeleton className="h-3.5 w-2/5" /><Skeleton className="h-3 w-1/4" /></div></div>)}
+            {isLoading &&
+              [0, 1, 2].map((item) => (
+                <div key={item} className="flex items-center gap-3 px-4 py-3.5">
+                  <Skeleton className="h-7 w-7 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3.5 w-2/5" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </div>
+                </div>
+              ))}
             {!isLoading && visibleTasks.length === 0 && (
-              <motion.div initial={reduceMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="px-5 py-12 text-center">
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="px-5 py-12 text-center"
+              >
                 <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
@@ -452,15 +542,9 @@ export default function Today() {
           </div>
         </section>
 
-        <section className="bento-card overflow-hidden">
-          <header className="border-b px-4 py-3">
-            <h2 className="font-black">Habits</h2>
-            <p className="text-xs text-muted-foreground">
-              Small routines for today.
-            </p>
-          </header>
+        <aside className="self-start lg:sticky lg:top-5" aria-label="Habits">
           <DailyChecklist />
-        </section>
+        </aside>
       </div>
 
       {selectedTask !== null && (
