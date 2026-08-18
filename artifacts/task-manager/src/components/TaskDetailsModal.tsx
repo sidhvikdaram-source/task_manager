@@ -47,6 +47,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
 import { invalidateCanvasData } from "@/hooks/useCanvasSync";
+import { subjectColor, useSubjects } from "@/hooks/useSubjects";
 
 interface TaskLink {
   url: string;
@@ -82,6 +83,7 @@ export function TaskDetailsModal({
       },
     });
   const { data: projects } = useListProjects();
+  const { data: subjects = [] } = useSubjects();
 
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
@@ -96,10 +98,16 @@ export function TaskDetailsModal({
       queryKey: getGetDashboardOverviewQueryKey(),
     });
     queryClient.invalidateQueries({ queryKey: getGetUserStatsQueryKey() });
+    window.dispatchEvent(new Event("nimbus:workspace-changed"));
   };
 
   const handleUpdate = (field: string, value: unknown) => {
-    if (field === "status" && value === "completed" && task && task.status !== "completed") {
+    if (
+      field === "status" &&
+      value === "completed" &&
+      task &&
+      task.status !== "completed"
+    ) {
       void taskCompletion.complete(task, null, {
         onSuccess: () =>
           queryClient.invalidateQueries({
@@ -263,7 +271,9 @@ export function TaskDetailsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Task Details</DialogTitle>
+          <DialogTitle style={{ color: subjectColor(task?.subject, subjects) }}>
+            Task details
+          </DialogTitle>
         </DialogHeader>
 
         {isLoadingTask ? (
@@ -330,6 +340,63 @@ export function TaskDetailsModal({
               />
             </div>
 
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  Subject
+                </label>
+                <Select
+                  value={task.subject || "none"}
+                  onValueChange={(value) =>
+                    handleUpdate("subject", value === "none" ? null : value)
+                  }
+                >
+                  <SelectTrigger
+                    style={{
+                      color: subjectColor(task.subject, subjects),
+                      borderColor: subjectColor(task.subject, subjects),
+                    }}
+                  >
+                    <SelectValue placeholder="Inbox / no subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Inbox / no subject</SelectItem>
+                    {subjects.map((subject) => (
+                      <SelectItem key={subject.id} value={subject.name}>
+                        <span className="flex items-center gap-2">
+                          <span
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: subject.color }}
+                          />
+                          {subject.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  Work type
+                </label>
+                <Select
+                  value={task.taskKind || "assignment"}
+                  onValueChange={(value) => handleUpdate("taskKind", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="assignment">Assignment</SelectItem>
+                    <SelectItem value="test">Test</SelectItem>
+                    <SelectItem value="quiz">Quiz</SelectItem>
+                    <SelectItem value="project">Project</SelectItem>
+                    <SelectItem value="note">Other task</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
@@ -358,7 +425,12 @@ export function TaskDetailsModal({
                   value={task.status}
                   onValueChange={(val) => handleUpdate("status", val)}
                 >
-                  <SelectTrigger disabled={canvasControlsCompletion || taskCompletion.isPending(task.id)}>
+                  <SelectTrigger
+                    disabled={
+                      canvasControlsCompletion ||
+                      taskCompletion.isPending(task.id)
+                    }
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

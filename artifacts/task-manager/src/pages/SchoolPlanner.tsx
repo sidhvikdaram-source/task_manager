@@ -6,6 +6,8 @@ import {
   Clock3,
   FileText,
   FolderKanban,
+  Check,
+  Palette,
   Pencil,
   Settings2,
   Trash2,
@@ -17,6 +19,7 @@ import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 import { CanvasSyncPanel } from "@/components/CanvasSyncPanel";
 import { QuickCapture } from "@/components/QuickCapture";
 import { useExperience } from "@/experience";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Subject = { id: number; name: string; color: string };
 type SchoolTask = {
@@ -42,9 +45,34 @@ type SchoolProject = {
 };
 
 const subjectKey = (value: string | null | undefined) =>
-  (value ?? "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+const subjectPalette = [
+  "#2563eb",
+  "#0ea5e9",
+  "#06b6d4",
+  "#14b8a6",
+  "#059669",
+  "#16a34a",
+  "#65a30d",
+  "#ca8a04",
+  "#ea580c",
+  "#dc2626",
+  "#e11d48",
+  "#db2777",
+  "#c026d3",
+  "#9333ea",
+  "#7c3aed",
+  "#4f46e5",
+  "#475569",
+  "#78716c",
+];
 
 export default function SchoolPlanner() {
+  const queryClient = useQueryClient();
   const { preferences } = useExperience();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [tasks, setTasks] = useState<SchoolTask[]>([]);
@@ -53,6 +81,8 @@ export default function SchoolPlanner() {
   const [selectedTask, setSelectedTask] = useState<number | null>(null);
   const [addingSubject, setAddingSubject] = useState(false);
   const [newSubject, setNewSubject] = useState("");
+  const [newSubjectColor, setNewSubjectColor] = useState(subjectPalette[0]);
+  const [colorSubjectId, setColorSubjectId] = useState<number | null>(null);
   const load = async () => {
     const [s, t, p] = await Promise.all([
       fetch("/api/subjects", { credentials: "include" }),
@@ -69,7 +99,8 @@ export default function SchoolPlanner() {
   useEffect(() => {
     const refresh = () => void load();
     window.addEventListener("nimbus:workspace-changed", refresh);
-    return () => window.removeEventListener("nimbus:workspace-changed", refresh);
+    return () =>
+      window.removeEventListener("nimbus:workspace-changed", refresh);
   }, []);
   useEffect(() => {
     if (
@@ -79,7 +110,10 @@ export default function SchoolPlanner() {
       setSelectedSubject(subjects[0].name);
   }, [subjects]);
   const subjectTasks = useMemo(
-    () => tasks.filter((task) => subjectKey(task.subject) === subjectKey(selectedSubject)),
+    () =>
+      tasks.filter(
+        (task) => subjectKey(task.subject) === subjectKey(selectedSubject),
+      ),
     [tasks, selectedSubject],
   );
   const active = subjectTasks.filter((task) => task.status !== "completed");
@@ -94,12 +128,14 @@ export default function SchoolPlanner() {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newSubject }),
+      body: JSON.stringify({ name: newSubject, color: newSubjectColor }),
     });
     if (response.ok) {
       setNewSubject("");
+      setNewSubjectColor(subjectPalette[0]);
       setAddingSubject(false);
       await load();
+      await queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
     } else toast.error("That subject could not be added");
   };
   const renameSubject = async (subject: Subject) => {
@@ -114,6 +150,7 @@ export default function SchoolPlanner() {
     if (response.ok) {
       if (selectedSubject === subject.name) setSelectedSubject(name);
       await load();
+      await queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
       toast.success("Subject renamed");
     } else toast.error("Subject could not be renamed");
   };
@@ -126,14 +163,35 @@ export default function SchoolPlanner() {
     });
     if (response.ok) {
       await load();
+      await queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
       toast.success("Subject removed");
     } else toast.error("Subject could not be removed");
+  };
+  const changeSubjectColor = async (subject: Subject, color: string) => {
+    const response = await fetch(`/api/subjects/${subject.id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ color }),
+    });
+    if (!response.ok) {
+      toast.error("Subject color could not be changed");
+      return;
+    }
+    setColorSubjectId(null);
+    await load();
+    await queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
+    window.dispatchEvent(new Event("nimbus:workspace-changed"));
+    toast.success(`${subject.name} color updated`);
   };
   const subjectProjects = projects.filter(
     (project) =>
       subjectKey(project.subject) === subjectKey(selectedSubject) &&
       !["completed"].includes(project.status),
   );
+  const selectedSubjectColor = subjects.find(
+    (subject) => subjectKey(subject.name) === subjectKey(selectedSubject),
+  )?.color;
   return (
     <div className="page-stack space-y-5">
       <section data-tour="academics" className="bento-card p-5 sm:p-6">
@@ -150,7 +208,10 @@ export default function SchoolPlanner() {
           </div>
           <div className="flex flex-wrap gap-2">
             {preferences.advancedFeaturesEnabled && (
-              <Link href="/projects" className="flex min-h-11 touch-manipulation items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold">
+              <Link
+                href="/projects"
+                className="flex min-h-11 touch-manipulation items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold"
+              >
                 <FolderKanban className="h-4 w-4" /> Projects
               </Link>
             )}
@@ -171,6 +232,15 @@ export default function SchoolPlanner() {
             key={subject.id}
             onClick={() => setSelectedSubject(subject.name)}
             className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold ${selectedSubject === subject.name ? "border-primary bg-primary text-primary-foreground" : "bg-card"}`}
+            style={
+              selectedSubject === subject.name
+                ? {
+                    backgroundColor: subject.color,
+                    borderColor: subject.color,
+                    color: "white",
+                  }
+                : { color: subject.color }
+            }
           >
             <span
               className="h-2.5 w-2.5 rounded-full"
@@ -193,7 +263,12 @@ export default function SchoolPlanner() {
         <section className="bento-card overflow-hidden">
           <header className="flex items-center justify-between border-b p-4">
             <div>
-              <h2 className="text-xl font-black">{selectedSubject}</h2>
+              <h2
+                className="text-xl font-black"
+                style={{ color: selectedSubjectColor }}
+              >
+                {selectedSubject}
+              </h2>
               <p className="text-xs text-muted-foreground">
                 {active.length} active · {completed.length} recently completed
               </p>
@@ -222,7 +297,12 @@ export default function SchoolPlanner() {
                     <span className="text-[10px] font-black uppercase text-primary">
                       {task.taskKind}
                     </span>
-                    <h3 className="mt-1 font-black">{task.title}</h3>
+                    <h3
+                      className="mt-1 font-black"
+                      style={{ color: selectedSubjectColor }}
+                    >
+                      {task.title}
+                    </h3>
                   </div>
                   {task.taskKind === "test" || task.taskKind === "quiz" ? (
                     <CalendarDays className="h-4 w-4 text-secondary" />
@@ -343,30 +423,75 @@ export default function SchoolPlanner() {
             <h2 className="font-black">Customize subjects</h2>
             <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
               {subjects.map((subject) => (
-                <div
-                  key={subject.id}
-                  className="flex items-center gap-3 rounded-xl border p-3"
-                >
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ backgroundColor: subject.color }}
-                  />
-                  <span className="flex-1 font-bold">{subject.name}</span>
-                  <button
-                    title="Rename subject"
-                    onClick={() => void renameSubject(subject)}
-                    className="rounded-lg p-2 hover:bg-muted"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    title="Remove subject"
-                    onClick={() => void removeSubject(subject)}
-                    disabled={subject.name === "Other"}
-                    className="rounded-lg p-2 text-destructive hover:bg-destructive/10 disabled:opacity-30"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                <div key={subject.id} className="rounded-xl border p-3">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      title={`Change ${subject.name} color`}
+                      aria-label={`Change ${subject.name} color`}
+                      onClick={() =>
+                        setColorSubjectId((current) =>
+                          current === subject.id ? null : subject.id,
+                        )
+                      }
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border transition-transform hover:scale-105"
+                      style={{
+                        borderColor: subject.color,
+                        color: subject.color,
+                        backgroundColor: `${subject.color}18`,
+                      }}
+                    >
+                      <Palette className="h-4 w-4" />
+                    </button>
+                    <span
+                      className="flex-1 font-bold"
+                      style={{ color: subject.color }}
+                    >
+                      {subject.name}
+                    </span>
+                    <button
+                      title="Rename subject"
+                      onClick={() => void renameSubject(subject)}
+                      className="rounded-lg p-2 hover:bg-muted"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      title="Remove subject"
+                      onClick={() => void removeSubject(subject)}
+                      disabled={subject.name === "Other"}
+                      className="rounded-lg p-2 text-destructive hover:bg-destructive/10 disabled:opacity-30"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {colorSubjectId === subject.id && (
+                    <div className="mt-3 grid grid-cols-6 gap-2 border-t pt-3 sm:grid-cols-9">
+                      {subjectPalette.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          aria-label={`Use ${color} for ${subject.name}`}
+                          title={color}
+                          onClick={() =>
+                            void changeSubjectColor(subject, color)
+                          }
+                          className="flex aspect-square min-h-8 items-center justify-center rounded-lg border-2 transition-transform hover:scale-110"
+                          style={{
+                            backgroundColor: color,
+                            borderColor:
+                              subject.color === color
+                                ? "hsl(var(--foreground))"
+                                : "transparent",
+                          }}
+                        >
+                          {subject.color === color && (
+                            <Check className="h-4 w-4 text-white drop-shadow" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -385,6 +510,32 @@ export default function SchoolPlanner() {
               >
                 Add
               </button>
+            </div>
+            <div
+              className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-9"
+              aria-label="New subject color"
+            >
+              {subjectPalette.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`Use ${color} for new subject`}
+                  title={color}
+                  onClick={() => setNewSubjectColor(color)}
+                  className="flex aspect-square min-h-8 items-center justify-center rounded-lg border-2 transition-transform hover:scale-110"
+                  style={{
+                    backgroundColor: color,
+                    borderColor:
+                      newSubjectColor === color
+                        ? "hsl(var(--foreground))"
+                        : "transparent",
+                  }}
+                >
+                  {newSubjectColor === color && (
+                    <Check className="h-4 w-4 text-white drop-shadow" />
+                  )}
+                </button>
+              ))}
             </div>
             <div className="mt-4 flex justify-end">
               <button

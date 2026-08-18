@@ -4,6 +4,8 @@ import {
   CalendarClock,
   CheckCircle2,
   Circle,
+  ClipboardList,
+  FileCheck2,
   ListTodo,
   Loader2,
   Plus,
@@ -13,6 +15,7 @@ import {
 import {
   getListTasksQueryKey,
   useListTasks,
+  type Task,
 } from "@workspace/api-client-react";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
@@ -21,8 +24,41 @@ import { Button } from "@/components/ui/button";
 import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
 import { subjectColor, useSubjects } from "@/hooks/useSubjects";
 
+type SortMode = "dueDate" | "importance";
+
+const priorityRank: Record<Task["priority"], number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+function isTestTask(task: Task) {
+  return (
+    ["test", "quiz", "exam", "assessment"].includes(
+      String(task.taskKind ?? "").toLowerCase(),
+    ) || /\b(test|quiz|exam|midterm|final|assessment)\b/i.test(task.title)
+  );
+}
+
+function sortTasks(tasks: Task[], mode: SortMode) {
+  return [...tasks].sort((a, b) => {
+    const dueA = a.dueDate ?? a.calendarDate ?? "9999-12-31";
+    const dueB = b.dueDate ?? b.calendarDate ?? "9999-12-31";
+    if (mode === "importance") {
+      const priorityDifference =
+        priorityRank[a.priority] - priorityRank[b.priority];
+      if (priorityDifference !== 0) return priorityDifference;
+    }
+    const dueDifference = dueA.localeCompare(dueB);
+    if (dueDifference !== 0) return dueDifference;
+    return priorityRank[a.priority] - priorityRank[b.priority];
+  });
+}
+
 export default function Tasks() {
   const [status, setStatus] = useState<"active" | "completed">("active");
+  const [sortMode, setSortMode] = useState<SortMode>("dueDate");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const reduceMotion = useReducedMotion();
@@ -34,28 +70,146 @@ export default function Tasks() {
   const taskCompletion = useReliableTaskCompletion();
   const visible = useMemo(
     () =>
-      tasks.filter((task) =>
-        status === "completed"
-          ? task.status === "completed"
-          : task.status !== "completed",
+      sortTasks(
+        tasks.filter((task) =>
+          status === "completed"
+            ? task.status === "completed"
+            : task.status !== "completed",
+        ),
+        sortMode,
       ),
-    [status, tasks],
+    [sortMode, status, tasks],
   );
+  const tests = visible.filter(isTestTask);
+  const assignments = visible.filter((task) => !isTestTask(task));
+
+  function renderTask(task: Task, index: number) {
+    const color = subjectColor(task.subject, subjects);
+    const date = task.dueDate ?? task.calendarDate;
+    return (
+      <motion.article
+        layout
+        key={task.id}
+        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, delay: Math.min(index * 0.02, 0.1) }}
+        className="px-4 py-3.5 transition-colors hover:bg-muted/30"
+      >
+        <div className="flex items-start gap-3">
+          {status === "active" ? (
+            <button
+              type="button"
+              aria-label={`Complete ${task.title}`}
+              disabled={taskCompletion.isPending(task.id)}
+              className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-70"
+              onClick={(event) =>
+                void taskCompletion.complete(task, event.currentTarget)
+              }
+            >
+              {taskCompletion.isPending(task.id) ? (
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              ) : (
+                <Circle className="h-6 w-6" />
+              )}
+            </button>
+          ) : (
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+              <CheckCircle2 className="h-6 w-6 text-primary" />
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => setSelectedId(task.id)}
+              className="block w-full text-left"
+            >
+              <p
+                className="truncate font-bold"
+                style={{ color: status === "active" ? color : undefined }}
+              >
+                {task.title}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <CalendarClock className="h-3.5 w-3.5" />
+                  {date
+                    ? new Date(`${date}T12:00:00`).toLocaleDateString()
+                    : "No deadline"}
+                </span>
+                {task.subject && <span style={{ color }}>{task.subject}</span>}
+                {task.priority !== "medium" && (
+                  <span className="capitalize">{task.priority}</span>
+                )}
+                <span className="inline-flex items-center gap-1">
+                  <Zap className="h-3 w-3 fill-current" /> {task.vpValue} NP
+                </span>
+              </div>
+            </button>
+            <TaskInlineNotes
+              taskId={task.id}
+              taskTitle={task.title}
+              notes={task.notes}
+              compact
+            />
+          </div>
+        </div>
+      </motion.article>
+    );
+  }
+
+  function taskColumn(
+    title: string,
+    description: string,
+    columnTasks: Task[],
+    icon: typeof FileCheck2,
+  ) {
+    const Icon = icon;
+    return (
+      <section className="bento-card min-w-0 overflow-hidden">
+        <header className="flex items-center gap-3 border-b px-4 py-3.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="font-black">{title}</h2>
+              <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">
+                {columnTasks.length}
+              </span>
+            </div>
+            <p className="truncate text-xs text-muted-foreground">
+              {description}
+            </p>
+          </div>
+        </header>
+        <div className="divide-y divide-border/70">
+          {columnTasks.map(renderTask)}
+          {columnTasks.length === 0 && (
+            <p className="px-5 py-12 text-center text-sm text-muted-foreground">
+              No {status === "active" ? "active" : "completed"}{" "}
+              {title.toLowerCase()}.
+            </p>
+          )}
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <div className="page-stack space-y-5">
+    <div className="page-stack space-y-5 overflow-x-hidden">
       <section className="bento-card p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+          <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-xs font-black uppercase text-primary">
               <ListTodo className="h-4 w-4" /> Task workspace
             </div>
             <h1 className="tech-title mt-2 text-3xl sm:text-4xl">
-              Every task, one calm list.
+              Plan by deadline. Act by importance.
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Review details, keep working notes, and manage tasks beyond today
-              without crowding My Day.
+            <p className="mt-2 text-sm text-muted-foreground">
+              Tests stay separate from everyday assignments so both kinds of
+              work remain easy to scan.
             </p>
           </div>
           <Button
@@ -67,112 +221,48 @@ export default function Tasks() {
         </div>
       </section>
 
-      <section className="bento-card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border p-3">
-          <div className="flex rounded-lg bg-muted p-1">
-            {(["active", "completed"] as const).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setStatus(item)}
-                className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${status === item ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
-              >
-                {item === "active" ? "Active" : "Completed"}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-            <SlidersHorizontal className="h-4 w-4" /> {visible.length} tasks
-          </div>
+      <section className="bento-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex rounded-lg bg-muted p-1">
+          {(["active", "completed"] as const).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setStatus(item)}
+              className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${status === item ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
+            >
+              {item === "active" ? "Active" : "Completed"}
+            </button>
+          ))}
         </div>
-
-        <div className="divide-y divide-border/70">
-          {visible.map((task, index) => {
-            const color = subjectColor(task.subject, subjects);
-            return (
-              <motion.article
-                key={task.id}
-                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{
-                  duration: 0.18,
-                  delay: Math.min(index * 0.02, 0.12),
-                }}
-                className="px-4 py-3.5 transition-colors hover:bg-muted/30"
-              >
-                <div className="flex items-start gap-3">
-                  {status === "active" ? (
-                    <button
-                      type="button"
-                      aria-label={`Complete ${task.title}`}
-                      disabled={taskCompletion.isPending(task.id)}
-                      className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-70"
-                      onClick={(event) =>
-                        void taskCompletion.complete(task, event.currentTarget)
-                      }
-                    >
-                      {taskCompletion.isPending(task.id) ? (
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                      ) : (
-                        <Circle className="h-6 w-6" />
-                      )}
-                    </button>
-                  ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center">
-                      <CheckCircle2 className="h-6 w-6 text-primary" />
-                    </div>
-                  )}
-
-                  <div className="min-w-0 flex-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(task.id)}
-                      className="block w-full text-left"
-                    >
-                      <p
-                        className="truncate font-bold"
-                        style={{
-                          color: status === "active" ? color : undefined,
-                        }}
-                      >
-                        {task.title}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <CalendarClock className="h-3.5 w-3.5" />
-                          {task.dueDate
-                            ? `Due ${new Date(`${task.dueDate}T12:00:00`).toLocaleDateString()}`
-                            : "No deadline"}
-                        </span>
-                        {task.subject && (
-                          <span style={{ color }}>{task.subject}</span>
-                        )}
-                        <span className="inline-flex items-center gap-1">
-                          <Zap className="h-3 w-3 fill-current" />{" "}
-                          {task.vpValue} NP
-                        </span>
-                      </div>
-                    </button>
-                    <TaskInlineNotes
-                      taskId={task.id}
-                      taskTitle={task.title}
-                      notes={task.notes}
-                      compact
-                    />
-                  </div>
-                </div>
-              </motion.article>
-            );
-          })}
-          {visible.length === 0 && (
-            <p className="p-10 text-center text-sm text-muted-foreground">
-              {status === "active"
-                ? "Your task workspace is clear."
-                : "Completed tasks will appear here."}
-            </p>
-          )}
-        </div>
+        <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
+          <SlidersHorizontal className="h-4 w-4" />
+          Organize by
+          <select
+            aria-label="Organize tasks by"
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value as SortMode)}
+            className="h-9 rounded-lg border bg-background px-3 text-sm font-bold text-foreground outline-none focus:border-primary"
+          >
+            <option value="dueDate">Due date</option>
+            <option value="importance">Importance</option>
+          </select>
+        </label>
       </section>
+
+      <div className="grid grid-flow-dense items-start gap-5 xl:grid-cols-2">
+        {taskColumn(
+          "Tests & quizzes",
+          "Assessments, exams, and study checkpoints",
+          tests,
+          FileCheck2,
+        )}
+        {taskColumn(
+          "Assignments & tasks",
+          "Homework, projects, errands, and everyday work",
+          assignments,
+          ClipboardList,
+        )}
+      </div>
 
       <CreateTaskModal open={createOpen} onOpenChange={setCreateOpen} />
       {selectedId !== null && (
