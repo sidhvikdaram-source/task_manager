@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BatteryMedium, CalendarClock, Check, CheckCircle2, ChevronDown, Circle, ClipboardList, Clock3, FileCheck2, GripVertical, ListTodo, Loader2, Plus, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
+import { BatteryMedium, CalendarClock, Check, CheckCircle2, ChevronDown, Circle, ClipboardList, Clock3, FileCheck2, GraduationCap, GripVertical, House, ListTodo, Loader2, Plus, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
 import { getListTasksQueryKey, useListTasks, type Task } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -13,11 +13,15 @@ import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
 import { subjectColor, useSubjects } from "@/hooks/useSubjects";
 import { localDateKey } from "@/lib/localDate";
 
-type SortMode = "dueDate" | "importance";
+type SortMode = "manual" | "dueDate" | "importance";
 type View = "all" | "completed" | "today" | "overdue" | "week" | "high" | "no-date" | "canvas";
 type OptionalView = Exclude<View, "all" | "completed">;
-type Lane = "tests" | "assignments";
+type Lane = "tests" | "assignments" | "personal";
 type Recommendation = { recommendation: Task | null; reason: string };
+type WorkspaceTask = Task & {
+  sortOrder?: number;
+  workspaceContext?: "school" | "personal";
+};
 
 const priorityRank: Record<Task["priority"], number> = { critical: 0, high: 1, medium: 2, low: 3 };
 const optionalViews: Array<{ id: OptionalView; label: string }> = [
@@ -26,14 +30,18 @@ const optionalViews: Array<{ id: OptionalView; label: string }> = [
   { id: "no-date", label: "No due date" }, { id: "canvas", label: "Canvas" },
 ];
 
-function taskDate(task: Task) { return task.dueDate || task.calendarDate; }
-function isTestTask(task: Task) {
+function taskDate(task: WorkspaceTask) { return task.dueDate || task.calendarDate; }
+function isTestTask(task: WorkspaceTask) {
   const kind = String(task.taskKind ?? "").toLowerCase();
   if (kind === "task") return false;
   return ["test", "quiz", "exam", "assessment"].includes(kind) || /\b(test|quiz|exam|midterm|final|assessment)\b/i.test(task.title);
 }
-function sortTasks(tasks: Task[], mode: SortMode) {
+function sortTasks(tasks: WorkspaceTask[], mode: SortMode) {
   return [...tasks].sort((a, b) => {
+    if (mode === "manual") {
+      const orderDifference = (a.sortOrder ?? a.id) - (b.sortOrder ?? b.id);
+      if (orderDifference !== 0) return orderDifference;
+    }
     const dueA = taskDate(a) ?? "9999-12-31";
     const dueB = taskDate(b) ?? "9999-12-31";
     if (mode === "importance") {
@@ -51,6 +59,7 @@ export default function Tasks() {
   const queryClient = useQueryClient();
   const [view, setView] = useState<View>("all");
   const [sortMode, setSortMode] = useState<SortMode>("dueDate");
+  const [workspaceMode, setWorkspaceMode] = useState<"school" | "personal">("school");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [viewsOpen, setViewsOpen] = useState(false);
@@ -76,7 +85,10 @@ export default function Tasks() {
 
   const visible = useMemo(() => {
     const completed = view === "completed";
-    let filtered = tasks.filter((task) => completed ? task.status === "completed" : task.status !== "completed");
+    let filtered = (tasks as WorkspaceTask[]).filter((task) => {
+      const inferredContext = task.workspaceContext ?? (/^(personal|home|errands?)$/i.test(task.subject ?? "") ? "personal" : "school");
+      return inferredContext === workspaceMode && (completed ? task.status === "completed" : task.status !== "completed");
+    });
     if (!completed && view !== "all") {
       const weekEnd = new Date();
       weekEnd.setDate(weekEnd.getDate() + 7);
@@ -92,7 +104,7 @@ export default function Tasks() {
       });
     }
     return sortTasks(filtered, sortMode);
-  }, [sortMode, tasks, today, view]);
+  }, [sortMode, tasks, today, view, workspaceMode]);
   const tests = visible.filter(isTestTask);
   const assignments = visible.filter((task) => !isTestTask(task));
 
@@ -100,7 +112,7 @@ export default function Tasks() {
   async function recommendNext() {
     setRecommendationLoading(true);
     try {
-      const response = await fetch(`/api/recommendations/next?minutes=${availableMinutes}&energy=${energy}`, { credentials: "include" });
+      const response = await fetch(`/api/recommendations/next?minutes=${availableMinutes}&energy=${energy}&workspace=${workspaceMode}`, { credentials: "include" });
       const data = (await response.json()) as Recommendation & { error?: string };
       if (!response.ok) throw new Error(data.error || "Recommendation failed");
       setRecommendation(data);
@@ -109,7 +121,7 @@ export default function Tasks() {
   }
   async function moveTask(taskId: number, lane: Lane) {
     const task = tasks.find((item) => item.id === taskId);
-    if (!task || view === "completed") return;
+    if (!task || view === "completed" || lane === "personal") return;
     if ((lane === "tests") === isTestTask(task)) { setDropTarget(null); return; }
     const response = await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
@@ -125,7 +137,41 @@ export default function Tasks() {
     setDraggingTaskId(null); setDropTarget(null);
   }
 
-  function renderTask(task: Task, index: number) {
+  async function reorderTask(targetId: number, placeAfter: boolean) {
+    if (!draggingTaskId || draggingTaskId === targetId || view === "completed") return;
+    const dragged = (tasks as WorkspaceTask[]).find((task) => task.id === draggingTaskId);
+    const target = (tasks as WorkspaceTask[]).find((task) => task.id === targetId);
+    if (!dragged || !target) return;
+    const targetLane: Lane = workspaceMode === "personal" ? "personal" : isTestTask(target) ? "tests" : "assignments";
+    const laneTasks = (targetLane === "tests" ? tests : targetLane === "assignments" ? assignments : visible)
+      .filter((task) => task.id !== dragged.id);
+    const targetIndex = Math.max(0, laneTasks.findIndex((task) => task.id === targetId));
+    laneTasks.splice(targetIndex + (placeAfter ? 1 : 0), 0, dragged);
+    const updates = laneTasks.map((task, index) => ({
+      id: task.id,
+      data: {
+        sortOrder: (index + 1) * 100,
+        ...(task.id === dragged.id && targetLane !== "personal"
+          ? { taskKind: targetLane === "tests" ? "test" : "task" }
+          : {}),
+      },
+    }));
+    const responses = await Promise.all(updates.map((update) => fetch(`/api/tasks/${update.id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(update.data),
+    })));
+    if (responses.some((response) => !response.ok)) toast.error("Task order could not be saved");
+    else {
+      setSortMode("manual");
+      await refreshTasks();
+    }
+    setDraggingTaskId(null);
+    setDropTarget(null);
+  }
+
+  function renderTask(task: WorkspaceTask, index: number) {
     const color = subjectColor(task.subject, subjects);
     const date = taskDate(task);
     const completed = view === "completed";
@@ -133,6 +179,14 @@ export default function Tasks() {
       <motion.article layout key={task.id} draggable={!completed}
         onDragStartCapture={(event) => { event.dataTransfer.setData("text/task-id", String(task.id)); event.dataTransfer.effectAllowed = "move"; setDraggingTaskId(task.id); }}
         onDragEndCapture={() => { setDraggingTaskId(null); setDropTarget(null); }}
+        onDragOverCapture={(event) => { if (!completed) event.preventDefault(); }}
+        onDropCapture={(event) => {
+          if (completed) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          void reorderTask(task.id, event.clientY > bounds.top + bounds.height / 2);
+        }}
         initial={reduceMotion ? false : { opacity: 0, y: 6 }} animate={{ opacity: draggingTaskId === task.id ? 0.45 : 1, y: 0, scale: draggingTaskId === task.id ? 0.985 : 1 }}
         transition={{ duration: 0.18, delay: Math.min(index * 0.02, 0.1) }} className="px-4 py-3.5 transition-colors hover:bg-muted/30">
         <div className="flex items-start gap-3">
@@ -159,7 +213,7 @@ export default function Tasks() {
     );
   }
 
-  function taskColumn(title: string, description: string, columnTasks: Task[], icon: typeof FileCheck2, lane: Lane) {
+  function taskColumn(title: string, description: string, columnTasks: WorkspaceTask[], icon: typeof FileCheck2, lane: Lane) {
     const Icon = icon;
     const activeDrop = dropTarget === lane && draggingTaskId !== null;
     return (
@@ -175,8 +229,9 @@ export default function Tasks() {
           {view !== "completed" && (
             <QuickCapture
               compact
-              contextTaskKind={lane === "tests" ? "test" : "assignment"}
-              placeholder={lane === "tests" ? "Add a test or quiz..." : "Add an assignment or task..."}
+              contextTaskKind={lane === "tests" ? "test" : lane === "personal" ? "task" : "assignment"}
+              contextWorkspace={workspaceMode}
+              placeholder={lane === "tests" ? "Add a test or quiz..." : lane === "personal" ? "Add a personal task..." : "Add an assignment or task..."}
               onCreated={() => void refreshTasks()}
             />
           )}
@@ -201,7 +256,15 @@ export default function Tasks() {
               <p className="mt-2 text-sm text-muted-foreground">Capture work in place, compare workloads, or drag a task to the lane where it belongs.</p>
             </div>
           </div>
-          <Button onClick={() => setCreateOpen(true)} className="h-11 rounded-xl bg-secondary px-5 text-secondary-foreground"><Plus className="mr-2 h-4 w-4" /> New task</Button>
+          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+            <div className="flex rounded-xl border bg-muted/45 p-1" aria-label="Workspace mode">
+              {(["school", "personal"] as const).map((mode) => {
+                const Icon = mode === "school" ? GraduationCap : House;
+                return <button key={mode} type="button" onClick={() => { setWorkspaceMode(mode); setView("all"); setRecommendation(null); }} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-black capitalize transition-colors ${workspaceMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Icon className="h-3.5 w-3.5" />{mode}</button>;
+              })}
+            </div>
+            <Button onClick={() => setCreateOpen(true)} className="h-11 rounded-xl bg-secondary px-5 text-secondary-foreground"><Plus className="mr-2 h-4 w-4" /> New task</Button>
+          </div>
         </div>
       </section>
 
@@ -210,7 +273,7 @@ export default function Tasks() {
           <div className="flex max-w-full overflow-x-auto rounded-xl bg-muted/70 p-1">{(["all", "completed", ...enabledViews] as View[]).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`shrink-0 rounded-lg px-3 py-2 text-sm font-bold transition-colors ${view === item ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>{viewLabel(item)}</button>)}</div>
           <div className="flex items-center gap-2 self-end lg:self-auto">
             <div className="relative"><Button type="button" variant="outline" size="sm" onClick={() => setViewsOpen((open) => !open)} className="h-10 rounded-xl gap-1.5"><SlidersHorizontal className="h-3.5 w-3.5" /> Views <ChevronDown className="h-3 w-3" /></Button><AnimatePresence>{viewsOpen && <motion.div initial={reduceMotion ? false : { opacity: 0, y: -5, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.98 }} className="absolute right-0 top-12 z-30 w-52 rounded-xl border bg-popover p-2 shadow-xl"><p className="px-2 pb-1 text-[10px] font-black uppercase text-muted-foreground">Task views</p>{optionalViews.map((item) => { const enabled = enabledViews.includes(item.id); return <button key={item.id} type="button" onClick={() => { setEnabledViews((current) => enabled ? current.filter((value) => value !== item.id) : [...current, item.id]); if (enabled && view === item.id) setView("all"); }} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-semibold hover:bg-muted"><span className={`flex h-4 w-4 items-center justify-center rounded border ${enabled ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{enabled && <Check className="h-3 w-3" />}</span>{item.label}</button>; })}</motion.div>}</AnimatePresence></div>
-            <label className="flex h-10 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-bold text-muted-foreground"><SlidersHorizontal className="h-3.5 w-3.5" /><select aria-label="Organize tasks by" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="bg-transparent font-bold text-foreground outline-none"><option value="dueDate">Due date</option><option value="importance">Importance</option></select></label>
+            <label className="flex h-10 items-center gap-2 rounded-xl border bg-background px-3 text-xs font-bold text-muted-foreground"><SlidersHorizontal className="h-3.5 w-3.5" /><select aria-label="Organize tasks by" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="bg-transparent font-bold text-foreground outline-none"><option value="manual">Manual order</option><option value="dueDate">Due date</option><option value="importance">Importance</option></select></label>
           </div>
         </div>
 
@@ -228,8 +291,12 @@ export default function Tasks() {
         {recommendation && <div className="mt-3 flex flex-col gap-2 rounded-xl border border-primary/25 bg-primary/8 px-4 py-3 sm:flex-row sm:items-center"><button type="button" disabled={!recommendation.recommendation} onClick={() => recommendation.recommendation && setSelectedId(recommendation.recommendation.id)} className="min-w-0 flex-1 text-left disabled:cursor-default"><p className="text-sm font-black text-primary">{recommendation.recommendation?.title ?? "No task fits right now"}</p><p className="mt-0.5 text-xs text-muted-foreground">{recommendation.reason}</p></button><Button variant="ghost" size="sm" onClick={() => void recommendNext()}>Refresh</Button></div>}
       </section>
 
-      <div className="grid grid-flow-dense items-start gap-5 xl:grid-cols-2">{taskColumn("Tests & quizzes", "Assessments, exams, and study checkpoints", tests, FileCheck2, "tests")}{taskColumn("Assignments & tasks", "Homework, projects, errands, and everyday work", assignments, ClipboardList, "assignments")}</div>
-      <CreateTaskModal open={createOpen} onOpenChange={setCreateOpen} />
+      {workspaceMode === "school" ? (
+        <div className="grid grid-flow-dense items-start gap-5 xl:grid-cols-2">{taskColumn("Tests & quizzes", "Assessments, exams, and study checkpoints", tests, FileCheck2, "tests")}{taskColumn("Assignments & tasks", "Homework, projects, and everyday school work", assignments, ClipboardList, "assignments")}</div>
+      ) : (
+        <div className="grid grid-flow-dense">{taskColumn("Personal tasks", "Home, errands, routines, and everything outside school", visible, House, "personal")}</div>
+      )}
+      <CreateTaskModal open={createOpen} onOpenChange={setCreateOpen} defaultWorkspaceContext={workspaceMode} />
       {selectedId !== null && <TaskDetailsModal taskId={selectedId} open onOpenChange={(open) => !open && setSelectedId(null)} />}
     </div>
   );

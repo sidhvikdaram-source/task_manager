@@ -26,7 +26,7 @@ const systemPrompt = [
   "Do not include malformed tables, decorative characters, fake JSON, or hidden chain-of-thought.",
 ].join(" ");
 
-const velocityGeminiModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+const velocityGeminiModels = ["gemini-3.6-flash", "gemini-3.5-flash-lite"];
 // GPT-OSS 120B supports Groq's strict JSON Schema mode; qwen3-32b was retired.
 const velocityGroqModels = ["openai/gpt-oss-120b", "qwen/qwen3.6-27b"];
 const assistantMaxOutputTokens = 3000;

@@ -22,6 +22,8 @@ export const tasksTable = pgTable("tasks", {
   notes: text("notes"),
   subject: text("subject"),
   taskKind: text("task_kind").notNull().default("assignment"),
+  workspaceContext: text("workspace_context").notNull().default("school"),
+  sortOrder: integer("sort_order").notNull().default(0),
   difficulty: integer("difficulty").notNull().default(2),
   blocked: boolean("blocked").notNull().default(false),
   organized: boolean("organized").notNull().default(true),

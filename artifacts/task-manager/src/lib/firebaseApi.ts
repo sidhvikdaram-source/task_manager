@@ -322,6 +322,11 @@ function taskDefaults(uid: string, id: number, input: JsonObject) {
         : null,
     taskKind:
       typeof input.taskKind === "string" ? input.taskKind : "assignment",
+    workspaceContext:
+      input.workspaceContext === "personal" ? "personal" : "school",
+    sortOrder: Number.isInteger(Number(input.sortOrder))
+      ? Math.max(0, Number(input.sortOrder))
+      : id,
     difficulty: Math.min(3, Math.max(1, Number(input.difficulty) || 2)),
     blocked: Boolean(input.blocked),
     organized: input.organized !== false,
@@ -590,6 +595,21 @@ async function enrichedProjects(uid: string) {
     const completed = related.filter(
       (task) => task.status === "completed",
     ).length;
+    const syncedRequirements = requirements
+      .filter((item) => item.projectId === project.id)
+      .map((item) => ({
+        ...item,
+        completed: item.taskId
+          ? tasks.find((task) => task.id === item.taskId)?.status === "completed"
+          : item.completed,
+      }));
+    const incompleteTasks = related.filter(
+      (task) => task.status !== "completed",
+    ).length;
+    const incompleteRequirements = syncedRequirements.filter(
+      (item) => !item.completed,
+    ).length;
+    const hasTrackedWork = related.length > 0 || syncedRequirements.length > 0;
     return {
       ...project,
       taskCount: related.length,
@@ -597,15 +617,15 @@ async function enrichedProjects(uid: string) {
       progress: related.length
         ? Math.round((completed / related.length) * 100)
         : 0,
-      requirements: requirements
-        .filter((item) => item.projectId === project.id)
-        .map((item) => ({
-          ...item,
-          completed: item.taskId
-            ? tasks.find((task) => task.id === item.taskId)?.status ===
-              "completed"
-            : item.completed,
-        })),
+      requirements: syncedRequirements,
+      tasks: related,
+      canComplete:
+        hasTrackedWork && incompleteTasks === 0 && incompleteRequirements === 0,
+      completionBlockers: {
+        incompleteTasks,
+        incompleteRequirements,
+        hasTrackedWork,
+      },
     };
   });
 }
@@ -810,6 +830,8 @@ async function handleTasks(
       "notes",
       "subject",
       "taskKind",
+      "workspaceContext",
+      "sortOrder",
       "difficulty",
       "blocked",
       "organized",
@@ -1021,8 +1043,14 @@ async function handlePlanning(
         ? url.searchParams.get("energy")
         : "medium"
     ) as RecommendationEnergy;
+    const workspaceContext =
+      url.searchParams.get("workspace") === "personal" ? "personal" : "school";
     const tasks = (await list(uid, "tasks")).filter(
-      (task) => !task.archived && task.status !== "completed" && !task.blocked,
+      (task) =>
+        !task.archived &&
+        task.status !== "completed" &&
+        !task.blocked &&
+        (task.workspaceContext ?? "school") === workspaceContext,
     );
     const ranked = tasks
       .map((task) => ({
@@ -1091,6 +1119,8 @@ async function handlePlanning(
       )
         ? String(input.contextTaskKind)
         : "assignment",
+      workspaceContext:
+        input.contextWorkspace === "personal" ? "personal" : "school",
     });
     const batch = writeBatch(firebaseDb);
     batch.set(childDoc(uid, "tasks", id), task);
@@ -1148,6 +1178,7 @@ async function handleProjects(
       notes: input.notes ?? null,
       rubric: input.rubric ?? null,
       submissionLink: input.submissionLink ?? null,
+      links: [],
       gradeWeight: input.gradeWeight ?? null,
       archived: false,
       createdAt: now(),
@@ -1213,7 +1244,40 @@ async function handleProjects(
   const existing = await find(uid, "projects", id);
   if (!existing) return json({ error: "Project not found." }, 404);
   if (request.method === "PATCH") {
+    if (input.status === "completed") {
+      const snapshot = (await enrichedProjects(uid)).find(
+        (project) => project.id === id,
+      );
+      if (!snapshot?.canComplete) {
+        const blockers = (snapshot?.completionBlockers ?? {}) as JsonObject;
+        const incompleteTasks = Number(blockers.incompleteTasks ?? 0);
+        const incompleteRequirements = Number(
+          blockers.incompleteRequirements ?? 0,
+        );
+        const reason = !blockers.hasTrackedWork
+          ? "Add and complete at least one related task or milestone first."
+          : `Finish ${incompleteTasks} related task${incompleteTasks === 1 ? "" : "s"} and ${incompleteRequirements} requirement${incompleteRequirements === 1 ? "" : "s"} first.`;
+        return json({ error: reason, completionBlockers: blockers }, 409);
+      }
+    }
     const changes = clean(input);
+    if (Array.isArray(input.links)) {
+      changes.links = input.links.slice(0, 20).flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const value = item as JsonObject;
+        try {
+          const url = new URL(String(value.url ?? "").trim());
+          if (url.protocol !== "https:" && url.protocol !== "http:") return [];
+          const label = String(value.label ?? "").trim().slice(0, 100);
+          return [{
+            url: url.toString().slice(0, 1000),
+            ...(label ? { label } : {}),
+          }];
+        } catch {
+          return [];
+        }
+      });
+    }
     await updateDoc(childDoc(uid, "projects", id), changes);
     return json({ ...existing, ...changes });
   }
@@ -2113,14 +2177,16 @@ async function handleCanvas(
   return null;
 }
 
-let nimboModel: ReturnType<typeof getGenerativeModel> | null = null;
-function getNimboModel() {
-  if (nimboModel) return nimboModel;
+const nimboModels = new Map<string, ReturnType<typeof getGenerativeModel>>();
+function getNimboModel(modelName?: string) {
+  const selectedModel = modelName ||
+    (import.meta.env.VITE_FIREBASE_AI_MODEL as string | undefined) ||
+    "gemini-3.6-flash";
+  const cached = nimboModels.get(selectedModel);
+  if (cached) return cached;
   const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
-  nimboModel = getGenerativeModel(ai, {
-    model:
-      (import.meta.env.VITE_FIREBASE_AI_MODEL as string | undefined) ||
-      "gemini-3.5-flash",
+  const model = getGenerativeModel(ai, {
+    model: selectedModel,
     systemInstruction: [
       "You are Nimbo, the concise planning companion inside Nimbus, a gamified task manager.",
       "Help organize tasks, projects, deadlines, focus, habits, and workload. Do not solve homework for the user.",
@@ -2152,7 +2218,8 @@ function getNimboModel() {
       maxOutputTokens: 1000,
     },
   });
-  return nimboModel;
+  nimboModels.set(selectedModel, model);
+  return model;
 }
 
 function normalizeAiJson(text: string) {
@@ -2315,6 +2382,62 @@ function localWorkspaceResponse(
   };
 }
 
+function localNimboFallback(
+  message: string,
+  tasks: Stored[],
+  projects: Stored[],
+  subjects: Stored[],
+) {
+  if (/\b(create|add|capture|remember|remind me to)\b/i.test(message)) {
+    const parsed = parseQuickCapture(
+      message.replace(/^(?:please\s+)?(?:create|add|capture|remember|remind me to)\s+(?:a\s+task\s+)?/i, ""),
+      projects.map((project) => ({ id: Number(project.id), name: String(project.name ?? "") })),
+      subjects.map((subject) => ({ id: Number(subject.id), name: String(subject.name ?? "") })),
+      dateKey(),
+    );
+    if (parsed.title) {
+      return {
+        reply: `I prepared “${parsed.title}” for review.`,
+        taskCreated: false,
+        task: null,
+        tasks: [],
+        taskPreview: [{
+          title: parsed.title,
+          date: parsed.dueDate ?? undefined,
+          dueDate: parsed.dueDate ?? undefined,
+          time: parsed.time ?? undefined,
+          scheduleLabel: parsed.dueDate ?? undefined,
+          subject: parsed.subject,
+          estimatedMinutes: parsed.estimatedMinutes,
+          taskType: "task",
+          priority: parsed.priority,
+          keywords: [],
+        }],
+        actionPreview: null,
+        planPreview: null,
+        workspacePreview: null,
+      };
+    }
+  }
+  const active = tasks
+    .filter((task) => !task.archived && task.status !== "completed")
+    .sort((a, b) => String(a.dueDate ?? "9999-12-31").localeCompare(String(b.dueDate ?? "9999-12-31")))
+    .slice(0, 4);
+  const reply = active.length
+    ? `I can still read your Nimbus workspace. Your nearest active work is:\n${active.map((task) => `- ${task.title}${task.dueDate ? ` · due ${task.dueDate}` : ""}`).join("\n")}\n\nI did not change anything.`
+    : "Your active task list is clear. I did not change anything.";
+  return {
+    reply,
+    taskCreated: false,
+    task: null,
+    tasks: [],
+    taskPreview: [],
+    actionPreview: null,
+    planPreview: null,
+    workspacePreview: null,
+  };
+}
+
 async function handleAi(
   uid: string,
   request: Request,
@@ -2361,21 +2484,21 @@ async function handleAi(
         .map((subject) => subject.name),
     };
     const history = Array.isArray(input.history) ? input.history.slice(-4) : [];
-    try {
-      const result = await getNimboModel().generateContent(
-        `Workspace context: ${JSON.stringify(context)}\nRecent conversation: ${JSON.stringify(history)}\nUser request: ${message}`,
-      );
-      return json(normalizeAiJson(result.response.text()));
-    } catch (error) {
-      console.error("Firebase AI Logic failed", error);
-      return json(
-        {
-          error:
-            "Nimbo could not prepare a safe preview just now. Please retry.",
-        },
-        503,
-      );
+    const prompt = `Workspace context: ${JSON.stringify(context)}\nRecent conversation: ${JSON.stringify(history)}\nUser request: ${message}`;
+    const configuredModel = import.meta.env.VITE_FIREBASE_AI_MODEL as string | undefined;
+    const candidates = [...new Set([configuredModel, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter(Boolean) as string[])];
+    let lastError: unknown = null;
+    for (const modelName of candidates) {
+      try {
+        const result = await getNimboModel(modelName).generateContent(prompt);
+        return json(normalizeAiJson(result.response.text()));
+      } catch (error) {
+        lastError = error;
+        console.warn(`Firebase AI Logic model ${modelName} failed`, error);
+      }
     }
+    console.error("Firebase AI Logic providers failed; using local safe fallback", lastError);
+    return json(localNimboFallback(message, tasks, projects, subjects));
   }
   if (path === "/api/ai/tasks/confirm" && request.method === "POST") {
     const previews = Array.isArray(input.tasks)

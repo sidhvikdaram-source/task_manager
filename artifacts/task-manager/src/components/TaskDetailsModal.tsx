@@ -13,6 +13,7 @@ import {
   getGetUserStatsQueryKey,
   getListChecklistItemsQueryKey,
   getGetTaskQueryKey,
+  type Task,
 } from "@workspace/api-client-react";
 import {
   Dialog,
@@ -340,7 +341,7 @@ export function TaskDetailsModal({
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">
                   Subject
@@ -393,6 +394,23 @@ export function TaskDetailsModal({
                     <SelectItem value="quiz">Quiz</SelectItem>
                     <SelectItem value="project">Project</SelectItem>
                     <SelectItem value="note">Other task</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">
+                  Area
+                </label>
+                <Select
+                  value={(task as Task & { workspaceContext?: string }).workspaceContext || "school"}
+                  onValueChange={(value) => handleUpdate("workspaceContext", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="school">School</SelectItem>
+                    <SelectItem value="personal">Personal</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

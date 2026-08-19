@@ -2,11 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Archive,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Circle,
   ExternalLink,
   FileCheck2,
   FolderKanban,
+  Link2,
+  LockKeyhole,
   Plus,
   Sparkles,
   Trash2,
@@ -33,12 +37,26 @@ type Project = {
   notes: string | null;
   rubric: string | null;
   submissionLink: string | null;
+  links: Array<{ url: string; label?: string }>;
   gradeWeight: number | null;
   archived: boolean;
   taskCount: number;
   completedTaskCount: number;
   progress: number;
   requirements: Requirement[];
+  tasks: Array<{
+    id: number;
+    title: string;
+    status: string;
+    dueDate: string | null;
+    priority: string;
+  }>;
+  canComplete: boolean;
+  completionBlockers: {
+    incompleteTasks: number;
+    incompleteRequirements: number;
+    hasTrackedWork: boolean;
+  };
 };
 
 export default function Projects() {
@@ -54,6 +72,8 @@ export default function Projects() {
   const [milestoneDate, setMilestoneDate] = useState("");
   const [preview, setPreview] = useState<string[]>([]);
   const [gradeWeightDraft, setGradeWeightDraft] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkLabel, setLinkLabel] = useState("");
   const load = async () => {
     const response = await fetch("/api/projects", { credentials: "include" });
     if (response.ok) {
@@ -104,7 +124,32 @@ export default function Projects() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values),
     });
-    if (response.ok) await load();
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      toast.error(data?.error ?? "Project could not be updated");
+      return false;
+    }
+    await load();
+    return true;
+  };
+  const addProjectLink = async () => {
+    if (!selected || !linkUrl.trim()) return;
+    try {
+      const parsed = new URL(linkUrl.trim());
+      if (parsed.protocol !== "https:" && parsed.protocol !== "http:") throw new Error();
+      const links = [...(selected.links ?? []), { url: parsed.toString(), label: linkLabel.trim() || undefined }];
+      if (await update({ links })) {
+        setLinkUrl("");
+        setLinkLabel("");
+        toast.success("Project link added");
+      }
+    } catch {
+      toast.error("Enter a valid http or https link");
+    }
+  };
+  const removeProjectLink = async (url: string) => {
+    if (!selected) return;
+    await update({ links: (selected.links ?? []).filter((link) => link.url !== url) });
   };
   const addRequirement = async () => {
     if (!selected || !requirement.trim()) return;
@@ -226,7 +271,7 @@ export default function Projects() {
       <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="bento-card self-start overflow-hidden">
           <div className="border-b p-3 text-xs font-black uppercase text-muted-foreground">
-            Active projects
+            Projects
           </div>
           {projects
             .filter((project) => !project.archived)
@@ -306,7 +351,29 @@ export default function Projects() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={selected.status === "completed" || !selected.canComplete}
+                    onClick={() => void update({ status: "completed" })}
+                    title={
+                      selected.status === "completed"
+                        ? "Project completed"
+                        : selected.canComplete
+                          ? "Mark project complete"
+                          : !selected.completionBlockers.hasTrackedWork
+                            ? "Add and complete related work first"
+                            : `Complete ${selected.completionBlockers.incompleteTasks} tasks and ${selected.completionBlockers.incompleteRequirements} requirements first`
+                    }
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 text-xs font-black text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:border-border disabled:bg-muted disabled:text-muted-foreground"
+                  >
+                    {selected.status === "completed" || selected.canComplete ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <LockKeyhole className="h-4 w-4" />
+                    )}
+                    {selected.status === "completed" ? "Completed" : "Complete project"}
+                  </button>
                   <button
                     onClick={() => void update({ archived: true })}
                     title="Archive"
@@ -334,6 +401,48 @@ export default function Projects() {
                     animate={{ width: `${selected.progress}%` }}
                     className="h-full bg-primary"
                   />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-flow-dense gap-5 xl:grid-cols-2">
+              <div className="bento-card overflow-hidden">
+                <div className="flex items-center justify-between border-b px-5 py-4">
+                  <div>
+                    <h3 className="font-black">Related tasks</h3>
+                    <p className="text-xs text-muted-foreground">Tasks assigned to this project appear here automatically.</p>
+                  </div>
+                  <span className="rounded-lg bg-muted px-2 py-1 text-xs font-black text-muted-foreground">{selected.completedTaskCount}/{selected.taskCount}</span>
+                </div>
+                <div className="divide-y divide-border/60">
+                  {(selected.tasks ?? []).map((task) => (
+                    <div key={task.id} className="flex items-center gap-3 px-5 py-3">
+                      {task.status === "completed" ? <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" /> : <Circle className="h-5 w-5 shrink-0 text-muted-foreground" />}
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm font-bold ${task.status === "completed" ? "text-muted-foreground line-through" : ""}`}>{task.title}</p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">{task.dueDate ? `Due ${new Date(`${task.dueDate}T12:00:00`).toLocaleDateString()}` : "No due date"} · {task.priority} priority</p>
+                      </div>
+                    </div>
+                  ))}
+                  {(selected.tasks ?? []).length === 0 && <p className="px-5 py-8 text-center text-sm text-muted-foreground">Assign a task to this project and it will appear here.</p>}
+                </div>
+              </div>
+
+              <div className="bento-card p-5">
+                <div className="flex items-center gap-2"><Link2 className="h-4 w-4 text-primary" /><h3 className="font-black">Project links</h3></div>
+                <p className="mt-1 text-xs text-muted-foreground">Keep research, documents, folders, and references with the project.</p>
+                <div className="mt-4 space-y-2">
+                  {(selected.links ?? []).map((link) => (
+                    <div key={link.url} className="group flex items-center gap-2 rounded-xl border bg-muted/20 p-2.5">
+                      <ExternalLink className="h-4 w-4 shrink-0 text-primary" />
+                      <a href={link.url} target="_blank" rel="noreferrer" className="min-w-0 flex-1 truncate text-sm font-bold hover:text-primary">{link.label || link.url}</a>
+                      <button type="button" onClick={() => void removeProjectLink(link.url)} className="rounded-lg p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Remove ${link.label || link.url}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_auto]">
+                  <input value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://..." className="min-w-0 rounded-xl border bg-background px-3 py-2 text-sm" />
+                  <input value={linkLabel} onChange={(event) => setLinkLabel(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void addProjectLink()} placeholder="Label" className="min-w-0 rounded-xl border bg-background px-3 py-2 text-sm" />
+                  <button type="button" onClick={() => void addProjectLink()} disabled={!linkUrl.trim()} className="inline-flex items-center justify-center rounded-xl bg-primary px-3 py-2 text-primary-foreground disabled:opacity-45" aria-label="Add project link"><Plus className="h-4 w-4" /></button>
                 </div>
               </div>
             </div>

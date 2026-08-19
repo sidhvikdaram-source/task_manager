@@ -27,12 +27,14 @@ export function QuickCapture({
   onCreated,
   contextSubject,
   contextTaskKind,
+  contextWorkspace,
   compact = false,
   placeholder = "Call mom Sunday afternoon #Personal p1",
 }: {
   onCreated?: () => void;
   contextSubject?: string;
   contextTaskKind?: "test" | "quiz" | "assignment" | "task";
+  contextWorkspace?: "school" | "personal";
   compact?: boolean;
   placeholder?: string;
 }) {
@@ -69,7 +71,7 @@ export function QuickCapture({
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, contextSubject, contextTaskKind }),
+          body: JSON.stringify({ text, contextSubject, contextTaskKind, contextWorkspace }),
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("Preview unavailable");
@@ -87,7 +89,7 @@ export function QuickCapture({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [text, contextSubject, contextTaskKind]);
+  }, [text, contextSubject, contextTaskKind, contextWorkspace]);
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -98,7 +100,7 @@ export function QuickCapture({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, contextSubject, contextTaskKind }),
+        body: JSON.stringify({ text, contextSubject, contextTaskKind, contextWorkspace }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         task?: { title: string };

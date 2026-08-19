@@ -279,6 +279,8 @@ export async function runMigrations(): Promise<void> {
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "notes" varchar;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "subject" text;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "task_kind" text DEFAULT 'assignment' NOT NULL;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "workspace_context" text DEFAULT 'school' NOT NULL;
+      ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "sort_order" integer DEFAULT 0 NOT NULL;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "difficulty" integer DEFAULT 2 NOT NULL;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "blocked" boolean DEFAULT false NOT NULL;
       ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "organized" boolean DEFAULT true NOT NULL;
@@ -443,6 +445,7 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "notes" text,
       ADD COLUMN IF NOT EXISTS "rubric" text,
       ADD COLUMN IF NOT EXISTS "submission_link" text,
+      ADD COLUMN IF NOT EXISTS "links" jsonb DEFAULT '[]'::jsonb NOT NULL,
       ADD COLUMN IF NOT EXISTS "grade_weight" integer,
       ADD COLUMN IF NOT EXISTS "archived" boolean DEFAULT false NOT NULL;
     CREATE TABLE IF NOT EXISTS "project_requirements" (

@@ -31,6 +31,7 @@ const formSchema = z.object({
   notes: z.string().optional(),
   subject: z.string().optional(),
   taskKind: z.enum(['assignment', 'test', 'quiz', 'project', 'note', 'reading', 'practice']),
+  workspaceContext: z.enum(['school', 'personal']),
   difficulty: z.enum(['1', '2', '3']),
   blocked: z.boolean(),
 });
@@ -91,10 +92,11 @@ interface CreateTaskModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultCalendarDate?: string;
+  defaultWorkspaceContext?: 'school' | 'personal';
   onSuccess?: () => void;
 }
 
-export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuccess }: CreateTaskModalProps) {
+export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, defaultWorkspaceContext = 'school', onSuccess }: CreateTaskModalProps) {
   const queryClient = useQueryClient();
   const createTask = useCreateTask();
   const { data: projects } = useListProjects();
@@ -119,6 +121,7 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
       notes: '',
       subject: '',
       taskKind: 'assignment',
+      workspaceContext: defaultWorkspaceContext,
       difficulty: '2',
       blocked: false,
     },
@@ -129,6 +132,10 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
       form.setValue('calendarDate', defaultCalendarDate);
     }
   }, [defaultCalendarDate, form]);
+
+  React.useEffect(() => {
+    if (open) form.setValue('workspaceContext', defaultWorkspaceContext);
+  }, [defaultWorkspaceContext, form, open]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     const payload: Record<string, unknown> = {
@@ -144,6 +151,7 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
     if (values.notes) payload.notes = values.notes;
     if (values.subject) payload.subject = values.subject;
     payload.taskKind = values.taskKind;
+    payload.workspaceContext = values.workspaceContext;
     payload.difficulty = Number(values.difficulty);
     payload.blocked = values.blocked;
 
@@ -262,9 +270,10 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <FormField control={form.control} name="subject" render={({ field }) => <FormItem><FormLabel>Subject</FormLabel><Select onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None / Inbox</SelectItem>{subjects.map((subject) => <SelectItem key={subject.id} value={subject.name}>{subject.name}</SelectItem>)}</SelectContent></Select></FormItem>} />
               <FormField control={form.control} name="taskKind" render={({ field }) => <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="assignment">Assignment</SelectItem><SelectItem value="test">Test</SelectItem><SelectItem value="quiz">Quiz</SelectItem><SelectItem value="project">Project</SelectItem><SelectItem value="reading">Reading</SelectItem><SelectItem value="practice">Practice</SelectItem><SelectItem value="note">Note</SelectItem></SelectContent></Select></FormItem>} />
+              <FormField control={form.control} name="workspaceContext" render={({ field }) => <FormItem><FormLabel>Area</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="school">School</SelectItem><SelectItem value="personal">Personal</SelectItem></SelectContent></Select></FormItem>} />
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

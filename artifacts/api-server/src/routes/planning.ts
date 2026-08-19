@@ -98,8 +98,9 @@ router.get("/recommendations/next", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const minutes = Math.min(60, Math.max(10, Number(req.query.minutes) || 30));
   const energy: RecommendationEnergy = ["low","medium","high"].includes(String(req.query.energy)) ? String(req.query.energy) as RecommendationEnergy : "medium";
+  const workspaceContext = req.query.workspace === "personal" ? "personal" : "school";
   const { today } = await userDateContext(req.user.id);
-  const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"), eq(tasksTable.blocked, false)));
+  const tasks = await db.select().from(tasksTable).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.archived, false), ne(tasksTable.status, "completed"), eq(tasksTable.blocked, false), eq(tasksTable.workspaceContext, workspaceContext)));
   const scored = tasks.map((task) => ({ task, ranking: scoreTaskRecommendation(task, { minutes, energy, today }) }))
     .filter((item) => item.ranking.eligible)
     .sort((a,b) => b.ranking.score - a.ranking.score || a.task.title.localeCompare(b.task.title));

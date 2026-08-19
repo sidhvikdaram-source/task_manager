@@ -4,6 +4,25 @@ import { db, projectRequirementsTable, projectsTable, tasksTable } from "@worksp
 
 const router: IRouter = Router();
 
+function safeProjectLinks(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  return value.slice(0, 20).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const raw = item as { url?: unknown; label?: unknown };
+    if (typeof raw.url !== "string") return [];
+    try {
+      const url = new URL(raw.url.trim());
+      if (url.protocol !== "https:" && url.protocol !== "http:") return [];
+      return [{
+        url: url.toString().slice(0, 1000),
+        label: typeof raw.label === "string" ? raw.label.trim().slice(0, 100) || undefined : undefined,
+      }];
+    } catch {
+      return [];
+    }
+  });
+}
+
 function projectInput(body: unknown, partial = false) {
   const value = body && typeof body === "object" ? body as Record<string, unknown> : {};
   const result: Partial<typeof projectsTable.$inferInsert> = {};
@@ -17,6 +36,8 @@ function projectInput(body: unknown, partial = false) {
   if (typeof value.notes === "string") result.notes = value.notes.trim().slice(0, 4000) || null;
   if (typeof value.rubric === "string") result.rubric = value.rubric.trim().slice(0, 10000) || null;
   if (typeof value.submissionLink === "string") result.submissionLink = value.submissionLink.trim().slice(0, 500) || null;
+  const links = safeProjectLinks(value.links);
+  if (links) result.links = links;
   if (value.gradeWeight === null || Number.isFinite(Number(value.gradeWeight))) result.gradeWeight = value.gradeWeight === null ? null : Math.min(100, Math.max(0, Number(value.gradeWeight)));
   if (typeof value.archived === "boolean") result.archived = value.archived;
   if (!partial) { result.color ??= "#2563eb"; result.type = "project"; result.status ??= "active"; result.priority ??= "medium"; }
@@ -28,7 +49,19 @@ async function enriched(project: typeof projectsTable.$inferSelect, userId: stri
   const completed = taskRows.filter((task) => task.status === "completed").length;
   const taskById = new Map(taskRows.map((task) => [task.id, task]));
   const syncedRequirements = requirements.map((item) => ({ ...item, completed: item.taskId ? taskById.get(item.taskId)?.status === "completed" : item.completed }));
-  return { ...project, taskCount: taskRows.length, completedTaskCount: completed, progress: taskRows.length ? Math.round(completed / taskRows.length * 100) : 0, requirements: syncedRequirements };
+  const incompleteTasks = taskRows.filter((task) => task.status !== "completed").length;
+  const incompleteRequirements = syncedRequirements.filter((item) => !item.completed).length;
+  const hasTrackedWork = taskRows.length > 0 || syncedRequirements.length > 0;
+  return {
+    ...project,
+    taskCount: taskRows.length,
+    completedTaskCount: completed,
+    progress: taskRows.length ? Math.round(completed / taskRows.length * 100) : 0,
+    requirements: syncedRequirements,
+    tasks: taskRows,
+    canComplete: hasTrackedWork && incompleteTasks === 0 && incompleteRequirements === 0,
+    completionBlockers: { incompleteTasks, incompleteRequirements, hasTrackedWork },
+  };
 }
 
 router.get("/projects", async (req, res): Promise<void> => {
@@ -47,8 +80,22 @@ router.post("/projects", async (req, res): Promise<void> => {
 router.patch("/projects/:id", async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const input = projectInput(req.body, true);
+  const projectId = Number(req.params.id);
+  if (input.status === "completed") {
+    const [existing] = await db.select().from(projectsTable).where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, req.user.id)));
+    if (!existing) { res.status(404).json({ error: "Project not found." }); return; }
+    const snapshot = await enriched(existing, req.user.id);
+    if (!snapshot.canComplete) {
+      const { incompleteTasks, incompleteRequirements, hasTrackedWork } = snapshot.completionBlockers;
+      const reason = !hasTrackedWork
+        ? "Add and complete at least one related task or milestone first."
+        : `Finish ${incompleteTasks} related task${incompleteTasks === 1 ? "" : "s"} and ${incompleteRequirements} requirement${incompleteRequirements === 1 ? "" : "s"} first.`;
+      res.status(409).json({ error: reason, completionBlockers: snapshot.completionBlockers });
+      return;
+    }
+  }
   const [project] = await db.transaction(async (tx) => {
-    const updated = await tx.update(projectsTable).set(input).where(and(eq(projectsTable.id, Number(req.params.id)), eq(projectsTable.userId, req.user.id))).returning();
+    const updated = await tx.update(projectsTable).set(input).where(and(eq(projectsTable.id, projectId), eq(projectsTable.userId, req.user.id))).returning();
     if (updated[0] && input.subject !== undefined) {
       await tx.update(tasksTable).set({ subject: input.subject }).where(and(eq(tasksTable.userId, req.user.id), eq(tasksTable.projectId, updated[0].id), isNull(tasksTable.externalSource)));
     }

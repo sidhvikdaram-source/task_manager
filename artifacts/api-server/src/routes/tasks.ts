@@ -46,6 +46,10 @@ function taskMetadata(body: unknown) {
     update.difficulty = Math.min(3, Math.max(1, Number(value.difficulty)));
   if (typeof value.blocked === "boolean") update.blocked = value.blocked;
   if (typeof value.organized === "boolean") update.organized = value.organized;
+  if (value.workspaceContext === "school" || value.workspaceContext === "personal")
+    update.workspaceContext = value.workspaceContext;
+  if (Number.isInteger(value.sortOrder))
+    update.sortOrder = Math.max(0, Number(value.sortOrder));
   return update;
 }
 
