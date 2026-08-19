@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { CanvasSyncButton } from "@/components/CanvasSyncButton";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
+import { subjectColor, useSubjects, type NimbusSubject } from "@/hooks/useSubjects";
 
 type CanvasEvent = {
   id: number;
@@ -85,6 +86,14 @@ function priorityStyle(priority: Task["priority"]) {
   if (priority === "medium")
     return "border-primary/55 bg-primary/12 text-primary";
   return "border-white/15 bg-white/8 text-muted-foreground";
+}
+
+function subjectTaskStyle(task: Task | undefined, subjects: NimbusSubject[]) {
+  if (!task) return undefined;
+  const color = subjectColor(task.subject, subjects);
+  return color
+    ? { color, borderColor: `${color}66`, backgroundColor: `${color}18` }
+    : undefined;
 }
 
 function urgencyClass(tasks: Task[]) {
@@ -144,6 +153,7 @@ export default function Calendar() {
       },
     },
   );
+  const { data: subjects = [] } = useSubjects();
   const { data: canvasEvents = [] } = useQuery({
     queryKey: ["canvas-events"],
     queryFn: async () => {
@@ -468,7 +478,7 @@ export default function Calendar() {
                         </div>
 
                         <div className="flex flex-wrap gap-1 sm:hidden">
-                          {dayTasks.slice(0, 3).map((task) => <span key={task.id} className={cn("h-1.5 w-1.5 rounded-full", task.priority === "critical" ? "bg-destructive" : task.priority === "high" ? "bg-secondary" : "bg-primary")} />)}
+                          {dayTasks.slice(0, 3).map((task) => <span key={task.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: subjectColor(task.subject, subjects) ?? "hsl(var(--primary))" }} />)}
                           {dayEvents.slice(0, 2).map((event) => <span key={event.id} className="h-1.5 w-1.5 rounded-full bg-[#0f6cbf]" />)}
                           {dayTasks.length + dayEvents.length > 5 && <span className="text-[8px] font-black text-muted-foreground">+{dayTasks.length + dayEvents.length - 5}</span>}
                         </div>
@@ -485,6 +495,7 @@ export default function Calendar() {
                                 "block min-h-[34px] break-words rounded-lg border px-2 py-1 text-[11px] font-bold leading-tight line-clamp-2",
                                 priorityStyle(task.priority),
                               )}
+                              style={subjectTaskStyle(task, subjects)}
                             >
                               {task.title}
                             </span>
@@ -567,6 +578,7 @@ export default function Calendar() {
                             "w-full break-words rounded-lg border p-2 text-left text-xs font-bold leading-snug",
                             priorityStyle(task.priority),
                           )}
+                          style={subjectTaskStyle(task, subjects)}
                         >
                           {task.title}
                         </button>
@@ -609,7 +621,7 @@ export default function Calendar() {
                     )}
                   </span>
                   <span className="break-words text-sm font-bold">
-                    {item.title}
+                    <span style={item.taskId ? { color: subjectColor(tasks.find((task) => task.id === item.taskId)?.subject, subjects) } : undefined}>{item.title}</span>
                   </span>
                   <span className="hidden text-right text-[10px] font-black uppercase text-muted-foreground sm:block">
                     {item.kind}
@@ -658,6 +670,7 @@ export default function Calendar() {
                   type="button"
                   onClick={() => setSelectedTaskId(task.id)}
                   className="w-full rounded-lg border border-border/80 bg-muted/20 p-3 text-left transition-colors hover:border-primary/45 hover:bg-primary/8"
+                  style={subjectTaskStyle(task, subjects)}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-bold leading-tight">
@@ -706,6 +719,7 @@ export default function Calendar() {
                       event.dataTransfer.effectAllowed = "move";
                     }}
                     className="flex items-center gap-2 rounded-xl border bg-muted/30 p-2"
+                    style={subjectTaskStyle(task, subjects)}
                   >
                     <GripVertical className="h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
                     <button

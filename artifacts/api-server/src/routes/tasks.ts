@@ -38,6 +38,7 @@ function taskMetadata(body: unknown) {
       "note",
       "reading",
       "practice",
+      "task",
     ].includes(value.taskKind)
   )
     update.taskKind = value.taskKind;

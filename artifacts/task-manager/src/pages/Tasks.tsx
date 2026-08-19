@@ -1,277 +1,205 @@
-import { useMemo, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
-import {
-  CalendarClock,
-  CheckCircle2,
-  Circle,
-  ClipboardList,
-  FileCheck2,
-  ListTodo,
-  Loader2,
-  Plus,
-  SlidersHorizontal,
-  Zap,
-} from "lucide-react";
-import {
-  getListTasksQueryKey,
-  useListTasks,
-  type Task,
-} from "@workspace/api-client-react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { CalendarClock, Check, CheckCircle2, ChevronDown, Circle, ClipboardList, FileCheck2, GripVertical, ListTodo, Loader2, Plus, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
+import { getListTasksQueryKey, useListTasks, type Task } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
+import { QuickCapture } from "@/components/QuickCapture";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 import { TaskInlineNotes } from "@/components/TaskInlineNotes";
 import { Button } from "@/components/ui/button";
 import { useReliableTaskCompletion } from "@/hooks/useReliableTaskCompletion";
 import { subjectColor, useSubjects } from "@/hooks/useSubjects";
+import { localDateKey } from "@/lib/localDate";
 
 type SortMode = "dueDate" | "importance";
+type View = "all" | "completed" | "today" | "overdue" | "week" | "high" | "no-date" | "canvas";
+type OptionalView = Exclude<View, "all" | "completed">;
+type Lane = "tests" | "assignments";
+type Recommendation = { recommendation: Task | null; reason: string };
 
-const priorityRank: Record<Task["priority"], number> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
-};
+const priorityRank: Record<Task["priority"], number> = { critical: 0, high: 1, medium: 2, low: 3 };
+const optionalViews: Array<{ id: OptionalView; label: string }> = [
+  { id: "today", label: "Today" }, { id: "overdue", label: "Overdue" },
+  { id: "week", label: "This week" }, { id: "high", label: "High priority" },
+  { id: "no-date", label: "No due date" }, { id: "canvas", label: "Canvas" },
+];
 
+function taskDate(task: Task) { return task.dueDate || task.calendarDate; }
 function isTestTask(task: Task) {
-  return (
-    ["test", "quiz", "exam", "assessment"].includes(
-      String(task.taskKind ?? "").toLowerCase(),
-    ) || /\b(test|quiz|exam|midterm|final|assessment)\b/i.test(task.title)
-  );
+  const kind = String(task.taskKind ?? "").toLowerCase();
+  if (kind === "task") return false;
+  return ["test", "quiz", "exam", "assessment"].includes(kind) || /\b(test|quiz|exam|midterm|final|assessment)\b/i.test(task.title);
 }
-
 function sortTasks(tasks: Task[], mode: SortMode) {
   return [...tasks].sort((a, b) => {
-    const dueA = a.dueDate ?? a.calendarDate ?? "9999-12-31";
-    const dueB = b.dueDate ?? b.calendarDate ?? "9999-12-31";
+    const dueA = taskDate(a) ?? "9999-12-31";
+    const dueB = taskDate(b) ?? "9999-12-31";
     if (mode === "importance") {
-      const priorityDifference =
-        priorityRank[a.priority] - priorityRank[b.priority];
-      if (priorityDifference !== 0) return priorityDifference;
+      const difference = priorityRank[a.priority] - priorityRank[b.priority];
+      if (difference !== 0) return difference;
     }
-    const dueDifference = dueA.localeCompare(dueB);
-    if (dueDifference !== 0) return dueDifference;
-    return priorityRank[a.priority] - priorityRank[b.priority];
+    return dueA.localeCompare(dueB) || priorityRank[a.priority] - priorityRank[b.priority];
   });
+}
+function viewLabel(view: View) {
+  return optionalViews.find((option) => option.id === view)?.label ?? (view === "all" ? "All active" : "Completed");
 }
 
 export default function Tasks() {
-  const [status, setStatus] = useState<"active" | "completed">("active");
+  const queryClient = useQueryClient();
+  const [view, setView] = useState<View>("all");
   const [sortMode, setSortMode] = useState<SortMode>("dueDate");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [viewsOpen, setViewsOpen] = useState(false);
+  const [enabledViews, setEnabledViews] = useState<OptionalView[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("velocity-task-views") ?? "[]");
+      return Array.isArray(saved) ? saved.filter((value): value is OptionalView => optionalViews.some((item) => item.id === value)) : [];
+    } catch { return []; }
+  });
+  const [availableMinutes, setAvailableMinutes] = useState(30);
+  const [energy, setEnergy] = useState<"low" | "medium" | "high">("medium");
+  const [recommendation, setRecommendation] = useState<Recommendation | null>(null);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [draggingTaskId, setDraggingTaskId] = useState<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<Lane | null>(null);
   const reduceMotion = useReducedMotion();
-  const { data: tasks = [] } = useListTasks(
-    { sortBy: "priority" },
-    { query: { queryKey: getListTasksQueryKey({ sortBy: "priority" }) } },
-  );
+  const { data: tasks = [] } = useListTasks({ sortBy: "priority" }, { query: { queryKey: getListTasksQueryKey({ sortBy: "priority" }) } });
   const { data: subjects = [] } = useSubjects();
   const taskCompletion = useReliableTaskCompletion();
-  const visible = useMemo(
-    () =>
-      sortTasks(
-        tasks.filter((task) =>
-          status === "completed"
-            ? task.status === "completed"
-            : task.status !== "completed",
-        ),
-        sortMode,
-      ),
-    [sortMode, status, tasks],
-  );
+  const today = localDateKey(new Date());
+
+  useEffect(() => { localStorage.setItem("velocity-task-views", JSON.stringify(enabledViews)); }, [enabledViews]);
+
+  const visible = useMemo(() => {
+    const completed = view === "completed";
+    let filtered = tasks.filter((task) => completed ? task.status === "completed" : task.status !== "completed");
+    if (!completed && view !== "all") {
+      const weekEnd = new Date();
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      const endKey = localDateKey(weekEnd);
+      filtered = filtered.filter((task) => {
+        const date = taskDate(task);
+        if (view === "today") return !date || date <= today;
+        if (view === "overdue") return Boolean(date && date < today);
+        if (view === "week") return Boolean(date && date >= today && date <= endKey);
+        if (view === "high") return task.priority === "critical" || task.priority === "high";
+        if (view === "no-date") return !date;
+        return task.externalSource?.startsWith("canvas");
+      });
+    }
+    return sortTasks(filtered, sortMode);
+  }, [sortMode, tasks, today, view]);
   const tests = visible.filter(isTestTask);
   const assignments = visible.filter((task) => !isTestTask(task));
 
+  async function refreshTasks() { await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] }); }
+  async function recommendNext() {
+    setRecommendationLoading(true);
+    try {
+      const response = await fetch(`/api/recommendations/next?minutes=${availableMinutes}&energy=${energy}`, { credentials: "include" });
+      const data = (await response.json()) as Recommendation & { error?: string };
+      if (!response.ok) throw new Error(data.error || "Recommendation failed");
+      setRecommendation(data);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not recommend a task"); }
+    finally { setRecommendationLoading(false); }
+  }
+  async function moveTask(taskId: number, lane: Lane) {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task || view === "completed") return;
+    if ((lane === "tests") === isTestTask(task)) { setDropTarget(null); return; }
+    const response = await fetch(`/api/tasks/${taskId}`, {
+      method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskKind: lane === "tests" ? "test" : "task" }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      toast.error(data?.error ?? "Task could not be moved");
+    } else {
+      await refreshTasks();
+      toast.success(lane === "tests" ? "Moved to tests and quizzes" : "Moved to assignments and tasks");
+    }
+    setDraggingTaskId(null); setDropTarget(null);
+  }
+
   function renderTask(task: Task, index: number) {
     const color = subjectColor(task.subject, subjects);
-    const date = task.dueDate ?? task.calendarDate;
+    const date = taskDate(task);
+    const completed = view === "completed";
     return (
-      <motion.article
-        layout
-        key={task.id}
-        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.18, delay: Math.min(index * 0.02, 0.1) }}
-        className="px-4 py-3.5 transition-colors hover:bg-muted/30"
-      >
+      <motion.article layout key={task.id} draggable={!completed}
+        onDragStartCapture={(event) => { event.dataTransfer.setData("text/task-id", String(task.id)); event.dataTransfer.effectAllowed = "move"; setDraggingTaskId(task.id); }}
+        onDragEndCapture={() => { setDraggingTaskId(null); setDropTarget(null); }}
+        initial={reduceMotion ? false : { opacity: 0, y: 6 }} animate={{ opacity: draggingTaskId === task.id ? 0.45 : 1, y: 0, scale: draggingTaskId === task.id ? 0.985 : 1 }}
+        transition={{ duration: 0.18, delay: Math.min(index * 0.02, 0.1) }} className="px-4 py-3.5 transition-colors hover:bg-muted/30">
         <div className="flex items-start gap-3">
-          {status === "active" ? (
-            <button
-              type="button"
-              aria-label={`Complete ${task.title}`}
-              disabled={taskCompletion.isPending(task.id)}
-              className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-70"
-              onClick={(event) =>
-                void taskCompletion.complete(task, event.currentTarget)
-              }
-            >
-              {taskCompletion.isPending(task.id) ? (
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              ) : (
-                <Circle className="h-6 w-6" />
-              )}
+          {!completed && <GripVertical aria-hidden className="mt-3 h-4 w-4 shrink-0 cursor-grab text-muted-foreground/55 active:cursor-grabbing" />}
+          {!completed ? (
+            <button type="button" aria-label={`Complete ${task.title}`} disabled={taskCompletion.isPending(task.id)} className="-ml-2 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-70" onClick={(event) => void taskCompletion.complete(task, event.currentTarget)}>
+              {taskCompletion.isPending(task.id) ? <Loader2 className="h-6 w-6 animate-spin text-primary" /> : <Circle className="h-6 w-6" />}
             </button>
-          ) : (
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center">
-              <CheckCircle2 className="h-6 w-6 text-primary" />
-            </div>
-          )}
-
+          ) : <div className="flex h-11 w-11 shrink-0 items-center justify-center"><CheckCircle2 className="h-6 w-6 text-primary" /></div>}
           <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={() => setSelectedId(task.id)}
-              className="block w-full text-left"
-            >
-              <p
-                className="truncate font-bold"
-                style={{ color: status === "active" ? color : undefined }}
-              >
-                {task.title}
-              </p>
+            <button type="button" onClick={() => setSelectedId(task.id)} className="block w-full text-left">
+              <p className="truncate font-bold" style={{ color: completed ? undefined : color }}>{task.title}</p>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <CalendarClock className="h-3.5 w-3.5" />
-                  {date
-                    ? new Date(`${date}T12:00:00`).toLocaleDateString()
-                    : "No deadline"}
-                </span>
+                <span className="inline-flex items-center gap-1"><CalendarClock className="h-3.5 w-3.5" />{date ? new Date(`${date}T12:00:00`).toLocaleDateString() : "No deadline"}</span>
                 {task.subject && <span style={{ color }}>{task.subject}</span>}
-                {task.priority !== "medium" && (
-                  <span className="capitalize">{task.priority}</span>
-                )}
-                <span className="inline-flex items-center gap-1">
-                  <Zap className="h-3 w-3 fill-current" /> {task.vpValue} NP
-                </span>
+                {task.priority !== "medium" && <span className="capitalize">{task.priority}</span>}
+                <span className="inline-flex items-center gap-1"><Zap className="h-3 w-3 fill-current" /> {task.vpValue} NP</span>
               </div>
             </button>
-            <TaskInlineNotes
-              taskId={task.id}
-              taskTitle={task.title}
-              notes={task.notes}
-              compact
-            />
+            <TaskInlineNotes taskId={task.id} taskTitle={task.title} notes={task.notes} compact />
           </div>
         </div>
       </motion.article>
     );
   }
 
-  function taskColumn(
-    title: string,
-    description: string,
-    columnTasks: Task[],
-    icon: typeof FileCheck2,
-  ) {
+  function taskColumn(title: string, description: string, columnTasks: Task[], icon: typeof FileCheck2, lane: Lane) {
     const Icon = icon;
+    const activeDrop = dropTarget === lane && draggingTaskId !== null;
     return (
-      <section className="bento-card min-w-0 overflow-hidden">
-        <header className="flex items-center gap-3 border-b px-4 py-3.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Icon className="h-4 w-4" />
+      <section className={`bento-card min-w-0 overflow-hidden transition-[border-color,background-color] ${activeDrop ? "border-primary bg-primary/[0.035]" : ""}`}
+        onDragOver={(event) => { if (view === "completed") return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropTarget(lane); }}
+        onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null); }}
+        onDrop={(event) => { event.preventDefault(); const taskId = Number(event.dataTransfer.getData("text/task-id")); if (Number.isInteger(taskId)) void moveTask(taskId, lane); }}>
+        <header className="border-b px-4 py-3.5">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-black">{title}</h2><span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">{columnTasks.length}</span></div><p className="truncate text-xs text-muted-foreground">{activeDrop ? "Release to move here" : description}</p></div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h2 className="font-black">{title}</h2>
-              <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">
-                {columnTasks.length}
-              </span>
-            </div>
-            <p className="truncate text-xs text-muted-foreground">
-              {description}
-            </p>
-          </div>
+          {lane === "tests" && view !== "completed" && <QuickCapture compact contextTaskKind="test" placeholder="Add a test or quiz..." onCreated={() => void refreshTasks()} />}
         </header>
-        <div className="divide-y divide-border/70">
-          {columnTasks.map(renderTask)}
-          {columnTasks.length === 0 && (
-            <p className="px-5 py-12 text-center text-sm text-muted-foreground">
-              No {status === "active" ? "active" : "completed"}{" "}
-              {title.toLowerCase()}.
-            </p>
-          )}
-        </div>
+        <div className="divide-y divide-border/70">{columnTasks.map(renderTask)}{columnTasks.length === 0 && <p className="px-5 py-12 text-center text-sm text-muted-foreground">{activeDrop ? "Drop the task here." : `No ${view === "completed" ? "completed" : "active"} ${title.toLowerCase()}.`}</p>}</div>
       </section>
     );
   }
 
   return (
     <div className="page-stack space-y-5 overflow-x-hidden">
-      <section className="bento-card p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-xs font-black uppercase text-primary">
-              <ListTodo className="h-4 w-4" /> Task workspace
-            </div>
-            <h1 className="tech-title mt-2 text-3xl sm:text-4xl">
-              Plan by deadline. Act by importance.
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Tests stay separate from everyday assignments so both kinds of
-              work remain easy to scan.
-            </p>
+      <section className="bento-card p-5 sm:p-6"><div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div className="max-w-2xl"><div className="flex items-center gap-2 text-xs font-black uppercase text-primary"><ListTodo className="h-4 w-4" /> Task workspace</div><h1 className="tech-title mt-2 text-3xl sm:text-4xl">Plan by deadline. Act by importance.</h1><p className="mt-2 text-sm text-muted-foreground">Capture assessments in place, compare workloads, or drag work between lanes when its type changes.</p></div><Button onClick={() => setCreateOpen(true)} className="bg-secondary text-secondary-foreground"><Plus className="mr-2 h-4 w-4" /> New task</Button></div></section>
+
+      <section className="bento-card p-3">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex max-w-full overflow-x-auto rounded-lg bg-muted p-1">{(["all", "completed", ...enabledViews] as View[]).map((item) => <button key={item} type="button" onClick={() => setView(item)} className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${view === item ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>{viewLabel(item)}</button>)}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select aria-label="Available time" value={availableMinutes} onChange={(event) => { setAvailableMinutes(Number(event.target.value)); setRecommendation(null); }} className="h-9 min-w-24 flex-1 rounded-lg border bg-background px-3 text-xs font-bold sm:flex-none">{[10, 20, 30, 45, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}</select>
+            <select aria-label="Energy level" value={energy} onChange={(event) => { setEnergy(event.target.value as typeof energy); setRecommendation(null); }} className="h-9 min-w-32 flex-1 rounded-lg border bg-background px-3 text-xs font-bold sm:flex-none"><option value="low">Low energy</option><option value="medium">Medium energy</option><option value="high">High energy</option></select>
+            <Button type="button" size="sm" onClick={() => void recommendNext()} disabled={recommendationLoading} className="h-9 flex-1 gap-1.5 sm:flex-none">{recommendationLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}Recommend next</Button>
+            <div className="relative"><Button type="button" variant="outline" size="sm" onClick={() => setViewsOpen((open) => !open)} className="h-9 gap-1.5"><SlidersHorizontal className="h-3.5 w-3.5" /> Views <ChevronDown className="h-3 w-3" /></Button><AnimatePresence>{viewsOpen && <motion.div initial={reduceMotion ? false : { opacity: 0, y: -5, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -3, scale: 0.98 }} className="absolute right-0 top-11 z-30 w-52 rounded-lg border bg-popover p-2 shadow-xl"><p className="px-2 pb-1 text-[10px] font-black uppercase text-muted-foreground">Task views</p>{optionalViews.map((item) => { const enabled = enabledViews.includes(item.id); return <button key={item.id} type="button" onClick={() => { setEnabledViews((current) => enabled ? current.filter((value) => value !== item.id) : [...current, item.id]); if (enabled && view === item.id) setView("all"); }} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs font-semibold hover:bg-muted"><span className={`flex h-4 w-4 items-center justify-center rounded border ${enabled ? "border-primary bg-primary text-primary-foreground" : "border-border"}`}>{enabled && <Check className="h-3 w-3" />}</span>{item.label}</button>; })}</motion.div>}</AnimatePresence></div>
+            <label className="flex h-9 items-center gap-2 rounded-lg border bg-background px-3 text-xs font-bold text-muted-foreground"><SlidersHorizontal className="h-3.5 w-3.5" /><select aria-label="Organize tasks by" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)} className="bg-transparent font-bold text-foreground outline-none"><option value="dueDate">Due date</option><option value="importance">Importance</option></select></label>
           </div>
-          <Button
-            onClick={() => setCreateOpen(true)}
-            className="bg-secondary text-secondary-foreground"
-          >
-            <Plus className="mr-2 h-4 w-4" /> New task
-          </Button>
         </div>
+        {recommendation && <div className="mt-3 flex flex-col gap-2 rounded-lg border border-primary/25 bg-primary/8 px-3 py-2.5 sm:flex-row sm:items-center"><button type="button" disabled={!recommendation.recommendation} onClick={() => recommendation.recommendation && setSelectedId(recommendation.recommendation.id)} className="min-w-0 flex-1 text-left disabled:cursor-default"><p className="text-xs font-black text-primary">{recommendation.recommendation?.title ?? "No task fits right now"}</p><p className="mt-0.5 text-xs text-muted-foreground">{recommendation.reason}</p></button><Button variant="ghost" size="sm" onClick={() => void recommendNext()}>Refresh</Button></div>}
       </section>
 
-      <section className="bento-card flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex rounded-lg bg-muted p-1">
-          {(["active", "completed"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setStatus(item)}
-              className={`rounded-md px-3 py-1.5 text-sm font-bold transition-colors ${status === item ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
-            >
-              {item === "active" ? "Active" : "Completed"}
-            </button>
-          ))}
-        </div>
-        <label className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-          <SlidersHorizontal className="h-4 w-4" />
-          Organize by
-          <select
-            aria-label="Organize tasks by"
-            value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as SortMode)}
-            className="h-9 rounded-lg border bg-background px-3 text-sm font-bold text-foreground outline-none focus:border-primary"
-          >
-            <option value="dueDate">Due date</option>
-            <option value="importance">Importance</option>
-          </select>
-        </label>
-      </section>
-
-      <div className="grid grid-flow-dense items-start gap-5 xl:grid-cols-2">
-        {taskColumn(
-          "Tests & quizzes",
-          "Assessments, exams, and study checkpoints",
-          tests,
-          FileCheck2,
-        )}
-        {taskColumn(
-          "Assignments & tasks",
-          "Homework, projects, errands, and everyday work",
-          assignments,
-          ClipboardList,
-        )}
-      </div>
-
+      <div className="grid grid-flow-dense items-start gap-5 xl:grid-cols-2">{taskColumn("Tests & quizzes", "Assessments, exams, and study checkpoints", tests, FileCheck2, "tests")}{taskColumn("Assignments & tasks", "Homework, projects, errands, and everyday work", assignments, ClipboardList, "assignments")}</div>
       <CreateTaskModal open={createOpen} onOpenChange={setCreateOpen} />
-      {selectedId !== null && (
-        <TaskDetailsModal
-          taskId={selectedId}
-          open
-          onOpenChange={(open) => !open && setSelectedId(null)}
-        />
-      )}
+      {selectedId !== null && <TaskDetailsModal taskId={selectedId} open onOpenChange={(open) => !open && setSelectedId(null)} />}
     </div>
   );
 }

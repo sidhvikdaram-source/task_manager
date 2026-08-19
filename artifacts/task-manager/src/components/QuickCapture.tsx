@@ -26,10 +26,14 @@ type Preview = {
 export function QuickCapture({
   onCreated,
   contextSubject,
+  contextTaskKind,
+  compact = false,
   placeholder = "Call mom Sunday afternoon #Personal p1",
 }: {
   onCreated?: () => void;
   contextSubject?: string;
+  contextTaskKind?: "test" | "quiz" | "assignment" | "task";
+  compact?: boolean;
   placeholder?: string;
 }) {
   const [text, setText] = useState("");
@@ -65,7 +69,7 @@ export function QuickCapture({
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, contextSubject }),
+          body: JSON.stringify({ text, contextSubject, contextTaskKind }),
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("Preview unavailable");
@@ -83,7 +87,7 @@ export function QuickCapture({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [text, contextSubject]);
+  }, [text, contextSubject, contextTaskKind]);
 
   async function create(event: React.FormEvent) {
     event.preventDefault();
@@ -94,7 +98,7 @@ export function QuickCapture({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, contextSubject }),
+        body: JSON.stringify({ text, contextSubject, contextTaskKind }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         task?: { title: string };
@@ -136,9 +140,9 @@ export function QuickCapture({
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            rows={2}
+            rows={compact ? 1 : 2}
             placeholder={placeholder}
-            className="min-h-12 flex-1 resize-none bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground/75"
+            className={`${compact ? "min-h-9" : "min-h-12"} flex-1 resize-none bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground/75`}
           />
           <motion.button
             type="submit"
@@ -154,7 +158,7 @@ export function QuickCapture({
         </div>
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-muted-foreground">
+      {!compact && <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-muted-foreground">
         {[
           ["#Subject", "#"],
           ["Priority", "p1"],
@@ -170,7 +174,7 @@ export function QuickCapture({
             {label}
           </motion.button>
         ))}
-      </div>
+      </div>}
 
       <AnimatePresence mode="wait" initial={false}>
         {parsing && !preview?.title ? (

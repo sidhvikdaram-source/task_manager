@@ -388,6 +388,7 @@ export function TaskDetailsModal({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="assignment">Assignment</SelectItem>
+                    <SelectItem value="task">Regular task</SelectItem>
                     <SelectItem value="test">Test</SelectItem>
                     <SelectItem value="quiz">Quiz</SelectItem>
                     <SelectItem value="project">Project</SelectItem>

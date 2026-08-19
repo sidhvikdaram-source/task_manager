@@ -1086,6 +1086,11 @@ async function handlePlanning(
       organized: Boolean(
         parsed.projectId || parsed.subject || input.contextSubject,
       ),
+      taskKind: ["test", "quiz", "assignment", "task"].includes(
+        String(input.contextTaskKind ?? ""),
+      )
+        ? String(input.contextTaskKind)
+        : "assignment",
     });
     const batch = writeBatch(firebaseDb);
     batch.set(childDoc(uid, "tasks", id), task);

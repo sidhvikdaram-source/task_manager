@@ -93,6 +93,11 @@ router.post("/quick-capture", async (req, res): Promise<void> => {
     text,
     req.body?.contextSubject,
   );
+  const contextTaskKind = ["test", "quiz", "assignment", "task"].includes(
+    req.body?.contextTaskKind,
+  )
+    ? req.body.contextTaskKind
+    : undefined;
   if (!parsed.title) {
     res
       .status(400)
@@ -124,6 +129,7 @@ router.post("/quick-capture", async (req, res): Promise<void> => {
         subject: parsed.subject,
         estimatedMinutes: parsed.estimatedMinutes,
         organized: Boolean(parsed.projectId || parsed.subject),
+        taskKind: contextTaskKind ?? "assignment",
       })
       .returning();
     const checklist = parsed.checklist.length
