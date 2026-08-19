@@ -42,7 +42,7 @@ export function TaskCard({ task, layoutId }: TaskCardProps) {
     event.stopPropagation();
     if (isCompleted) return;
     void taskCompletion.complete(task, event.currentTarget, {
-      onSuccess: () => {
+      onOptimistic: () => {
         setCompletionPop(true);
         window.setTimeout(() => setCompletionPop(false), 1300);
       },

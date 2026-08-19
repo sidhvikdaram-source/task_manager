@@ -28,22 +28,22 @@ export function useCompletionFeedback() {
       const soundReady = preferences.completionSoundEnabled
         ? primeCompletionSound()
         : Promise.resolve();
+      const origin = completionOrigin(element);
       if (preferences.completionSoundEnabled) {
         void playCompletionTick(soundReady).catch(() => undefined);
       }
+      playCompletionEffect(
+        data?.equipped?.completion_effect ?? "clean-confetti",
+        origin,
+      );
       return {
-        origin: completionOrigin(element),
         soundReady,
       };
     },
-    celebrate(prepared: { origin: { x: number; y: number }; soundReady: Promise<void> }) {
+    celebrate(prepared: { soundReady: Promise<void> }) {
       if (preferences.completionSoundEnabled) {
         void playCompletionSound(prepared.soundReady).catch(() => undefined);
       }
-      playCompletionEffect(
-        data?.equipped?.completion_effect ?? "clean-confetti",
-        prepared.origin,
-      );
     },
   };
 }
