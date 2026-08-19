@@ -171,7 +171,7 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[92vh] overflow-x-hidden overflow-y-auto sm:max-w-[760px]">
         <DialogHeader>
           <DialogTitle>New Task</DialogTitle>
         </DialogHeader>
@@ -205,7 +205,7 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
               )}
             />
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="priority"
@@ -262,17 +262,17 @@ export function CreateTaskModal({ open, onOpenChange, defaultCalendarDate, onSuc
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField control={form.control} name="subject" render={({ field }) => <FormItem><FormLabel>Subject</FormLabel><Select onValueChange={(value) => field.onChange(value === 'none' ? '' : value)} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None / Inbox</SelectItem>{subjects.map((subject) => <SelectItem key={subject.id} value={subject.name}>{subject.name}</SelectItem>)}</SelectContent></Select></FormItem>} />
               <FormField control={form.control} name="taskKind" render={({ field }) => <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="assignment">Assignment</SelectItem><SelectItem value="test">Test</SelectItem><SelectItem value="quiz">Quiz</SelectItem><SelectItem value="project">Project</SelectItem><SelectItem value="reading">Reading</SelectItem><SelectItem value="practice">Practice</SelectItem><SelectItem value="note">Note</SelectItem></SelectContent></Select></FormItem>} />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField control={form.control} name="difficulty" render={({ field }) => <FormItem><FormLabel>Difficulty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">Light</SelectItem><SelectItem value="2">Standard</SelectItem><SelectItem value="3">Deep work</SelectItem></SelectContent></Select></FormItem>} />
               <FormField control={form.control} name="blocked" render={({ field }) => <FormItem><FormLabel>Availability</FormLabel><button type="button" onClick={() => field.onChange(!field.value)} className={`flex h-10 w-full items-center rounded-md border px-3 text-sm ${field.value ? 'border-secondary bg-secondary/10 text-secondary' : 'text-muted-foreground'}`}>{field.value ? 'Waiting / blocked' : 'Ready to work'}</button></FormItem>} />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="startDate"

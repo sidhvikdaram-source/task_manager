@@ -128,8 +128,11 @@ export function QuickCapture({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18 }}
     >
-      <div className="quick-capture-shell" data-page-visible={pageVisible}>
-        <div className="relative z-[1] flex items-end gap-2 rounded-[calc(0.9rem-1px)] bg-background p-2">
+      <div
+        className={compact ? "rounded-xl border border-border/80 bg-background transition-colors focus-within:border-primary/55" : "quick-capture-shell"}
+        data-page-visible={pageVisible}
+      >
+        <div className={`relative z-[1] flex items-end gap-2 bg-background p-2 ${compact ? "rounded-[calc(0.75rem-1px)]" : "rounded-[calc(0.9rem-1px)]"}`}>
           <textarea
             aria-label="Quick capture task"
             value={text}

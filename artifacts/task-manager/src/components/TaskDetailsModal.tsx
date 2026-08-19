@@ -269,7 +269,7 @@ export function TaskDetailsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[92vh] overflow-x-hidden overflow-y-auto sm:max-w-[820px]">
         <DialogHeader>
           <DialogTitle style={{ color: subjectColor(task?.subject, subjects) }}>
             Task details
@@ -398,7 +398,7 @@ export function TaskDetailsModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
                   Priority
@@ -472,7 +472,7 @@ export function TaskDetailsModal({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
                   Start Date <span className="text-xs">(soft)</span>
@@ -501,7 +501,7 @@ export function TaskDetailsModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-muted-foreground" />
