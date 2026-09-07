@@ -235,14 +235,14 @@ function LoginScreen() {
                     setAuthError("");
                     setIsSubmitting(true);
                     void resetPassword(email)
-                      .then(() => setAuthError("Password reset sent. Check your inbox and spam folder."))
+                      .then(() => setAuthError("If password login is enabled for that account, Firebase sent a reset email. Check your inbox and spam folder."))
                       .catch((error) => setAuthError(error instanceof Error ? error.message : "Password reset could not be sent."))
                       .finally(() => setIsSubmitting(false));
                   }} className="text-xs font-black text-primary hover:underline disabled:opacity-50">Forgot password?</button>
                 </div>
               )}
               {authError && (
-                <p className={`rounded-xl border px-3 py-2 text-sm ${authError.startsWith("Password reset sent") ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-destructive/30 bg-destructive/10 text-destructive"}`}>
+                <p className={`rounded-xl border px-3 py-2 text-sm ${authError.startsWith("If password login") ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-destructive/30 bg-destructive/10 text-destructive"}`}>
                   {authError}
                 </p>
               )}

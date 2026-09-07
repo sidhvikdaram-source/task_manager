@@ -142,6 +142,8 @@ function userDefaults() {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     calendarView: "month",
     completionSoundEnabled: true,
+    emailRemindersEnabled: false,
+    reminderEmails: current.email ? [current.email.toLowerCase()] : [],
     taskWorkspaceNotes: {},
     equippedFrame: "none",
     equippedPet: "none",
@@ -1479,6 +1481,8 @@ async function handleUserAndRewards(
       "timezone",
       "calendarView",
       "completionSoundEnabled",
+      "emailRemindersEnabled",
+      "reminderEmails",
       "taskWorkspaceNotes",
     ];
     return json(Object.fromEntries(keys.map((key) => [key, user[key]])));
@@ -1494,6 +1498,8 @@ async function handleUserAndRewards(
       "timezone",
       "calendarView",
       "completionSoundEnabled",
+      "emailRemindersEnabled",
+      "reminderEmails",
       "taskWorkspaceNotes",
     ];
     const changes = Object.fromEntries(
@@ -1501,6 +1507,17 @@ async function handleUserAndRewards(
         .filter((key) => Object.hasOwn(input, key))
         .map((key) => [key, input[key]]),
     );
+    if (Object.hasOwn(changes, "reminderEmails")) {
+      const emails = Array.isArray(changes.reminderEmails) ? changes.reminderEmails : [];
+      changes.reminderEmails = [...new Set(emails
+        .filter((email): email is string => typeof email === "string")
+        .map((email) => email.trim().toLowerCase())
+        .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))]
+        .slice(0, 5);
+    }
+    if (Object.hasOwn(changes, "emailRemindersEnabled")) {
+      changes.emailRemindersEnabled = changes.emailRemindersEnabled === true;
+    }
     await updateDoc(userPath(uid), { ...changes, updatedAt: now() });
     await setDoc(
       doc(firebaseDb, "publicProfiles", uid),

@@ -20,6 +20,8 @@ export type ExperiencePreferences = {
   timezone: string;
   calendarView: "month" | "week" | "day" | "agenda";
   completionSoundEnabled: boolean;
+  emailRemindersEnabled: boolean;
+  reminderEmails: string[];
 };
 
 const defaults: ExperiencePreferences = {
@@ -32,6 +34,8 @@ const defaults: ExperiencePreferences = {
   timezone: "UTC",
   calendarView: "month",
   completionSoundEnabled: true,
+  emailRemindersEnabled: false,
+  reminderEmails: [],
 };
 
 function preferencesCacheKey(email?: string | null) {

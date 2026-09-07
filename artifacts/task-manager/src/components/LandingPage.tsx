@@ -379,13 +379,13 @@ export function LandingPage({ onOpenApp }: { onOpenApp?: () => void }) {
                         setAuthError("");
                         setIsSubmitting(true);
                         void resetPassword(email)
-                          .then(() => setAuthError("Password reset sent. Check your inbox and spam folder."))
+                          .then(() => setAuthError("If password login is enabled for that account, Firebase sent a reset email. Check your inbox and spam folder."))
                           .catch((error) => setAuthError(error instanceof Error ? error.message : "Password reset could not be sent."))
                           .finally(() => setIsSubmitting(false));
                       }} className="text-xs font-black text-[#6f5cda] hover:underline disabled:opacity-50">Forgot password?</button>
                     </div>
                   )}
-                  {authError && <p className={`rounded-xl border px-3 py-2 text-sm ${authError.startsWith("Password reset sent") ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>{authError}</p>}
+                  {authError && <p className={`rounded-xl border px-3 py-2 text-sm ${authError.startsWith("If password login") ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>{authError}</p>}
                   <button type="submit" disabled={isSubmitting} className="group flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#7c68ef] text-sm font-black text-white shadow-[0_15px_35px_rgba(124,104,239,.22)] transition-transform hover:-translate-y-0.5 disabled:opacity-60">
                     {submitLabel}<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </button>

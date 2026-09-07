@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
   sendPasswordResetEmail,
+  linkWithCredential,
+  reload,
   updatePassword,
   signOut,
   browserLocalPersistence,
@@ -68,6 +71,7 @@ interface AuthState {
   registerWithPassword: (email: string, password: string, firstName?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   setPassword: (password: string) => Promise<void>;
+  hasPassword: boolean;
   logout: () => void;
 }
 
@@ -166,14 +170,21 @@ export function useAuth(): AuthState {
     if (!currentUser?.email) throw new Error("Sign in before creating a password.");
     if (password.length < 6) throw new Error("Use a password with at least six characters.");
     try {
-      await updatePassword(currentUser, password);
+      const passwordIsLinked = currentUser.providerData.some((provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID);
+      if (passwordIsLinked) {
+        await updatePassword(currentUser, password);
+      } else {
+        await linkWithCredential(currentUser, EmailAuthProvider.credential(currentUser.email, password));
+      }
+      await reload(currentUser);
+      publishUser(toAuthUser(currentUser));
     } catch (error) {
       if (firebaseAuthCode(error) === "auth/requires-recent-login") {
         throw new Error("For security, sign out and sign in with Google again, then create the password immediately.");
       }
       throw new Error(authMessage(error));
     }
-  }, []);
+  }, [publishUser]);
 
   const logout = useCallback(() => {
     setLegacySessionToken(null);
@@ -192,6 +203,7 @@ export function useAuth(): AuthState {
     registerWithPassword,
     resetPassword,
     setPassword,
+    hasPassword: firebaseAuth.currentUser?.providerData.some((provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID) ?? false,
     logout,
   };
 }

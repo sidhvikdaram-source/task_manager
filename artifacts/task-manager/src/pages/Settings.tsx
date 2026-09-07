@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Check, FlaskConical, Gift, KeyRound, Settings2, ShieldCheck, Sparkles, Users, Volume2 } from "lucide-react";
+import { BellRing, Check, FlaskConical, Gift, KeyRound, Mail, Plus, Settings2, ShieldCheck, Sparkles, Users, Volume2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
 import { playCompletionSound, primeCompletionSound } from "@/lib/completionSound";
@@ -15,10 +15,12 @@ type AdminState = {
 export default function Settings() {
   const { preferences, updatePreferences } = useExperience();
   const queryClient = useQueryClient();
-  const { setPassword } = useAuth();
+  const { user, setPassword, resetPassword, hasPassword } = useAuth();
   const [saving, setSaving] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [reminderEmail, setReminderEmail] = useState("");
   const [admin, setAdmin] = useState<AdminState | null>(null);
+  const reminderDeliveryAvailable = import.meta.env.VITE_EMAIL_REMINDERS_AVAILABLE === "true";
 
   useEffect(() => {
     fetch("/api/admin", { credentials: "include" })
@@ -100,6 +102,28 @@ export default function Settings() {
     }
   }
 
+  async function saveReminderEmails(emails: string[], enabled = preferences.emailRemindersEnabled) {
+    setSaving("reminderEmails");
+    try {
+      await updatePreferences({ reminderEmails: emails, emailRemindersEnabled: enabled && emails.length > 0 });
+      toast.success("Reminder recipients saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Reminder recipients could not be saved");
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  function addReminderEmail(event: React.FormEvent) {
+    event.preventDefault();
+    const email = reminderEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast.error("Enter a valid email address"); return; }
+    if (preferences.reminderEmails.includes(email)) { toast.error("That email is already included"); return; }
+    if (preferences.reminderEmails.length >= 5) { toast.error("Nimbus supports up to five reminder emails"); return; }
+    setReminderEmail("");
+    void saveReminderEmails([...preferences.reminderEmails, email]);
+  }
+
   return (
     <div className="page-stack mx-auto max-w-4xl space-y-5">
       <header className="border-b pb-4">
@@ -155,11 +179,25 @@ export default function Settings() {
         <SettingRow icon={Volume2} title="Completion sounds" detail="Play a short confirmation sound when a task is completed." enabled={preferences.completionSoundEnabled} disabled={saving === "completionSoundEnabled"} onChange={(value) => void toggle("completionSoundEnabled", value)} />
       </section>
       <section className="bento-card p-5">
-        <div className="flex items-start gap-3"><KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div className="min-w-0 flex-1"><h2 className="font-black">Nimbus password</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">If you normally use Google, create a password for the same account so you can sign in where Google is blocked.</p></div></div>
+        <div className="flex items-start gap-3"><KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="font-black">Nimbus password</h2><span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${hasPassword ? "bg-emerald-500/12 text-emerald-600" : "bg-amber-500/12 text-amber-600"}`}>{hasPassword ? "Password login ready" : "Google login only"}</span></div><p className="mt-1 text-sm leading-5 text-muted-foreground">Passwords are encrypted and can never be displayed. {hasPassword ? "You can replace yours or request a secure reset email." : "Create one for this same account so you can sign in where Google is blocked."}</p></div></div>
         <form onSubmit={savePassword} className="mt-4 flex flex-col gap-2 sm:flex-row">
           <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={6} autoComplete="new-password" placeholder="New password (6+ characters)" className="h-11 min-w-0 flex-1 rounded-xl border bg-background px-3 text-sm outline-none focus:border-primary" required />
           <button type="submit" disabled={saving === "password" || newPassword.length < 6} className="h-11 rounded-xl bg-primary px-4 text-sm font-black text-primary-foreground disabled:opacity-50">{saving === "password" ? "Saving…" : "Create or change password"}</button>
         </form>
+        {hasPassword && user?.email && <button type="button" disabled={saving === "passwordReset"} onClick={() => { setSaving("passwordReset"); void resetPassword(user.email!).then(() => toast.success("Password reset email sent", { description: `Check ${user.email} and its spam folder.` })).catch((error) => toast.error(error instanceof Error ? error.message : "Reset email could not be sent")).finally(() => setSaving(null)); }} className="mt-3 inline-flex items-center gap-2 text-xs font-black text-primary hover:underline disabled:opacity-50"><Mail className="h-3.5 w-3.5" />Send a password reset email</button>}
+      </section>
+      <section className="bento-card overflow-hidden">
+        <div className="flex items-start gap-3 p-5">
+          <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1"><h2 className="font-black">Due-date email reminders</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">Send one concise digest when unfinished tasks are two days away. Add up to five recipients.</p></div>
+          <button type="button" role="switch" aria-checked={preferences.emailRemindersEnabled} aria-label="Toggle due-date email reminders" disabled={!reminderDeliveryAvailable || saving === "reminderEmails" || preferences.reminderEmails.length === 0} onClick={() => void saveReminderEmails(preferences.reminderEmails, !preferences.emailRemindersEnabled)} className={`h-6 w-11 shrink-0 rounded-full p-1 transition-colors disabled:opacity-40 ${preferences.emailRemindersEnabled ? "bg-primary" : "bg-muted-foreground/30"}`}><span className={`block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${preferences.emailRemindersEnabled ? "translate-x-5" : ""}`} /></button>
+        </div>
+        <div className="border-t bg-muted/20 p-5">
+          <div className="mb-3 flex flex-wrap gap-2">{preferences.reminderEmails.map((email) => <span key={email} className="inline-flex max-w-full items-center gap-1.5 rounded-full border bg-background py-1.5 pl-3 pr-1.5 text-xs font-bold"><span className="truncate">{email}</span><button type="button" aria-label={`Remove ${email}`} onClick={() => void saveReminderEmails(preferences.reminderEmails.filter((item) => item !== email))} className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button></span>)}</div>
+          <form onSubmit={addReminderEmail} className="flex flex-col gap-2 sm:flex-row"><label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border bg-background px-3 focus-within:border-primary"><Mail className="h-4 w-4 text-muted-foreground" /><input type="email" value={reminderEmail} onChange={(event) => setReminderEmail(event.target.value)} placeholder="Add a reminder email" autoComplete="email" className="min-w-0 flex-1 bg-transparent text-sm outline-none" /></label><button type="submit" disabled={!reminderEmail.trim() || saving === "reminderEmails" || preferences.reminderEmails.length >= 5} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-black transition-colors hover:bg-muted disabled:opacity-40"><Plus className="h-4 w-4" />Add email</button></form>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">{!reminderDeliveryAvailable ? "Recipients can be saved now, but delivery stays off until Nimbus's one-time mail service setup is complete." : preferences.emailRemindersEnabled ? "Reminders are enabled." : preferences.reminderEmails.length ? "Recipients saved. Turn the switch on to start reminders." : `Start with ${user?.email ?? "your account email"}, or add another inbox.`}</p>
+          {!preferences.reminderEmails.length && user?.email && <button type="button" onClick={() => void saveReminderEmails([user.email!], reminderDeliveryAvailable)} className="mt-2 text-xs font-black text-primary hover:underline">Use my account email</button>}
+        </div>
       </section>
       {preferences.completionSoundEnabled && (
         <button

@@ -54,6 +54,13 @@ export const usersTable = pgTable("users", {
   completionSoundEnabled: boolean("completion_sound_enabled")
     .notNull()
     .default(true),
+  emailRemindersEnabled: boolean("email_reminders_enabled")
+    .notNull()
+    .default(false),
+  reminderEmails: jsonb("reminder_emails")
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   taskWorkspaceNotes: jsonb("task_workspace_notes")
     .$type<Record<string, string>>()
     .notNull()

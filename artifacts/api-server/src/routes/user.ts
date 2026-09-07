@@ -61,6 +61,8 @@ router.get("/user/preferences", async (req, res): Promise<void> => {
       timezone: usersTable.timezone,
       calendarView: usersTable.calendarView,
       completionSoundEnabled: usersTable.completionSoundEnabled,
+      emailRemindersEnabled: usersTable.emailRemindersEnabled,
+      reminderEmails: usersTable.reminderEmails,
       taskWorkspaceNotes: usersTable.taskWorkspaceNotes,
     })
     .from(usersTable)
@@ -94,6 +96,14 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
     update.calendarView = req.body.calendarView;
   if (typeof req.body?.completionSoundEnabled === "boolean")
     update.completionSoundEnabled = req.body.completionSoundEnabled;
+  if (typeof req.body?.emailRemindersEnabled === "boolean")
+    update.emailRemindersEnabled = req.body.emailRemindersEnabled;
+  if (Array.isArray(req.body?.reminderEmails)) {
+    const sanitizedEmails = (req.body.reminderEmails as unknown[])
+      .flatMap((email): string[] => typeof email === "string" ? [email.trim().toLowerCase()] : [])
+      .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+    update.reminderEmails = Array.from(new Set(sanitizedEmails)).slice(0, 5);
+  }
   if (req.body?.taskWorkspaceNotes && typeof req.body.taskWorkspaceNotes === "object" && !Array.isArray(req.body.taskWorkspaceNotes)) {
     update.taskWorkspaceNotes = Object.fromEntries(
       Object.entries(req.body.taskWorkspaceNotes as Record<string, unknown>)
@@ -129,6 +139,8 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
       timezone: usersTable.timezone,
       calendarView: usersTable.calendarView,
       completionSoundEnabled: usersTable.completionSoundEnabled,
+      emailRemindersEnabled: usersTable.emailRemindersEnabled,
+      reminderEmails: usersTable.reminderEmails,
       taskWorkspaceNotes: usersTable.taskWorkspaceNotes,
     });
   res.json(user);

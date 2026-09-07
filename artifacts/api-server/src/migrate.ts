@@ -39,6 +39,8 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "timezone" varchar DEFAULT 'UTC' NOT NULL,
       ADD COLUMN IF NOT EXISTS "calendar_view" varchar DEFAULT 'month' NOT NULL,
       ADD COLUMN IF NOT EXISTS "completion_sound_enabled" boolean DEFAULT true NOT NULL,
+      ADD COLUMN IF NOT EXISTS "email_reminders_enabled" boolean DEFAULT false NOT NULL,
+      ADD COLUMN IF NOT EXISTS "reminder_emails" jsonb DEFAULT '[]'::jsonb NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_completion_effect" varchar DEFAULT 'clean-confetti' NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_transition" varchar DEFAULT 'velocity-slide' NOT NULL,
       ADD COLUMN IF NOT EXISTS "equipped_profile_theme" varchar DEFAULT 'none' NOT NULL,
