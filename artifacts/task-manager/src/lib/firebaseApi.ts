@@ -142,6 +142,7 @@ function userDefaults() {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     calendarView: "month",
     completionSoundEnabled: true,
+    taskWorkspaceNotes: {},
     equippedFrame: "none",
     equippedPet: "none",
     equippedTitle: "none",
@@ -842,6 +843,14 @@ async function handleTasks(
         .filter((key) => Object.hasOwn(input, key))
         .map((key) => [key, input[key]]),
     );
+    if (changes.taskWorkspaceNotes && typeof changes.taskWorkspaceNotes === "object" && !Array.isArray(changes.taskWorkspaceNotes)) {
+      changes.taskWorkspaceNotes = Object.fromEntries(
+        Object.entries(changes.taskWorkspaceNotes as JsonObject)
+          .slice(0, 6)
+          .filter(([, value]) => typeof value === "string")
+          .map(([key, value]) => [key.slice(0, 40), String(value).slice(0, 20_000)]),
+      );
+    }
     await updateDoc(childDoc(uid, "tasks", id), clean(changes));
     return json({ ...existing, ...changes });
   }
@@ -1470,6 +1479,7 @@ async function handleUserAndRewards(
       "timezone",
       "calendarView",
       "completionSoundEnabled",
+      "taskWorkspaceNotes",
     ];
     return json(Object.fromEntries(keys.map((key) => [key, user[key]])));
   }
@@ -1484,6 +1494,7 @@ async function handleUserAndRewards(
       "timezone",
       "calendarView",
       "completionSoundEnabled",
+      "taskWorkspaceNotes",
     ];
     const changes = Object.fromEntries(
       keys

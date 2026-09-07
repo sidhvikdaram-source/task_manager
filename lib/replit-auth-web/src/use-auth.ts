@@ -5,6 +5,8 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signInWithPopup,
+  sendPasswordResetEmail,
+  updatePassword,
   signOut,
   browserLocalPersistence,
   setPersistence,
@@ -64,6 +66,8 @@ interface AuthState {
   login: () => Promise<void>;
   loginWithPassword: (email: string, password: string) => Promise<void>;
   registerWithPassword: (email: string, password: string, firstName?: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  setPassword: (password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -150,6 +154,27 @@ export function useAuth(): AuthState {
     publishUser(toAuthUser(credential.user));
   }, [publishUser]);
 
+  const resetPassword = useCallback(async (email: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) throw new Error("Enter your email first.");
+    await persistenceReady;
+    await withTransientRetry(() => sendPasswordResetEmail(firebaseAuth, normalizedEmail));
+  }, []);
+
+  const setPassword = useCallback(async (password: string) => {
+    const currentUser = firebaseAuth.currentUser;
+    if (!currentUser?.email) throw new Error("Sign in before creating a password.");
+    if (password.length < 6) throw new Error("Use a password with at least six characters.");
+    try {
+      await updatePassword(currentUser, password);
+    } catch (error) {
+      if (firebaseAuthCode(error) === "auth/requires-recent-login") {
+        throw new Error("For security, sign out and sign in with Google again, then create the password immediately.");
+      }
+      throw new Error(authMessage(error));
+    }
+  }, []);
+
   const logout = useCallback(() => {
     setLegacySessionToken(null);
     void signOut(firebaseAuth).finally(() => {
@@ -165,6 +190,8 @@ export function useAuth(): AuthState {
     login,
     loginWithPassword,
     registerWithPassword,
+    resetPassword,
+    setPassword,
     logout,
   };
 }

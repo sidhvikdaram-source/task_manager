@@ -61,6 +61,7 @@ router.get("/user/preferences", async (req, res): Promise<void> => {
       timezone: usersTable.timezone,
       calendarView: usersTable.calendarView,
       completionSoundEnabled: usersTable.completionSoundEnabled,
+      taskWorkspaceNotes: usersTable.taskWorkspaceNotes,
     })
     .from(usersTable)
     .where(eq(usersTable.id, req.user.id));
@@ -93,6 +94,14 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
     update.calendarView = req.body.calendarView;
   if (typeof req.body?.completionSoundEnabled === "boolean")
     update.completionSoundEnabled = req.body.completionSoundEnabled;
+  if (req.body?.taskWorkspaceNotes && typeof req.body.taskWorkspaceNotes === "object" && !Array.isArray(req.body.taskWorkspaceNotes)) {
+    update.taskWorkspaceNotes = Object.fromEntries(
+      Object.entries(req.body.taskWorkspaceNotes as Record<string, unknown>)
+        .slice(0, 6)
+        .filter(([, value]) => typeof value === "string")
+        .map(([key, value]) => [key.slice(0, 40), String(value).slice(0, 20_000)]),
+    );
+  }
   if (typeof req.body?.timezone === "string") {
     try {
       Intl.DateTimeFormat("en-US", { timeZone: req.body.timezone }).format();
@@ -120,6 +129,7 @@ router.patch("/user/preferences", async (req, res): Promise<void> => {
       timezone: usersTable.timezone,
       calendarView: usersTable.calendarView,
       completionSoundEnabled: usersTable.completionSoundEnabled,
+      taskWorkspaceNotes: usersTable.taskWorkspaceNotes,
     });
   res.json(user);
 });

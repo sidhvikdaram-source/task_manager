@@ -57,7 +57,7 @@ const queryClient = new QueryClient({
 });
 
 function LoginScreen() {
-  const { login, loginWithPassword, registerWithPassword } = useAuth();
+  const { login, loginWithPassword, registerWithPassword, resetPassword } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -229,8 +229,20 @@ function LoginScreen() {
                   required
                 />
               </label>
+              {mode === "login" && (
+                <div className="flex justify-end">
+                  <button type="button" disabled={isSubmitting} onClick={() => {
+                    setAuthError("");
+                    setIsSubmitting(true);
+                    void resetPassword(email)
+                      .then(() => setAuthError("Password reset sent. Check your inbox and spam folder."))
+                      .catch((error) => setAuthError(error instanceof Error ? error.message : "Password reset could not be sent."))
+                      .finally(() => setIsSubmitting(false));
+                  }} className="text-xs font-black text-primary hover:underline disabled:opacity-50">Forgot password?</button>
+                </div>
+              )}
               {authError && (
-                <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p className={`rounded-xl border px-3 py-2 text-sm ${authError.startsWith("Password reset sent") ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600" : "border-destructive/30 bg-destructive/10 text-destructive"}`}>
                   {authError}
                 </p>
               )}

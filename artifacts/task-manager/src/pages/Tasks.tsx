@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BatteryMedium, CalendarClock, Check, CheckCircle2, ChevronDown, Circle, ClipboardList, Clock3, FileCheck2, GraduationCap, GripVertical, House, ListTodo, Loader2, NotebookPen, Plus, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
 import { getListTasksQueryKey, useListTasks, type Task } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
@@ -33,11 +33,36 @@ function DocumentTaskEntry({
 }) {
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<{ title?: string; dueDate?: string | null; subject?: string | null; priority?: string; estimatedMinutes?: number | null } | null>(null);
   const placeholder = lane === "tests"
     ? "Type a test or quiz, date, subject, and priority…"
     : lane === "personal"
       ? "Type a personal task with its date or priority…"
       : "Type an assignment, date, subject, and priority…";
+
+  useEffect(() => {
+    if (!text.trim()) { setPreview(null); return; }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/quick-capture/preview", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            contextTaskKind: lane === "tests" ? "test" : lane === "personal" ? "task" : "assignment",
+            contextWorkspace: workspaceMode,
+          }),
+          signal: controller.signal,
+        });
+        if (response.ok) setPreview(await response.json());
+      } catch {
+        if (!controller.signal.aborted) setPreview(null);
+      }
+    }, 160);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [lane, text, workspaceMode]);
 
   async function create() {
     if (!text.trim() || saving) return;
@@ -68,9 +93,11 @@ function DocumentTaskEntry({
   }
 
   return (
-    <div className="border-b border-border/70 bg-background/55 px-4 py-3">
-      <div className="flex items-start gap-3">
-        <Plus className="mt-2.5 h-4 w-4 shrink-0 text-primary" />
+    <div className="border-b border-border/70 bg-background/55 px-4 py-4">
+      <div className="overflow-hidden rounded-xl border bg-background shadow-[0_8px_30px_hsl(var(--foreground)/0.04)] focus-within:border-primary/45">
+        <div className="flex items-center justify-between border-b px-4 py-2 text-[11px] font-bold text-muted-foreground"><span>Write a task naturally</span><span>{saving ? "Parsing…" : "Enter adds · Shift+Enter adds a line"}</span></div>
+        <div className="flex items-start gap-3 px-4 py-3">
+        <Plus className="mt-2 h-4 w-4 shrink-0 text-primary" />
         <textarea
           aria-label={`Add ${lane === "tests" ? "test or quiz" : "task"}`}
           value={text}
@@ -81,11 +108,42 @@ function DocumentTaskEntry({
               void create();
             }
           }}
-          rows={1}
+          rows={6}
           placeholder={placeholder}
-          className="min-h-10 flex-1 resize-none bg-transparent py-2 text-sm leading-6 outline-none placeholder:text-muted-foreground/65"
+          className="min-h-40 flex-1 resize-y bg-transparent py-1 text-[15px] leading-8 outline-none placeholder:text-muted-foreground/60"
+          style={{ backgroundImage: "linear-gradient(to bottom, transparent 31px, hsl(var(--border) / .32) 32px)", backgroundSize: "100% 32px" }}
         />
-        <span className="mt-2.5 shrink-0 text-[10px] font-bold text-muted-foreground">{saving ? "Parsing…" : "Enter to add"}</span>
+        </div>
+        <AnimatePresence initial={false}>
+          {preview?.title && text.trim() && (
+            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-wrap items-center gap-1.5 border-t bg-muted/25 px-4 py-2 text-[11px] text-muted-foreground">
+              <span className="font-black text-foreground">{preview.title}</span>
+              {preview.dueDate && <span className="rounded-md bg-background px-2 py-1">{preview.dueDate}</span>}
+              {preview.subject && <span className="rounded-md bg-background px-2 py-1">{preview.subject}</span>}
+              {preview.priority && <span className="rounded-md bg-background px-2 py-1 capitalize">{preview.priority}</span>}
+              {preview.estimatedMinutes && <span className="rounded-md bg-background px-2 py-1">{preview.estimatedMinutes} min</span>}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+function LaneNotesEditor({ value, onChange, onSave, saving }: { value: string; onChange: (value: string) => void; onSave: () => void; saving: boolean }) {
+  return (
+    <div className="border-b border-border/70 bg-background/55 px-4 py-4">
+      <div className="overflow-hidden rounded-xl border bg-background shadow-[0_8px_30px_hsl(var(--foreground)/0.04)] focus-within:border-primary/45">
+        <div className="flex items-center justify-between border-b px-4 py-2 text-[11px] font-bold text-muted-foreground"><span>Notes stay notes and sync to your account</span><span>{saving ? "Saving…" : "Saved on blur"}</span></div>
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onSave}
+          rows={7}
+          placeholder="Write class context, reminders, ideas, or planning notes here. Nothing in this mode becomes a task."
+          className="min-h-48 w-full resize-y bg-transparent px-5 py-4 text-[15px] leading-8 outline-none placeholder:text-muted-foreground/55"
+          style={{ backgroundImage: "linear-gradient(to bottom, transparent 31px, hsl(var(--border) / .34) 32px)", backgroundSize: "100% 32px" }}
+        />
       </div>
     </div>
   );
@@ -144,13 +202,46 @@ export default function Tasks() {
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [draggingTaskId, setDraggingTaskId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<Lane | null>(null);
+  const [workspaceNotes, setWorkspaceNotes] = useState<Record<string, string>>({});
+  const [savingNoteKey, setSavingNoteKey] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const { data: tasks = [] } = useListTasks({ sortBy: "priority" }, { query: { queryKey: getListTasksQueryKey({ sortBy: "priority" }) } });
   const { data: subjects = [] } = useSubjects();
+  const { data: workspacePreferences } = useQuery({
+    queryKey: ["task-workspace-preferences"],
+    queryFn: async () => {
+      const response = await fetch("/api/user/preferences", { credentials: "include" });
+      if (!response.ok) throw new Error("Workspace notes could not be loaded");
+      return response.json() as Promise<{ taskWorkspaceNotes?: Record<string, string> }>;
+    },
+  });
   const taskCompletion = useReliableTaskCompletion();
   const today = localDateKey(new Date());
 
   useEffect(() => { localStorage.setItem("velocity-task-views", JSON.stringify(enabledViews)); }, [enabledViews]);
+  useEffect(() => {
+    if (workspacePreferences?.taskWorkspaceNotes) setWorkspaceNotes(workspacePreferences.taskWorkspaceNotes);
+  }, [workspacePreferences]);
+
+  const notesKey = (lane: Lane) => `${workspaceMode}-${lane}`;
+  async function saveWorkspaceNote(lane: Lane) {
+    const key = notesKey(lane);
+    setSavingNoteKey(key);
+    try {
+      const response = await fetch("/api/user/preferences", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskWorkspaceNotes: workspaceNotes }),
+      });
+      if (!response.ok) throw new Error("Notes could not be saved");
+      queryClient.setQueryData(["task-workspace-preferences"], (current: { taskWorkspaceNotes?: Record<string, string> } | undefined) => ({ ...current, taskWorkspaceNotes: workspaceNotes }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Notes could not be saved");
+    } finally {
+      setSavingNoteKey(null);
+    }
+  }
 
   const visible = useMemo(() => {
     const completed = view === "completed";
@@ -297,7 +388,7 @@ export default function Tasks() {
                 <span className="inline-flex items-center gap-1"><Zap className="h-3 w-3 fill-current" /> {task.vpValue} NP</span>
               </div>
             </button>
-            <TaskInlineNotes taskId={task.id} taskTitle={task.title} notes={task.notes} compact={editingMode === "tasks"} />
+            <TaskInlineNotes taskId={task.id} taskTitle={task.title} notes={task.notes} compact />
           </div>
         </div>
       </motion.article>
@@ -319,6 +410,7 @@ export default function Tasks() {
           </div>
         </header>
         {view !== "completed" && editingMode === "tasks" && <DocumentTaskEntry lane={lane} workspaceMode={workspaceMode} onCreated={() => void refreshTasks()} />}
+        {view !== "completed" && editingMode === "notes" && <LaneNotesEditor value={workspaceNotes[notesKey(lane)] ?? ""} onChange={(value) => setWorkspaceNotes((current) => ({ ...current, [notesKey(lane)]: value }))} onSave={() => void saveWorkspaceNote(lane)} saving={savingNoteKey === notesKey(lane)} />}
         <div className="divide-y divide-border/70">{columnTasks.map(renderTask)}{columnTasks.length === 0 && <p className="px-5 py-12 text-center text-sm text-muted-foreground">{activeDrop ? "Drop the task here." : `No ${view === "completed" ? "completed" : "active"} ${title.toLowerCase()}.`}</p>}</div>
       </section>
     );

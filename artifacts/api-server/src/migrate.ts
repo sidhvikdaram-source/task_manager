@@ -32,6 +32,7 @@ export async function runMigrations(): Promise<void> {
       ADD COLUMN IF NOT EXISTS "main_goal" varchar,
       ADD COLUMN IF NOT EXISTS "onboarding_completed" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "advanced_features_enabled" boolean DEFAULT false NOT NULL,
+      ADD COLUMN IF NOT EXISTS "task_workspace_notes" jsonb DEFAULT '{}'::jsonb NOT NULL,
       ADD COLUMN IF NOT EXISTS "tutorial_completed" boolean DEFAULT false NOT NULL,
       ADD COLUMN IF NOT EXISTS "tutorial_step" integer DEFAULT 0 NOT NULL,
       ADD COLUMN IF NOT EXISTS "social_enabled" boolean DEFAULT false NOT NULL,

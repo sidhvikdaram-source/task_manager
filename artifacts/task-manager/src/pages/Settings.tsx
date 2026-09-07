@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Check, FlaskConical, Gift, Settings2, ShieldCheck, Sparkles, Users, Volume2 } from "lucide-react";
+import { Check, FlaskConical, Gift, KeyRound, Settings2, ShieldCheck, Sparkles, Users, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import { useExperience } from "@/experience";
 import { playCompletionSound, primeCompletionSound } from "@/lib/completionSound";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@workspace/replit-auth-web";
 
 type AdminState = {
   isAdmin: boolean;
@@ -14,7 +15,9 @@ type AdminState = {
 export default function Settings() {
   const { preferences, updatePreferences } = useExperience();
   const queryClient = useQueryClient();
+  const { setPassword } = useAuth();
   const [saving, setSaving] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
   const [admin, setAdmin] = useState<AdminState | null>(null);
 
   useEffect(() => {
@@ -83,6 +86,20 @@ export default function Settings() {
     }
   }
 
+  async function savePassword(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving("password");
+    try {
+      await setPassword(newPassword);
+      setNewPassword("");
+      toast.success("Nimbus password ready", { description: "You can now use email and password on your school computer." });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Password could not be created");
+    } finally {
+      setSaving(null);
+    }
+  }
+
   return (
     <div className="page-stack mx-auto max-w-4xl space-y-5">
       <header className="border-b pb-4">
@@ -136,6 +153,13 @@ export default function Settings() {
         <SettingRow icon={Users} title="Social" detail="Friends, private messages, challenges, and friend activity. Your account is hidden from Social search while this is off." enabled={preferences.socialEnabled} disabled={saving === "socialEnabled"} onChange={(value) => void toggle("socialEnabled", value)} />
         <SettingRow icon={Sparkles} title="Advanced workspace" detail="Projects, Calendar, Insights, and other planning tools." enabled={preferences.advancedFeaturesEnabled} disabled={saving === "advancedFeaturesEnabled"} onChange={(value) => void toggle("advancedFeaturesEnabled", value)} />
         <SettingRow icon={Volume2} title="Completion sounds" detail="Play a short confirmation sound when a task is completed." enabled={preferences.completionSoundEnabled} disabled={saving === "completionSoundEnabled"} onChange={(value) => void toggle("completionSoundEnabled", value)} />
+      </section>
+      <section className="bento-card p-5">
+        <div className="flex items-start gap-3"><KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-primary" /><div className="min-w-0 flex-1"><h2 className="font-black">Nimbus password</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">If you normally use Google, create a password for the same account so you can sign in where Google is blocked.</p></div></div>
+        <form onSubmit={savePassword} className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={6} autoComplete="new-password" placeholder="New password (6+ characters)" className="h-11 min-w-0 flex-1 rounded-xl border bg-background px-3 text-sm outline-none focus:border-primary" required />
+          <button type="submit" disabled={saving === "password" || newPassword.length < 6} className="h-11 rounded-xl bg-primary px-4 text-sm font-black text-primary-foreground disabled:opacity-50">{saving === "password" ? "Saving…" : "Create or change password"}</button>
+        </form>
       </section>
       {preferences.completionSoundEnabled && (
         <button

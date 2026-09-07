@@ -54,6 +54,10 @@ export const usersTable = pgTable("users", {
   completionSoundEnabled: boolean("completion_sound_enabled")
     .notNull()
     .default(true),
+  taskWorkspaceNotes: jsonb("task_workspace_notes")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default({}),
   equippedCompletionEffect: varchar("equipped_completion_effect")
     .notNull()
     .default("clean-confetti"),
