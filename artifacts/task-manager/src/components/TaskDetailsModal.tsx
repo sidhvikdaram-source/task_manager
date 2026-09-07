@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   useGetTask,
   useUpdateTask,
@@ -42,6 +43,7 @@ import {
   Clock,
   ExternalLink,
   BookOpenCheck,
+  CheckCircle2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -72,6 +74,7 @@ export function TaskDetailsModal({
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [newLinkLabel, setNewLinkLabel] = useState("");
   const [showLinkForm, setShowLinkForm] = useState(false);
+  const [fieldFeedback, setFieldFeedback] = useState<string | null>(null);
 
   const { data: task, isLoading: isLoadingTask } = useGetTask(taskId, {
     query: { enabled: open && !!taskId, queryKey: getGetTaskQueryKey(taskId) },
@@ -117,11 +120,31 @@ export function TaskDetailsModal({
       });
       return;
     }
+    const changes = field === "dueDate"
+      ? { dueDate: value, calendarDate: value }
+      : { [field]: value };
+    const detailKey = getGetTaskQueryKey(taskId);
+    const detailSnapshot = queryClient.getQueryData<Task>(detailKey);
+    const listSnapshots = queryClient.getQueriesData<Task[]>({ queryKey: ["/api/tasks"] });
+    queryClient.setQueryData<Task>(detailKey, (current) => current ? { ...current, ...changes } as Task : current);
+    queryClient.setQueriesData<Task[]>({ queryKey: ["/api/tasks"] }, (current) =>
+      current?.map((item) => item.id === taskId ? { ...item, ...changes } as Task : item),
+    );
+    setFieldFeedback(field);
+    window.dispatchEvent(new Event("nimbus:workspace-changed"));
     updateTask.mutate(
-      { id: taskId, data: { [field]: value } as never },
+      { id: taskId, data: changes as never },
       {
-        onSuccess: invalidate,
-        onError: () => toast.error("Failed to update"),
+        onSuccess: () => {
+          invalidate();
+          window.setTimeout(() => setFieldFeedback((current) => current === field ? null : current), 1200);
+        },
+        onError: () => {
+          queryClient.setQueryData(detailKey, detailSnapshot);
+          listSnapshots.forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data));
+          setFieldFeedback(null);
+          toast.error("Failed to update");
+        },
       },
     );
   };
@@ -505,14 +528,23 @@ export function TaskDetailsModal({
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1.5 block text-muted-foreground">
-                  Due Date <span className="text-xs">(hard)</span>
-                </label>
+                <div className="mb-1.5 flex min-h-5 items-center justify-between gap-2">
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Due Date <span className="text-xs">(hard)</span>
+                  </label>
+                  <AnimatePresence initial={false}>
+                    {fieldFeedback === "dueDate" && (
+                      <motion.span initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Calendar updated
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </div>
                 <Input
                   type="date"
-                  defaultValue={task.dueDate || ""}
+                  value={task.dueDate || ""}
                   disabled={isCanvasTask}
-                  onBlur={(e) =>
+                  onChange={(e) =>
                     handleUpdate("dueDate", e.target.value || null)
                   }
                 />

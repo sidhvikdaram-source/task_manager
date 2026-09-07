@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BatteryMedium, CalendarClock, Check, CheckCircle2, ChevronDown, Circle, ClipboardList, Clock3, FileCheck2, GraduationCap, GripVertical, House, ListTodo, Loader2, Plus, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
+import { BatteryMedium, CalendarClock, Check, CheckCircle2, ChevronDown, Circle, ClipboardList, Clock3, FileCheck2, GraduationCap, GripVertical, House, ListTodo, Loader2, NotebookPen, Plus, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
 import { getListTasksQueryKey, useListTasks, type Task } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { CreateTaskModal } from "@/components/CreateTaskModal";
-import { QuickCapture } from "@/components/QuickCapture";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 import { TaskInlineNotes } from "@/components/TaskInlineNotes";
 import { Button } from "@/components/ui/button";
@@ -22,6 +21,75 @@ type WorkspaceTask = Task & {
   sortOrder?: number;
   workspaceContext?: "school" | "personal";
 };
+
+function DocumentTaskEntry({
+  lane,
+  workspaceMode,
+  onCreated,
+}: {
+  lane: Lane;
+  workspaceMode: "school" | "personal";
+  onCreated: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const placeholder = lane === "tests"
+    ? "Type a test or quiz, date, subject, and priority…"
+    : lane === "personal"
+      ? "Type a personal task with its date or priority…"
+      : "Type an assignment, date, subject, and priority…";
+
+  async function create() {
+    if (!text.trim() || saving) return;
+    const source = text.trim();
+    setText("");
+    setSaving(true);
+    try {
+      const response = await fetch("/api/quick-capture", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: source,
+          contextTaskKind: lane === "tests" ? "test" : lane === "personal" ? "task" : "assignment",
+          contextWorkspace: workspaceMode,
+        }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.task) throw new Error(data?.error ?? "Task could not be created");
+      onCreated();
+      toast.success(`Added ${data.task.title}`, { description: "Nimbus parsed the details from your line." });
+    } catch (error) {
+      setText(source);
+      toast.error(error instanceof Error ? error.message : "Task could not be created");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="border-b border-border/70 bg-background/55 px-4 py-3">
+      <div className="flex items-start gap-3">
+        <Plus className="mt-2.5 h-4 w-4 shrink-0 text-primary" />
+        <textarea
+          aria-label={`Add ${lane === "tests" ? "test or quiz" : "task"}`}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void create();
+            }
+          }}
+          rows={1}
+          placeholder={placeholder}
+          className="min-h-10 flex-1 resize-none bg-transparent py-2 text-sm leading-6 outline-none placeholder:text-muted-foreground/65"
+        />
+        <span className="mt-2.5 shrink-0 text-[10px] font-bold text-muted-foreground">{saving ? "Parsing…" : "Enter to add"}</span>
+      </div>
+    </div>
+  );
+}
 
 const priorityRank: Record<Task["priority"], number> = { critical: 0, high: 1, medium: 2, low: 3 };
 const optionalViews: Array<{ id: OptionalView; label: string }> = [
@@ -60,6 +128,7 @@ export default function Tasks() {
   const [view, setView] = useState<View>("all");
   const [sortMode, setSortMode] = useState<SortMode>("dueDate");
   const [workspaceMode, setWorkspaceMode] = useState<"school" | "personal">("school");
+  const [editingMode, setEditingMode] = useState<"tasks" | "notes">("tasks");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [viewsOpen, setViewsOpen] = useState(false);
@@ -123,23 +192,29 @@ export default function Tasks() {
     const task = tasks.find((item) => item.id === taskId);
     if (!task || view === "completed" || lane === "personal") return;
     if ((lane === "tests") === isTestTask(task)) { setDropTarget(null); return; }
+    const nextTaskKind = lane === "tests" ? "test" : "task";
+    const snapshots = queryClient.getQueriesData<Task[]>({ queryKey: ["/api/tasks"] });
+    queryClient.setQueriesData<Task[]>({ queryKey: ["/api/tasks"] }, (current) =>
+      current?.map((item) => item.id === taskId ? { ...item, taskKind: nextTaskKind } : item),
+    );
+    setDraggingTaskId(null); setDropTarget(null);
     const response = await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskKind: lane === "tests" ? "test" : "task" }),
+      body: JSON.stringify({ taskKind: nextTaskKind }),
     });
     if (!response.ok) {
+      snapshots.forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data));
       const data = await response.json().catch(() => null);
       toast.error(data?.error ?? "Task could not be moved");
     } else {
-      await refreshTasks();
+      void refreshTasks();
       toast.success(lane === "tests" ? "Moved to tests and quizzes" : "Moved to assignments and tasks");
     }
-    setDraggingTaskId(null); setDropTarget(null);
   }
 
-  async function reorderTask(targetId: number, placeAfter: boolean) {
-    if (!draggingTaskId || draggingTaskId === targetId || view === "completed") return;
-    const dragged = (tasks as WorkspaceTask[]).find((task) => task.id === draggingTaskId);
+  async function reorderTask(draggedId: number, targetId: number, placeAfter: boolean) {
+    if (!draggedId || draggedId === targetId || view === "completed") return;
+    const dragged = (tasks as WorkspaceTask[]).find((task) => task.id === draggedId);
     const target = (tasks as WorkspaceTask[]).find((task) => task.id === targetId);
     if (!dragged || !target) return;
     const targetLane: Lane = workspaceMode === "personal" ? "personal" : isTestTask(target) ? "tests" : "assignments";
@@ -156,22 +231,37 @@ export default function Tasks() {
           : {}),
       },
     }));
-    const responses = await Promise.all(updates.map((update) => fetch(`/api/tasks/${update.id}`, {
+    const listSnapshots = queryClient.getQueriesData<Task[]>({ queryKey: ["/api/tasks"] });
+    const updateById = new Map(updates.map((update) => [update.id, update.data]));
+    queryClient.setQueriesData<Task[]>({ queryKey: ["/api/tasks"] }, (current) =>
+      current?.map((task) => {
+        const change = updateById.get(task.id);
+        return change ? { ...task, ...change } as Task : task;
+      }),
+    );
+    setSortMode("manual");
+    setDraggingTaskId(null);
+    setDropTarget(null);
+    const changedUpdates = updates.filter((update) => {
+      const current = (tasks as WorkspaceTask[]).find((task) => task.id === update.id);
+      return current?.sortOrder !== update.data.sortOrder || ("taskKind" in update.data && current?.taskKind !== update.data.taskKind);
+    });
+    const responses = await Promise.all(changedUpdates.map((update) => fetch(`/api/tasks/${update.id}`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(update.data),
     })));
-    if (responses.some((response) => !response.ok)) toast.error("Task order could not be saved");
-    else {
-      setSortMode("manual");
-      await refreshTasks();
+    if (responses.some((response) => !response.ok)) {
+      listSnapshots.forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data));
+      toast.error("Task order could not be saved");
     }
-    setDraggingTaskId(null);
-    setDropTarget(null);
+    else {
+      void refreshTasks();
+    }
   }
 
-  function renderTask(task: WorkspaceTask, index: number) {
+  function renderTask(task: WorkspaceTask) {
     const color = subjectColor(task.subject, subjects);
     const date = taskDate(task);
     const completed = view === "completed";
@@ -185,10 +275,11 @@ export default function Tasks() {
           event.preventDefault();
           event.stopPropagation();
           const bounds = event.currentTarget.getBoundingClientRect();
-          void reorderTask(task.id, event.clientY > bounds.top + bounds.height / 2);
+          const draggedId = Number(event.dataTransfer.getData("text/task-id")) || draggingTaskId;
+          if (draggedId) void reorderTask(draggedId, task.id, event.clientY > bounds.top + bounds.height / 2);
         }}
         initial={reduceMotion ? false : { opacity: 0, y: 6 }} animate={{ opacity: draggingTaskId === task.id ? 0.45 : 1, y: 0, scale: draggingTaskId === task.id ? 0.985 : 1 }}
-        transition={{ duration: 0.18, delay: Math.min(index * 0.02, 0.1) }} className="px-4 py-3.5 transition-colors hover:bg-muted/30">
+        transition={{ layout: { duration: 0.16 }, opacity: { duration: 0.12 } }} className="px-4 py-3.5 transition-colors hover:bg-muted/30">
         <div className="flex items-start gap-3">
           {!completed && <GripVertical aria-hidden className="mt-3 h-4 w-4 shrink-0 cursor-grab text-muted-foreground/55 active:cursor-grabbing" />}
           {!completed ? (
@@ -206,7 +297,7 @@ export default function Tasks() {
                 <span className="inline-flex items-center gap-1"><Zap className="h-3 w-3 fill-current" /> {task.vpValue} NP</span>
               </div>
             </button>
-            <TaskInlineNotes taskId={task.id} taskTitle={task.title} notes={task.notes} compact />
+            <TaskInlineNotes taskId={task.id} taskTitle={task.title} notes={task.notes} compact={editingMode === "tasks"} />
           </div>
         </div>
       </motion.article>
@@ -226,16 +317,8 @@ export default function Tasks() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div>
             <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-black">{title}</h2><span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">{columnTasks.length}</span></div><p className="truncate text-xs text-muted-foreground">{activeDrop ? "Release to move here" : description}</p></div>
           </div>
-          {view !== "completed" && (
-            <QuickCapture
-              compact
-              contextTaskKind={lane === "tests" ? "test" : lane === "personal" ? "task" : "assignment"}
-              contextWorkspace={workspaceMode}
-              placeholder={lane === "tests" ? "Add a test or quiz..." : lane === "personal" ? "Add a personal task..." : "Add an assignment or task..."}
-              onCreated={() => void refreshTasks()}
-            />
-          )}
         </header>
+        {view !== "completed" && editingMode === "tasks" && <DocumentTaskEntry lane={lane} workspaceMode={workspaceMode} onCreated={() => void refreshTasks()} />}
         <div className="divide-y divide-border/70">{columnTasks.map(renderTask)}{columnTasks.length === 0 && <p className="px-5 py-12 text-center text-sm text-muted-foreground">{activeDrop ? "Drop the task here." : `No ${view === "completed" ? "completed" : "active"} ${title.toLowerCase()}.`}</p>}</div>
       </section>
     );
@@ -262,6 +345,10 @@ export default function Tasks() {
                 const Icon = mode === "school" ? GraduationCap : House;
                 return <button key={mode} type="button" onClick={() => { setWorkspaceMode(mode); setView("all"); setRecommendation(null); }} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-black capitalize transition-colors ${workspaceMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Icon className="h-3.5 w-3.5" />{mode}</button>;
               })}
+            </div>
+            <div className="flex rounded-xl border bg-muted/45 p-1" aria-label="Editing mode">
+              <button type="button" onClick={() => setEditingMode("tasks")} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-black transition-colors ${editingMode === "tasks" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><ListTodo className="h-3.5 w-3.5" />Tasks</button>
+              <button type="button" onClick={() => setEditingMode("notes")} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-black transition-colors ${editingMode === "notes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><NotebookPen className="h-3.5 w-3.5" />Notes</button>
             </div>
             <Button onClick={() => setCreateOpen(true)} className="h-11 rounded-xl bg-secondary px-5 text-secondary-foreground"><Plus className="mr-2 h-4 w-4" /> New task</Button>
           </div>

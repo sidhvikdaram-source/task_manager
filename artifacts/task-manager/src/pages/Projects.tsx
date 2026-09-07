@@ -11,9 +11,12 @@ import {
   FolderKanban,
   Link2,
   LockKeyhole,
+  Maximize2,
+  NotebookPen,
   Plus,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -74,6 +77,9 @@ export default function Projects() {
   const [gradeWeightDraft, setGradeWeightDraft] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [linkLabel, setLinkLabel] = useState("");
+  const [projectNotes, setProjectNotes] = useState("");
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [notesSaved, setNotesSaved] = useState(true);
   const load = async () => {
     const response = await fetch("/api/projects", { credentials: "include" });
     if (response.ok) {
@@ -93,6 +99,10 @@ export default function Projects() {
         : String(selected.gradeWeight),
     );
   }, [selectedId, selected?.gradeWeight]);
+  useEffect(() => {
+    setProjectNotes(selected?.notes ?? "");
+    setNotesSaved(true);
+  }, [selectedId, selected?.notes]);
   const create = async () => {
     if (!name.trim()) return;
     const response = await fetch("/api/projects", {
@@ -118,6 +128,8 @@ export default function Projects() {
   };
   const update = async (values: Record<string, unknown>) => {
     if (!selected) return;
+    const snapshot = projects;
+    setProjects((current) => current.map((project) => project.id === selected.id ? { ...project, ...values } as Project : project));
     const response = await fetch(`/api/projects/${selected.id}`, {
       method: "PATCH",
       credentials: "include",
@@ -126,11 +138,17 @@ export default function Projects() {
     });
     const data = await response.json().catch(() => null);
     if (!response.ok) {
+      setProjects(snapshot);
       toast.error(data?.error ?? "Project could not be updated");
       return false;
     }
-    await load();
+    void load();
     return true;
+  };
+  const saveProjectNotes = async () => {
+    if (!selected || projectNotes === (selected.notes ?? "")) return;
+    const saved = await update({ notes: projectNotes || null });
+    setNotesSaved(Boolean(saved));
   };
   const addProjectLink = async () => {
     if (!selected || !linkUrl.trim()) return;
@@ -404,6 +422,26 @@ export default function Projects() {
                 </div>
               </div>
             </div>
+            <section className="bento-card overflow-hidden">
+              <header className="flex items-center justify-between gap-3 border-b px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary/10 text-primary"><NotebookPen className="h-4 w-4" /></span>
+                  <div><h3 className="font-black">Project notebook</h3><p className="text-xs text-muted-foreground">A full working page for research, drafts, decisions, and meeting notes.</p></div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] font-bold ${notesSaved ? "text-muted-foreground" : "text-primary"}`}>{notesSaved ? "Saved" : "Unsaved"}</span>
+                  <button type="button" onClick={() => setNotesExpanded(true)} className="grid h-9 w-9 place-items-center rounded-lg border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label="Open project notebook full screen"><Maximize2 className="h-4 w-4" /></button>
+                </div>
+              </header>
+              <textarea
+                value={projectNotes}
+                onChange={(event) => { setProjectNotes(event.target.value); setNotesSaved(false); }}
+                onBlur={() => void saveProjectNotes()}
+                placeholder="Start writing. Keep source notes, outlines, decisions, questions, and anything this project needs…"
+                className="min-h-[22rem] w-full resize-y bg-transparent px-6 py-5 text-[15px] leading-8 outline-none placeholder:text-muted-foreground/55"
+                style={{ backgroundImage: "linear-gradient(to bottom, transparent 31px, hsl(var(--border) / .38) 32px)", backgroundSize: "100% 32px" }}
+              />
+            </section>
             <div className="grid grid-flow-dense gap-5 xl:grid-cols-2">
               <div className="bento-card overflow-hidden">
                 <div className="flex items-center justify-between border-b px-5 py-4">
@@ -763,6 +801,25 @@ export default function Projects() {
                 Create {preview.length} tasks
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {notesExpanded && selected && (
+        <div className="fixed inset-0 z-[80] bg-background p-3 sm:p-6">
+          <div className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+            <header className="flex items-center justify-between gap-4 border-b px-5 py-4 sm:px-8">
+              <div className="min-w-0"><p className="truncate text-lg font-black">{selected.name}</p><p className="text-xs text-muted-foreground">Project notebook</p></div>
+              <div className="flex items-center gap-3"><span className={`text-xs font-bold ${notesSaved ? "text-muted-foreground" : "text-primary"}`}>{notesSaved ? "Saved" : "Unsaved changes"}</span><button type="button" onClick={() => { void saveProjectNotes(); setNotesExpanded(false); }} className="grid h-10 w-10 place-items-center rounded-xl border hover:bg-muted" aria-label="Close project notebook"><X className="h-4 w-4" /></button></div>
+            </header>
+            <textarea
+              autoFocus
+              value={projectNotes}
+              onChange={(event) => { setProjectNotes(event.target.value); setNotesSaved(false); }}
+              onBlur={() => void saveProjectNotes()}
+              placeholder="Start writing…"
+              className="min-h-0 flex-1 resize-none bg-transparent px-6 py-8 text-base leading-8 outline-none sm:px-12"
+              style={{ backgroundImage: "linear-gradient(to bottom, transparent 31px, hsl(var(--border) / .34) 32px)", backgroundSize: "100% 32px" }}
+            />
           </div>
         </div>
       )}

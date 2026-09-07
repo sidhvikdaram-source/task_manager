@@ -68,8 +68,10 @@ const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 type CalendarView = "month" | "week" | "day" | "agenda";
 
 function taskDate(task: Task) {
+  if (task.dueDate) return task.dueDate;
+  if (task.calendarDate) return task.calendarDate;
   if (task.dueAt) return format(new Date(task.dueAt), "yyyy-MM-dd");
-  return task.calendarDate || task.dueDate || task.startDate || null;
+  return task.startDate || null;
 }
 
 function matchesDate(task: Task, day: Date) {
@@ -250,6 +252,15 @@ export default function Calendar() {
 
   const scheduleTask = async (taskId: number, date: Date) => {
     const dateValue = format(date, "yyyy-MM-dd");
+    const snapshots = queryClient.getQueriesData<Task[]>({ queryKey: ["/api/tasks"] });
+    queryClient.setQueriesData<Task[]>({ queryKey: ["/api/tasks"] }, (current) =>
+      current?.map((task) => task.id === taskId
+        ? { ...task, dueDate: dateValue, calendarDate: dateValue }
+        : task),
+    );
+    toast.success(`Moved to ${format(date, "MMM d")}`, {
+      description: "The calendar updated immediately.",
+    });
     const response = await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       credentials: "include",
@@ -257,6 +268,7 @@ export default function Calendar() {
       body: JSON.stringify({ dueDate: dateValue, calendarDate: dateValue }),
     });
     if (!response.ok) {
+      snapshots.forEach(([queryKey, data]) => queryClient.setQueryData(queryKey, data));
       const data = await response.json().catch(() => null);
       toast.error(data?.error ?? "Task could not be scheduled");
       return;
@@ -264,7 +276,6 @@ export default function Calendar() {
     await queryClient.invalidateQueries({
       queryKey: getListTasksQueryKey({ sortBy: "dueDate" }),
     });
-    toast.success(`Scheduled for ${format(date, "MMM d")}`);
   };
 
   const movePeriod = (direction: -1 | 1) => {

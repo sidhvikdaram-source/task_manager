@@ -73,7 +73,7 @@ export function TaskInlineNotes({
       <textarea
         aria-label={`Notes for ${taskTitle}`}
         value={value}
-        rows={compact ? 1 : 2}
+        rows={compact ? 1 : 5}
         placeholder="Add a note…"
         onChange={(event) => {
           setValue(event.target.value);
@@ -85,7 +85,10 @@ export function TaskInlineNotes({
             event.currentTarget.blur();
           }
         }}
-        className="min-h-6 flex-1 resize-none bg-transparent text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/70"
+        className={cn(
+          "flex-1 resize-none bg-transparent leading-5 text-foreground outline-none placeholder:text-muted-foreground/70",
+          compact ? "min-h-6 text-xs" : "min-h-28 text-sm leading-7",
+        )}
       />
       <span
         className="mt-1 flex h-4 min-w-4 items-center justify-end text-[10px] font-bold text-muted-foreground"
