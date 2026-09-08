@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BatteryMedium, CalendarClock, Check, CheckCircle2, ChevronDown, Circle, ClipboardList, Clock3, FileCheck2, GraduationCap, GripVertical, House, ListTodo, Loader2, NotebookPen, Plus, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
+import { BatteryMedium, CalendarClock, Check, CheckCircle2, ChevronDown, Circle, ClipboardList, Clock3, FileCheck2, GraduationCap, GripVertical, House, Loader2, Square, SlidersHorizontal, Sparkles, Zap } from "lucide-react";
 import { getListTasksQueryKey, useListTasks, type Task } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CreateTaskModal } from "@/components/CreateTaskModal";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 import { TaskInlineNotes } from "@/components/TaskInlineNotes";
 import { Button } from "@/components/ui/button";
@@ -26,13 +25,25 @@ function DocumentTaskEntry({
   lane,
   workspaceMode,
   onCreated,
+  noteValue,
+  onNoteChange,
+  onNoteSave,
+  noteSaving,
 }: {
   lane: Lane;
   workspaceMode: "school" | "personal";
   onCreated: () => void;
+  noteValue: string;
+  onNoteChange: (value: string) => void;
+  onNoteSave: () => void;
+  noteSaving: boolean;
 }) {
+  const queryClient = useQueryClient();
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [lineMode, setLineMode] = useState<"task" | "writing">("task");
+  const taskInputRef = useRef<HTMLTextAreaElement>(null);
+  const writingInputRef = useRef<HTMLTextAreaElement>(null);
   const [preview, setPreview] = useState<{ title?: string; dueDate?: string | null; subject?: string | null; priority?: string; estimatedMinutes?: number | null } | null>(null);
   const placeholder = lane === "tests"
     ? "Type a test or quiz, date, subject, and priority…"
@@ -82,10 +93,15 @@ function DocumentTaskEntry({
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.task) throw new Error(data?.error ?? "Task could not be created");
+      queryClient.setQueriesData<Task[]>({ queryKey: ["/api/tasks"] }, (current) => {
+        if (!current || current.some((task) => task.id === data.task.id)) return current;
+        return [...current, data.task];
+      });
       onCreated();
-      toast.success(`Added ${data.task.title}`, { description: "Nimbus parsed the details from your line." });
+      window.requestAnimationFrame(() => taskInputRef.current?.focus());
     } catch (error) {
       setText(source);
+      window.requestAnimationFrame(() => taskInputRef.current?.focus());
       toast.error(error instanceof Error ? error.message : "Task could not be created");
     } finally {
       setSaving(false);
@@ -93,28 +109,70 @@ function DocumentTaskEntry({
   }
 
   return (
-    <div className="focus-within:border-primary/45">
-      <div className="flex items-center justify-between border-b border-t bg-muted/15 px-4 py-2 text-[11px] font-bold text-muted-foreground"><span>Next task</span><span>{saving ? "Parsing…" : "Enter adds"}</span></div>
-      <div className="flex items-start gap-3 px-4 py-2.5">
-        <Plus className="mt-1.5 h-4 w-4 shrink-0 text-primary" />
-        <textarea
-          aria-label={`Add ${lane === "tests" ? "test or quiz" : "task"}`}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              void create();
-            }
-          }}
-          rows={1}
-          placeholder={placeholder}
-          className="min-h-8 max-h-40 flex-1 resize-none overflow-y-auto bg-transparent py-1 text-[15px] leading-6 outline-none [field-sizing:content] placeholder:text-muted-foreground/60"
-        />
-      </div>
+    <div className="border-t border-border/70 bg-background focus-within:bg-muted/[0.12]">
+      {(noteValue || lineMode === "writing") && (
+        <div className="group relative px-5 pb-3 pt-4">
+          <textarea
+            ref={writingInputRef}
+            aria-label="Free writing"
+            value={noteValue}
+            onChange={(event) => onNoteChange(event.target.value)}
+            onBlur={onNoteSave}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                onNoteSave();
+                setLineMode("task");
+                window.requestAnimationFrame(() => taskInputRef.current?.focus());
+              }
+            }}
+            rows={lineMode === "writing" ? 4 : 2}
+            placeholder="Write freely. This text stays as notes and is never parsed."
+            className="min-h-16 w-full resize-y bg-transparent pl-7 pr-16 text-[15px] leading-7 outline-none [field-sizing:content] placeholder:text-muted-foreground/55"
+          />
+          <span className="absolute left-5 top-[1.15rem] select-none text-lg leading-7 text-muted-foreground/35">·</span>
+          <span className="absolute right-5 top-4 text-[10px] font-bold text-muted-foreground/55">{noteSaving ? "Saving…" : "Notes"}</span>
+        </div>
+      )}
+      {lineMode === "task" ? (
+        <div className="flex items-start gap-3 px-4 py-3">
+          <button type="button" aria-label="Current line will become a task" className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary" onClick={() => taskInputRef.current?.focus()}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Square className="h-[18px] w-[18px]" />}
+          </button>
+          <textarea
+            ref={taskInputRef}
+            aria-label={`Add ${lane === "tests" ? "test or quiz" : "task"}`}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Backspace" && text.length === 0) {
+                event.preventDefault();
+                setLineMode("writing");
+                window.requestAnimationFrame(() => writingInputRef.current?.focus());
+                return;
+              }
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void create();
+              }
+            }}
+            rows={1}
+            placeholder={placeholder}
+            className="min-h-8 max-h-40 flex-1 resize-none overflow-y-auto bg-transparent py-1 text-[15px] leading-6 outline-none [field-sizing:content] placeholder:text-muted-foreground/60"
+          />
+          <span className="mt-2 hidden shrink-0 text-[10px] font-bold text-muted-foreground/45 sm:block">Enter to add</span>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between border-t border-dashed px-5 py-2.5">
+          <span className="text-[11px] text-muted-foreground">Writing normally · Ctrl + Enter starts a task</span>
+          <button type="button" onClick={() => { onNoteSave(); setLineMode("task"); window.requestAnimationFrame(() => taskInputRef.current?.focus()); }} className="inline-flex h-8 items-center gap-2 rounded-lg px-2.5 text-xs font-bold text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary">
+            <Square className="h-3.5 w-3.5" /> Start a task line
+          </button>
+        </div>
+      )}
       <AnimatePresence initial={false}>
-        {preview?.title && text.trim() && (
-          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-wrap items-center gap-1.5 border-t bg-muted/25 px-4 py-2 text-[11px] text-muted-foreground">
+        {lineMode === "task" && preview?.title && text.trim() && (
+          <motion.div initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-wrap items-center gap-1.5 border-t border-dashed bg-muted/20 px-12 py-2 text-[11px] text-muted-foreground">
             <span className="font-black text-foreground">{preview.title}</span>
             {preview.dueDate && <span className="rounded-md bg-background px-2 py-1">{preview.dueDate}</span>}
             {preview.subject && <span className="rounded-md bg-background px-2 py-1">{preview.subject}</span>}
@@ -123,23 +181,6 @@ function DocumentTaskEntry({
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function LaneNotesEditor({ value, onChange, onSave, saving }: { value: string; onChange: (value: string) => void; onSave: () => void; saving: boolean }) {
-  return (
-    <div className="focus-within:border-primary/45">
-      <div className="flex items-center justify-between border-b border-t bg-muted/15 px-4 py-2 text-[11px] font-bold text-muted-foreground"><span>Continue with a note · nothing here is parsed</span><span>{saving ? "Saving…" : "Saved on blur"}</span></div>
-      <textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onBlur={onSave}
-        rows={7}
-        placeholder="Write freely here, like a document. These notes stay notes."
-        className="min-h-48 w-full resize-y bg-transparent px-5 py-4 text-[15px] leading-8 outline-none placeholder:text-muted-foreground/55"
-        style={{ backgroundImage: "linear-gradient(to bottom, transparent 31px, hsl(var(--border) / .34) 32px)", backgroundSize: "100% 32px" }}
-      />
     </div>
   );
 }
@@ -181,8 +222,6 @@ export default function Tasks() {
   const [view, setView] = useState<View>("all");
   const [sortMode, setSortMode] = useState<SortMode>("dueDate");
   const [workspaceMode, setWorkspaceMode] = useState<"school" | "personal">("school");
-  const [laneEditingModes, setLaneEditingModes] = useState<Record<Lane, "tasks" | "notes">>({ tests: "tasks", assignments: "tasks", personal: "tasks" });
-  const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [viewsOpen, setViewsOpen] = useState(false);
   const [enabledViews, setEnabledViews] = useState<OptionalView[]>(() => {
@@ -393,26 +432,20 @@ export default function Tasks() {
   function taskColumn(title: string, description: string, columnTasks: WorkspaceTask[], icon: typeof FileCheck2, lane: Lane) {
     const Icon = icon;
     const activeDrop = dropTarget === lane && draggingTaskId !== null;
-    const editingMode = laneEditingModes[lane];
     return (
-      <section className={`bento-card min-w-0 overflow-hidden transition-[border-color,background-color] ${activeDrop ? "border-primary bg-primary/[0.035]" : ""}`}
+      <section className={`min-w-0 overflow-hidden rounded-2xl border bg-card transition-[border-color,background-color] ${activeDrop ? "border-primary bg-primary/[0.035]" : ""}`}
         onDragOver={(event) => { if (view === "completed") return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropTarget(lane); }}
         onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null); }}
         onDrop={(event) => { event.preventDefault(); const taskId = Number(event.dataTransfer.getData("text/task-id")); if (Number.isInteger(taskId)) void moveTask(taskId, lane); }}>
-        <header className="border-b px-4 py-3.5">
+        <header className="border-b px-5 py-4">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div>
-            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-black">{title}</h2><span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">{columnTasks.length}</span></div><p className="truncate text-xs text-muted-foreground">{activeDrop ? "Release to move here" : description}</p></div>
-            {view !== "completed" && <div className="flex shrink-0 rounded-lg border bg-muted/45 p-0.5" aria-label={`${title} editor mode`}>
-              <button type="button" onClick={() => setLaneEditingModes((current) => ({ ...current, [lane]: "tasks" }))} className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-black transition-colors ${editingMode === "tasks" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><ListTodo className="h-3 w-3" />Tasks</button>
-              <button type="button" onClick={() => setLaneEditingModes((current) => ({ ...current, [lane]: "notes" }))} className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-black transition-colors ${editingMode === "notes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><NotebookPen className="h-3 w-3" />Notes</button>
-            </div>}
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div>
+            <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-black">{title}</h2><span className="text-xs font-bold tabular-nums text-muted-foreground">{columnTasks.length}</span></div><p className="truncate text-xs text-muted-foreground">{activeDrop ? "Release to move here" : description}</p></div>
           </div>
         </header>
-        <div className="m-4 overflow-hidden rounded-xl border bg-background shadow-[0_8px_30px_hsl(var(--foreground)/0.04)] transition-colors focus-within:border-primary/45">
+        <div className="bg-background transition-colors focus-within:ring-1 focus-within:ring-inset focus-within:ring-primary/35">
           <div className="divide-y divide-border/70">{columnTasks.map(renderTask)}{columnTasks.length === 0 && (view === "completed" || activeDrop) && <p className="px-5 py-12 text-center text-sm text-muted-foreground">{activeDrop ? "Drop the task here." : `No completed ${title.toLowerCase()}.`}</p>}</div>
-          {view !== "completed" && editingMode === "tasks" && <DocumentTaskEntry lane={lane} workspaceMode={workspaceMode} onCreated={() => void refreshTasks()} />}
-          {view !== "completed" && editingMode === "notes" && <LaneNotesEditor value={workspaceNotes[notesKey(lane)] ?? ""} onChange={(value) => setWorkspaceNotes((current) => ({ ...current, [notesKey(lane)]: value }))} onSave={() => void saveWorkspaceNote(lane)} saving={savingNoteKey === notesKey(lane)} />}
+          {view !== "completed" && <DocumentTaskEntry lane={lane} workspaceMode={workspaceMode} onCreated={() => void refreshTasks()} noteValue={workspaceNotes[notesKey(lane)] ?? ""} onNoteChange={(value) => setWorkspaceNotes((current) => ({ ...current, [notesKey(lane)]: value }))} onNoteSave={() => void saveWorkspaceNote(lane)} noteSaving={savingNoteKey === notesKey(lane)} />}
         </div>
       </section>
     );
@@ -420,18 +453,11 @@ export default function Tasks() {
 
   return (
     <div className="page-stack space-y-5 overflow-x-hidden">
-      <section className="bento-card p-5 sm:p-6">
+      <header className="border-b pb-4 pt-1">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex max-w-2xl items-start gap-4">
-            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary shadow-[inset_0_1px_0_hsl(var(--foreground)/0.06)]">
-              <ListTodo className="h-5 w-5" />
-              <span className="absolute bottom-2 right-2 h-1.5 w-1.5 rounded-full bg-secondary" />
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-primary">Task workspace</p>
-              <h1 className="tech-title mt-1 text-3xl sm:text-4xl">Plan by deadline. Act by importance.</h1>
-              <p className="mt-2 text-sm text-muted-foreground">Capture work in place, compare workloads, or drag a task to the lane where it belongs.</p>
-            </div>
+          <div className="max-w-3xl">
+            <h1 className="tech-title text-3xl sm:text-4xl">Task workspace</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">Write naturally, press Enter to make a task, or Backspace on an empty task line to keep writing.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
             <div className="flex rounded-xl border bg-muted/45 p-1" aria-label="Workspace mode">
@@ -440,10 +466,9 @@ export default function Tasks() {
                 return <button key={mode} type="button" onClick={() => { setWorkspaceMode(mode); setView("all"); setRecommendation(null); }} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-black capitalize transition-colors ${workspaceMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Icon className="h-3.5 w-3.5" />{mode}</button>;
               })}
             </div>
-            <Button onClick={() => setCreateOpen(true)} className="h-11 rounded-xl bg-secondary px-5 text-secondary-foreground"><Plus className="mr-2 h-4 w-4" /> New task</Button>
           </div>
         </div>
-      </section>
+      </header>
 
       <section className="bento-card p-3 sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -454,16 +479,11 @@ export default function Tasks() {
           </div>
         </div>
 
-        <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border/80 bg-muted/20 p-3 lg:flex-row lg:items-end">
-          <div className="hidden min-w-0 flex-1 items-center gap-3 lg:flex">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Sparkles className="h-4 w-4" /></div>
-            <div><p className="text-sm font-black">Find the right next task</p><p className="text-xs text-muted-foreground">Nimbus balances time, energy, urgency, and priority.</p></div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-end">
-            <label className="min-w-0"><span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Time available</span><span className="flex h-11 items-center gap-2 rounded-xl border bg-background px-3"><Clock3 className="h-4 w-4 text-primary" /><select aria-label="Available time" value={availableMinutes} onChange={(event) => { setAvailableMinutes(Number(event.target.value)); setRecommendation(null); }} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-foreground outline-none">{[10, 20, 30, 45, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}</select></span></label>
-            <label className="min-w-0"><span className="mb-1 block text-[10px] font-black uppercase tracking-wide text-muted-foreground">Energy</span><span className="flex h-11 items-center gap-2 rounded-xl border bg-background px-3"><BatteryMedium className="h-4 w-4 text-primary" /><select aria-label="Energy level" value={energy} onChange={(event) => { setEnergy(event.target.value as typeof energy); setRecommendation(null); }} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-foreground outline-none"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></span></label>
-            <Button type="button" onClick={() => void recommendNext()} disabled={recommendationLoading} className="col-span-2 h-11 rounded-xl px-5 sm:col-span-1">{recommendationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}Recommend next</Button>
-          </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+          <label className="flex h-10 min-w-28 items-center gap-2 rounded-xl border bg-background px-3"><Clock3 className="h-4 w-4 text-primary" /><select aria-label="Available time" value={availableMinutes} onChange={(event) => { setAvailableMinutes(Number(event.target.value)); setRecommendation(null); }} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-foreground outline-none">{[10, 20, 30, 45, 60].map((minutes) => <option key={minutes} value={minutes}>{minutes} min</option>)}</select></label>
+          <label className="flex h-10 min-w-36 items-center gap-2 rounded-xl border bg-background px-3"><BatteryMedium className="h-4 w-4 text-primary" /><select aria-label="Energy level" value={energy} onChange={(event) => { setEnergy(event.target.value as typeof energy); setRecommendation(null); }} className="min-w-0 flex-1 bg-transparent text-sm font-bold text-foreground outline-none"><option value="low">Low energy</option><option value="medium">Medium energy</option><option value="high">High energy</option></select></label>
+          <Button type="button" onClick={() => void recommendNext()} disabled={recommendationLoading} className="h-10 rounded-xl px-4">{recommendationLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}Recommend next</Button>
+          <span className="hidden text-xs text-muted-foreground lg:inline">Matches time, energy, urgency, and priority.</span>
         </div>
         {recommendation && <div className="mt-3 flex flex-col gap-2 rounded-xl border border-primary/25 bg-primary/8 px-4 py-3 sm:flex-row sm:items-center"><button type="button" disabled={!recommendation.recommendation} onClick={() => recommendation.recommendation && setSelectedId(recommendation.recommendation.id)} className="min-w-0 flex-1 text-left disabled:cursor-default"><p className="text-sm font-black text-primary">{recommendation.recommendation?.title ?? "No task fits right now"}</p><p className="mt-0.5 text-xs text-muted-foreground">{recommendation.reason}</p></button><Button variant="ghost" size="sm" onClick={() => void recommendNext()}>Refresh</Button></div>}
       </section>
@@ -473,7 +493,6 @@ export default function Tasks() {
       ) : (
         <div className="grid grid-flow-dense">{taskColumn("Personal tasks", "Home, errands, routines, and everything outside school", visible, House, "personal")}</div>
       )}
-      <CreateTaskModal open={createOpen} onOpenChange={setCreateOpen} defaultWorkspaceContext={workspaceMode} />
       {selectedId !== null && <TaskDetailsModal taskId={selectedId} open onOpenChange={(open) => !open && setSelectedId(null)} />}
     </div>
   );
