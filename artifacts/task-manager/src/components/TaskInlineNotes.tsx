@@ -64,29 +64,34 @@ export function TaskInlineNotes({
   return (
     <div
       className={cn(
-        "group/note mt-2 flex items-start gap-2 rounded-lg border border-transparent bg-muted/35 px-2.5 transition-colors focus-within:border-border focus-within:bg-background",
-        compact ? "py-1.5" : "py-2",
+        "group/note mt-1 flex items-start gap-2 border-l border-border/70 pl-3 transition-colors focus-within:border-primary",
+        compact ? "py-1" : "py-2",
       )}
       onClick={(event) => event.stopPropagation()}
     >
-      <NotebookPen className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/75" />
+      {!compact && <NotebookPen className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/75" />}
       <textarea
         aria-label={`Notes for ${taskTitle}`}
         value={value}
         rows={compact ? 1 : 5}
-        placeholder="Add a note…"
+        placeholder="Write beneath this task…"
         onChange={(event) => {
           setValue(event.target.value);
           setStatus("idle");
         }}
         onBlur={() => void save()}
+        onInput={(event) => {
+          if (!compact) return;
+          event.currentTarget.style.height = "24px";
+          event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
+        }}
         onKeyDown={(event) => {
           if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
             event.currentTarget.blur();
           }
         }}
         className={cn(
-          "flex-1 resize-none bg-transparent leading-5 text-foreground outline-none placeholder:text-muted-foreground/70",
+          "flex-1 resize-none overflow-hidden bg-transparent leading-5 text-foreground outline-none placeholder:text-muted-foreground/60",
           compact ? "min-h-6 text-xs" : "min-h-28 text-sm leading-7",
         )}
       />

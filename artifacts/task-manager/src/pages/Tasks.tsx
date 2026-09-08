@@ -186,7 +186,7 @@ export default function Tasks() {
   const [view, setView] = useState<View>("all");
   const [sortMode, setSortMode] = useState<SortMode>("dueDate");
   const [workspaceMode, setWorkspaceMode] = useState<"school" | "personal">("school");
-  const [editingMode, setEditingMode] = useState<"tasks" | "notes">("tasks");
+  const [laneEditingModes, setLaneEditingModes] = useState<Record<Lane, "tasks" | "notes">>({ tests: "tasks", assignments: "tasks", personal: "tasks" });
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [viewsOpen, setViewsOpen] = useState(false);
@@ -398,15 +398,20 @@ export default function Tasks() {
   function taskColumn(title: string, description: string, columnTasks: WorkspaceTask[], icon: typeof FileCheck2, lane: Lane) {
     const Icon = icon;
     const activeDrop = dropTarget === lane && draggingTaskId !== null;
+    const editingMode = laneEditingModes[lane];
     return (
       <section className={`bento-card min-w-0 overflow-hidden transition-[border-color,background-color] ${activeDrop ? "border-primary bg-primary/[0.035]" : ""}`}
         onDragOver={(event) => { if (view === "completed") return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setDropTarget(lane); }}
         onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null); }}
         onDrop={(event) => { event.preventDefault(); const taskId = Number(event.dataTransfer.getData("text/task-id")); if (Number.isInteger(taskId)) void moveTask(taskId, lane); }}>
         <header className="border-b px-4 py-3.5">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div>
             <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="font-black">{title}</h2><span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground">{columnTasks.length}</span></div><p className="truncate text-xs text-muted-foreground">{activeDrop ? "Release to move here" : description}</p></div>
+            {view !== "completed" && <div className="flex shrink-0 rounded-lg border bg-muted/45 p-0.5" aria-label={`${title} editor mode`}>
+              <button type="button" onClick={() => setLaneEditingModes((current) => ({ ...current, [lane]: "tasks" }))} className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-black transition-colors ${editingMode === "tasks" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><ListTodo className="h-3 w-3" />Tasks</button>
+              <button type="button" onClick={() => setLaneEditingModes((current) => ({ ...current, [lane]: "notes" }))} className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[11px] font-black transition-colors ${editingMode === "notes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><NotebookPen className="h-3 w-3" />Notes</button>
+            </div>}
           </div>
         </header>
         {view !== "completed" && editingMode === "tasks" && <DocumentTaskEntry lane={lane} workspaceMode={workspaceMode} onCreated={() => void refreshTasks()} />}
@@ -437,10 +442,6 @@ export default function Tasks() {
                 const Icon = mode === "school" ? GraduationCap : House;
                 return <button key={mode} type="button" onClick={() => { setWorkspaceMode(mode); setView("all"); setRecommendation(null); }} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-black capitalize transition-colors ${workspaceMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><Icon className="h-3.5 w-3.5" />{mode}</button>;
               })}
-            </div>
-            <div className="flex rounded-xl border bg-muted/45 p-1" aria-label="Editing mode">
-              <button type="button" onClick={() => setEditingMode("tasks")} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-black transition-colors ${editingMode === "tasks" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><ListTodo className="h-3.5 w-3.5" />Tasks</button>
-              <button type="button" onClick={() => setEditingMode("notes")} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-black transition-colors ${editingMode === "notes" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}><NotebookPen className="h-3.5 w-3.5" />Notes</button>
             </div>
             <Button onClick={() => setCreateOpen(true)} className="h-11 rounded-xl bg-secondary px-5 text-secondary-foreground"><Plus className="mr-2 h-4 w-4" /> New task</Button>
           </div>
