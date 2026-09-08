@@ -93,10 +93,9 @@ function DocumentTaskEntry({
   }
 
   return (
-    <div className="border-b border-border/70 bg-background/55 px-4 py-4">
-      <div className="overflow-hidden rounded-xl border bg-background shadow-[0_8px_30px_hsl(var(--foreground)/0.04)] focus-within:border-primary/45">
-        <div className="flex items-center justify-between border-b px-4 py-2 text-[11px] font-bold text-muted-foreground"><span>Write a task naturally</span><span>{saving ? "Parsing…" : "Enter adds · Shift+Enter adds a line"}</span></div>
-        <div className="flex items-start gap-3 px-4 py-3">
+    <div className="focus-within:border-primary/45">
+      <div className="flex items-center justify-between border-b px-4 py-2 text-[11px] font-bold text-muted-foreground"><span>Write a task naturally</span><span>{saving ? "Parsing…" : "Enter adds · Shift+Enter adds a line"}</span></div>
+      <div className="flex items-start gap-3 px-4 py-3">
         <Plus className="mt-2 h-4 w-4 shrink-0 text-primary" />
         <textarea
           aria-label={`Add ${lane === "tests" ? "test or quiz" : "task"}`}
@@ -113,38 +112,35 @@ function DocumentTaskEntry({
           className="min-h-40 flex-1 resize-y bg-transparent py-1 text-[15px] leading-8 outline-none placeholder:text-muted-foreground/60"
           style={{ backgroundImage: "linear-gradient(to bottom, transparent 31px, hsl(var(--border) / .32) 32px)", backgroundSize: "100% 32px" }}
         />
-        </div>
-        <AnimatePresence initial={false}>
-          {preview?.title && text.trim() && (
-            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-wrap items-center gap-1.5 border-t bg-muted/25 px-4 py-2 text-[11px] text-muted-foreground">
-              <span className="font-black text-foreground">{preview.title}</span>
-              {preview.dueDate && <span className="rounded-md bg-background px-2 py-1">{preview.dueDate}</span>}
-              {preview.subject && <span className="rounded-md bg-background px-2 py-1">{preview.subject}</span>}
-              {preview.priority && <span className="rounded-md bg-background px-2 py-1 capitalize">{preview.priority}</span>}
-              {preview.estimatedMinutes && <span className="rounded-md bg-background px-2 py-1">{preview.estimatedMinutes} min</span>}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
+      <AnimatePresence initial={false}>
+        {preview?.title && text.trim() && (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-wrap items-center gap-1.5 border-t bg-muted/25 px-4 py-2 text-[11px] text-muted-foreground">
+            <span className="font-black text-foreground">{preview.title}</span>
+            {preview.dueDate && <span className="rounded-md bg-background px-2 py-1">{preview.dueDate}</span>}
+            {preview.subject && <span className="rounded-md bg-background px-2 py-1">{preview.subject}</span>}
+            {preview.priority && <span className="rounded-md bg-background px-2 py-1 capitalize">{preview.priority}</span>}
+            {preview.estimatedMinutes && <span className="rounded-md bg-background px-2 py-1">{preview.estimatedMinutes} min</span>}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
 function LaneNotesEditor({ value, onChange, onSave, saving }: { value: string; onChange: (value: string) => void; onSave: () => void; saving: boolean }) {
   return (
-    <div className="border-b border-border/70 bg-background/55 px-4 py-4">
-      <div className="overflow-hidden rounded-xl border bg-background shadow-[0_8px_30px_hsl(var(--foreground)/0.04)] focus-within:border-primary/45">
-        <div className="flex items-center justify-between border-b px-4 py-2 text-[11px] font-bold text-muted-foreground"><span>Notes stay notes and sync to your account</span><span>{saving ? "Saving…" : "Saved on blur"}</span></div>
-        <textarea
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onBlur={onSave}
-          rows={7}
-          placeholder="Write class context, reminders, ideas, or planning notes here. Nothing in this mode becomes a task."
-          className="min-h-48 w-full resize-y bg-transparent px-5 py-4 text-[15px] leading-8 outline-none placeholder:text-muted-foreground/55"
-          style={{ backgroundImage: "linear-gradient(to bottom, transparent 31px, hsl(var(--border) / .34) 32px)", backgroundSize: "100% 32px" }}
-        />
-      </div>
+    <div className="focus-within:border-primary/45">
+      <div className="flex items-center justify-between border-b px-4 py-2 text-[11px] font-bold text-muted-foreground"><span>Plain notes · nothing here is parsed</span><span>{saving ? "Saving…" : "Saved on blur"}</span></div>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onSave}
+        rows={7}
+        placeholder="Write freely here, like a document. These notes stay notes."
+        className="min-h-48 w-full resize-y bg-transparent px-5 py-4 text-[15px] leading-8 outline-none placeholder:text-muted-foreground/55"
+        style={{ backgroundImage: "linear-gradient(to bottom, transparent 31px, hsl(var(--border) / .34) 32px)", backgroundSize: "100% 32px" }}
+      />
     </div>
   );
 }
@@ -414,9 +410,11 @@ export default function Tasks() {
             </div>}
           </div>
         </header>
-        {view !== "completed" && editingMode === "tasks" && <DocumentTaskEntry lane={lane} workspaceMode={workspaceMode} onCreated={() => void refreshTasks()} />}
-        {view !== "completed" && editingMode === "notes" && <LaneNotesEditor value={workspaceNotes[notesKey(lane)] ?? ""} onChange={(value) => setWorkspaceNotes((current) => ({ ...current, [notesKey(lane)]: value }))} onSave={() => void saveWorkspaceNote(lane)} saving={savingNoteKey === notesKey(lane)} />}
-        <div className="divide-y divide-border/70">{columnTasks.map(renderTask)}{columnTasks.length === 0 && <p className="px-5 py-12 text-center text-sm text-muted-foreground">{activeDrop ? "Drop the task here." : `No ${view === "completed" ? "completed" : "active"} ${title.toLowerCase()}.`}</p>}</div>
+        <div className="m-4 overflow-hidden rounded-xl border bg-background shadow-[0_8px_30px_hsl(var(--foreground)/0.04)] transition-colors focus-within:border-primary/45">
+          {view !== "completed" && editingMode === "tasks" && <DocumentTaskEntry lane={lane} workspaceMode={workspaceMode} onCreated={() => void refreshTasks()} />}
+          {view !== "completed" && editingMode === "notes" && <LaneNotesEditor value={workspaceNotes[notesKey(lane)] ?? ""} onChange={(value) => setWorkspaceNotes((current) => ({ ...current, [notesKey(lane)]: value }))} onSave={() => void saveWorkspaceNote(lane)} saving={savingNoteKey === notesKey(lane)} />}
+          <div className={`${view !== "completed" ? "border-t" : ""} divide-y divide-border/70`}>{columnTasks.map(renderTask)}{columnTasks.length === 0 && <p className="px-5 py-12 text-center text-sm text-muted-foreground">{activeDrop ? "Drop the task here." : `No ${view === "completed" ? "completed" : "active"} ${title.toLowerCase()}.`}</p>}</div>
+        </div>
       </section>
     );
   }

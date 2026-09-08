@@ -2,19 +2,20 @@
   "name": "@workspace/reminder-functions",
   "version": "0.0.0",
   "private": true,
-  "main": "lib/index.js",
+  "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "send-reminders": "tsx src/run.ts"
   },
   "dependencies": {
     "firebase-admin": "^13.5.0",
-    "firebase-functions": "^6.4.0",
     "nodemailer": "^7.0.6"
   },
   "devDependencies": {
     "@types/nodemailer": "^7.0.1",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.3"
   }
 }
