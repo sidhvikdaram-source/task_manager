@@ -3,6 +3,7 @@ import {
   Link,
   Switch,
   Route,
+  Redirect,
   Router as WouterRouter,
   useLocation,
 } from "wouter";
@@ -20,7 +21,6 @@ import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Today = lazy(() => import("@/pages/Today"));
-const Tasks = lazy(() => import("@/pages/Tasks"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
 const FocusArena = lazy(() => import("@/pages/FocusArena"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
@@ -28,7 +28,6 @@ const Social = lazy(() => import("@/pages/Social"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Workspace = lazy(() => import("@/pages/Workspace"));
 const SchoolPlanner = lazy(() => import("@/pages/SchoolPlanner"));
-const Projects = lazy(() => import("@/pages/Projects"));
 const WeeklyReview = lazy(() => import("@/pages/WeeklyReview"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -393,11 +392,11 @@ function AnimatedRoutes() {
         <Suspense fallback={<PageLoadingSkeleton />}>
           <Switch>
             <Route path="/today" component={Today} />
-            <Route path="/tasks" component={Tasks} />
+            <Route path="/tasks"><Redirect to="/today" /></Route>
             <Route path="/calendar" component={Calendar} />
             <Route path="/workspace" component={Workspace} />
             <Route path="/school" component={SchoolPlanner} />
-            <Route path="/projects" component={Projects} />
+            <Route path="/projects"><Redirect to="/school?view=projects" /></Route>
             <Route path="/review" component={WeeklyReview} />
             <Route path="/focus" component={FocusArena} />
             <Route path="/social" component={SocialRoute} />

@@ -158,9 +158,9 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const pageTitles: Record<string, string> = {
     "/calendar": "Calendar",
-    "/tasks": "Task workspace",
+    "/tasks": "My Day",
     "/school": "Academics",
-    "/projects": "Projects",
+    "/projects": "Academics",
     "/focus": "Focus",
     "/analytics": "Insights",
     "/social": "Social",
@@ -473,7 +473,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
                   {preferences.advancedFeaturesEnabled && (
                     <div className="border-t py-1">
                       <Link
-                        href="/projects"
+                        href="/school?view=projects"
                         onClick={() => setAccountOpen(false)}
                         className="flex min-h-11 w-full touch-manipulation items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                       >

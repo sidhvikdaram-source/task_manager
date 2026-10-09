@@ -62,7 +62,7 @@ type Project = {
   };
 };
 
-export default function Projects() {
+export default function Projects({ embedded = false }: { embedded?: boolean }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
@@ -268,10 +268,7 @@ export default function Projects() {
       <section className="bento-card p-5 sm:p-6">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-black uppercase text-primary">
-              Projects and rubrics
-            </p>
-            <h1 className="tech-title mt-1 text-3xl">Long-form work</h1>
+            {embedded ? <h2 className="text-xl font-black">Projects</h2> : <h1 className="tech-title text-3xl">Projects</h1>}
             <p className="mt-1 text-sm text-muted-foreground">
               Requirements, milestones, related tasks, progress, and submission
               details.

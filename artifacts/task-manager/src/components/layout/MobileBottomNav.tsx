@@ -5,10 +5,8 @@ import {
   CalendarDays,
   Check,
   Ellipsis,
-  FolderKanban,
   GraduationCap,
   ListChecks,
-  Rows3,
   Palette,
   Settings2,
   Timer,
@@ -28,15 +26,13 @@ import { themes, useTheme, type ThemeId } from "@/theme";
 import { cn } from "@/lib/utils";
 
 const primary = [
-  { href: "/today", label: "Today", icon: ListChecks },
+  { href: "/today", label: "My Day", icon: ListChecks },
   { href: "/school", label: "Academics", icon: GraduationCap },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/focus", label: "Focus", icon: Timer },
 ] as const;
 
 const moreLinks = [
-  { href: "/tasks", label: "Task workspace", icon: Rows3 },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/social", label: "Social", icon: Users },
   { href: "/analytics", label: "Insights", icon: BarChart3 },
   { href: "/profile", label: "Profile", icon: UserRound },
@@ -214,7 +210,7 @@ export function MobileBottomNav() {
                       Enable advanced workspace
                     </span>
                     <span className="block text-xs text-muted-foreground">
-                      Unlock Projects, Social, and Insights.
+                      Unlock Social and Insights.
                     </span>
                   </span>
                 </button>

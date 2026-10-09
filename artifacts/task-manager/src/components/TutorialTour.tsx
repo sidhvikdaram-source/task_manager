@@ -63,7 +63,7 @@ const chapters = [
     path: "/calendar",
     target: "[data-tour='calendar']",
     title: "Plan beyond today when you need to",
-    detail: "Calendar, Projects, Insights, and Weekly Review are the deeper planning layer. They stay out of the way until you choose to use them.",
+    detail: "Calendar, Academics, Insights, and Weekly Review are the deeper planning layer. They stay out of the way until you choose to use them.",
     prompt: "Turn on Advanced workspace below if you want these tools kept in your navigation.",
     icon: CalendarDays,
   },

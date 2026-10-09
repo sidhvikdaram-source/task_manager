@@ -9,10 +9,8 @@ import { Link, useLocation } from "wouter";
 import {
   CalendarDays,
   ChartNoAxesCombined,
-  FolderKanban,
   GraduationCap,
   ListChecks,
-  Rows3,
   PanelLeftClose,
   PanelLeftOpen,
   Settings2,
@@ -42,11 +40,9 @@ type SidebarProps = {
 
 const navLinks = [
   { href: "/today", label: "My Day", icon: ListChecks },
-  { href: "/tasks", label: "Task workspace", icon: Rows3 },
   { href: "/school", label: "Academics", icon: GraduationCap },
   { href: "/focus", label: "Focus", icon: Timer },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/analytics", label: "Insights", icon: ChartNoAxesCombined },
 ];
 
