@@ -8,6 +8,7 @@ import {
 import { Link, useLocation } from "wouter";
 import {
   CalendarDays,
+  MessageSquare,
   ChartNoAxesCombined,
   GraduationCap,
   ListChecks,
@@ -44,6 +45,7 @@ const navLinks = [
   { href: "/focus", label: "Focus", icon: Timer },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/analytics", label: "Insights", icon: ChartNoAxesCombined },
+  { href: "/general", label: "General AI", icon: MessageSquare },
 ];
 
 function SlidingLabel({

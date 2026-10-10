@@ -20,6 +20,7 @@ import { ExperienceProvider, useExperience } from "@/experience";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const GeneralAI = lazy(() => import("@/pages/GeneralAI"));
 const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
 const FocusArena = lazy(() => import("@/pages/FocusArena"));
@@ -311,19 +312,20 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (location === "/") {
-    return (
-      <Suspense fallback={<div className="min-h-screen bg-[#f4f1ff]" />}>
-        <LandingPage onOpenApp={openApp} />
-      </Suspense>
-    );
-  }
-
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
+    );
+  }
+
+  if (location === "/") {
+    if (isAuthenticated) return <Redirect to="/today" />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-[#f4f1ff]" />}>
+        <LandingPage onOpenApp={openApp} />
+      </Suspense>
     );
   }
 
@@ -392,6 +394,7 @@ function AnimatedRoutes() {
         <Suspense fallback={<PageLoadingSkeleton />}>
           <Switch>
             <Route path="/today" component={Today} />
+            <Route path="/general" component={GeneralAI} />
             <Route path="/tasks"><Redirect to="/today" /></Route>
             <Route path="/calendar" component={Calendar} />
             <Route path="/workspace" component={Workspace} />

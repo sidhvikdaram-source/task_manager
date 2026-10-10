@@ -17,8 +17,7 @@ import {
   type DocumentReference,
 } from "firebase/firestore";
 import { firebaseAuth, firebaseDb } from "@workspace/replit-auth-web";
-import { firebaseApp } from "@workspace/replit-auth-web";
-import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
+import { aiRequest } from "./aiTransport";
 import { parseQuickCapture } from "../../../api-server/src/lib/quickCapture";
 import {
   scoreTaskRecommendation,
@@ -603,7 +602,8 @@ async function enrichedProjects(uid: string) {
       .map((item) => ({
         ...item,
         completed: item.taskId
-          ? tasks.find((task) => task.id === item.taskId)?.status === "completed"
+          ? tasks.find((task) => task.id === item.taskId)?.status ===
+            "completed"
           : item.completed,
       }));
     const incompleteTasks = related.filter(
@@ -845,12 +845,19 @@ async function handleTasks(
         .filter((key) => Object.hasOwn(input, key))
         .map((key) => [key, input[key]]),
     );
-    if (changes.taskWorkspaceNotes && typeof changes.taskWorkspaceNotes === "object" && !Array.isArray(changes.taskWorkspaceNotes)) {
+    if (
+      changes.taskWorkspaceNotes &&
+      typeof changes.taskWorkspaceNotes === "object" &&
+      !Array.isArray(changes.taskWorkspaceNotes)
+    ) {
       changes.taskWorkspaceNotes = Object.fromEntries(
         Object.entries(changes.taskWorkspaceNotes as JsonObject)
           .slice(0, 6)
           .filter(([, value]) => typeof value === "string")
-          .map(([key, value]) => [key.slice(0, 40), String(value).slice(0, 20_000)]),
+          .map(([key, value]) => [
+            key.slice(0, 40),
+            String(value).slice(0, 20_000),
+          ]),
       );
     }
     await updateDoc(childDoc(uid, "tasks", id), clean(changes));
@@ -1279,11 +1286,15 @@ async function handleProjects(
         try {
           const url = new URL(String(value.url ?? "").trim());
           if (url.protocol !== "https:" && url.protocol !== "http:") return [];
-          const label = String(value.label ?? "").trim().slice(0, 100);
-          return [{
-            url: url.toString().slice(0, 1000),
-            ...(label ? { label } : {}),
-          }];
+          const label = String(value.label ?? "")
+            .trim()
+            .slice(0, 100);
+          return [
+            {
+              url: url.toString().slice(0, 1000),
+              ...(label ? { label } : {}),
+            },
+          ];
         } catch {
           return [];
         }
@@ -1508,12 +1519,17 @@ async function handleUserAndRewards(
         .map((key) => [key, input[key]]),
     );
     if (Object.hasOwn(changes, "reminderEmails")) {
-      const emails = Array.isArray(changes.reminderEmails) ? changes.reminderEmails : [];
-      changes.reminderEmails = [...new Set(emails
-        .filter((email): email is string => typeof email === "string")
-        .map((email) => email.trim().toLowerCase())
-        .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))]
-        .slice(0, 5);
+      const emails = Array.isArray(changes.reminderEmails)
+        ? changes.reminderEmails
+        : [];
+      changes.reminderEmails = [
+        ...new Set(
+          emails
+            .filter((email): email is string => typeof email === "string")
+            .map((email) => email.trim().toLowerCase())
+            .filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+        ),
+      ].slice(0, 5);
     }
     if (Object.hasOwn(changes, "emailRemindersEnabled")) {
       changes.emailRemindersEnabled = changes.emailRemindersEnabled === true;
@@ -2205,51 +2221,6 @@ async function handleCanvas(
   return null;
 }
 
-const nimboModels = new Map<string, ReturnType<typeof getGenerativeModel>>();
-function getNimboModel(modelName?: string) {
-  const selectedModel = modelName ||
-    (import.meta.env.VITE_FIREBASE_AI_MODEL as string | undefined) ||
-    "gemini-3.6-flash";
-  const cached = nimboModels.get(selectedModel);
-  if (cached) return cached;
-  const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
-  const model = getGenerativeModel(ai, {
-    model: selectedModel,
-    systemInstruction: [
-      "You are Nimbo, the concise planning companion inside Nimbus, a gamified task manager.",
-      "Help organize tasks, projects, deadlines, focus, habits, and workload. Do not solve homework for the user.",
-      "Never claim that a workspace change happened. Changes are previews until the user confirms them.",
-      "Return the four string fields required by the response schema.",
-      "reply is the user-facing answer. taskPreviewJson is a JSON array string containing task previews with title, optional date YYYY-MM-DD, optional time, optional scheduleLabel, optional subject copied exactly from the supplied subject list, optional estimatedMinutes, taskType, priority, and keywords.",
-      "planPreviewJson is either the string null or a JSON object string with summary, optional project {name,subject,description,dueDate}, and tasks [{title,description,subject,dueDate,priority,estimatedMinutes,taskKind}].",
-      "workspacePreviewJson is either the string null or a JSON object string with summary and operations. Supported operations are create_task and update_task. update_task must include the numeric task id from context and may include title, subject copied exactly from the supplied subject list, dueDate YYYY-MM-DD, priority, estimatedMinutes, taskKind, or description. For advice, use [] for taskPreviewJson and null for both other preview strings.",
-      "Be honest, useful, and brief.",
-    ].join("\n"),
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: "object",
-        properties: {
-          reply: { type: "string" },
-          taskPreviewJson: { type: "string" },
-          planPreviewJson: { type: "string" },
-          workspacePreviewJson: { type: "string" },
-        },
-        required: [
-          "reply",
-          "taskPreviewJson",
-          "planPreviewJson",
-          "workspacePreviewJson",
-        ],
-      },
-      temperature: 0.25,
-      maxOutputTokens: 1000,
-    },
-  });
-  nimboModels.set(selectedModel, model);
-  return model;
-}
-
 function normalizeAiJson(text: string) {
   const cleaned = text
     .trim()
@@ -2418,9 +2389,18 @@ function localNimboFallback(
 ) {
   if (/\b(create|add|capture|remember|remind me to)\b/i.test(message)) {
     const parsed = parseQuickCapture(
-      message.replace(/^(?:please\s+)?(?:create|add|capture|remember|remind me to)\s+(?:a\s+task\s+)?/i, ""),
-      projects.map((project) => ({ id: Number(project.id), name: String(project.name ?? "") })),
-      subjects.map((subject) => ({ id: Number(subject.id), name: String(subject.name ?? "") })),
+      message.replace(
+        /^(?:please\s+)?(?:create|add|capture|remember|remind me to)\s+(?:a\s+task\s+)?/i,
+        "",
+      ),
+      projects.map((project) => ({
+        id: Number(project.id),
+        name: String(project.name ?? ""),
+      })),
+      subjects.map((subject) => ({
+        id: Number(subject.id),
+        name: String(subject.name ?? ""),
+      })),
       dateKey(),
     );
     if (parsed.title) {
@@ -2429,18 +2409,20 @@ function localNimboFallback(
         taskCreated: false,
         task: null,
         tasks: [],
-        taskPreview: [{
-          title: parsed.title,
-          date: parsed.dueDate ?? undefined,
-          dueDate: parsed.dueDate ?? undefined,
-          time: parsed.time ?? undefined,
-          scheduleLabel: parsed.dueDate ?? undefined,
-          subject: parsed.subject,
-          estimatedMinutes: parsed.estimatedMinutes,
-          taskType: "task",
-          priority: parsed.priority,
-          keywords: [],
-        }],
+        taskPreview: [
+          {
+            title: parsed.title,
+            date: parsed.dueDate ?? undefined,
+            dueDate: parsed.dueDate ?? undefined,
+            time: parsed.time ?? undefined,
+            scheduleLabel: parsed.dueDate ?? undefined,
+            subject: parsed.subject,
+            estimatedMinutes: parsed.estimatedMinutes,
+            taskType: "task",
+            priority: parsed.priority,
+            keywords: [],
+          },
+        ],
         actionPreview: null,
         planPreview: null,
         workspacePreview: null,
@@ -2449,7 +2431,11 @@ function localNimboFallback(
   }
   const active = tasks
     .filter((task) => !task.archived && task.status !== "completed")
-    .sort((a, b) => String(a.dueDate ?? "9999-12-31").localeCompare(String(b.dueDate ?? "9999-12-31")))
+    .sort((a, b) =>
+      String(a.dueDate ?? "9999-12-31").localeCompare(
+        String(b.dueDate ?? "9999-12-31"),
+      ),
+    )
     .slice(0, 4);
   const reply = active.length
     ? `I can still read your Nimbus workspace. Your nearest active work is:\n${active.map((task) => `- ${task.title}${task.dueDate ? ` · due ${task.dueDate}` : ""}`).join("\n")}\n\nI did not change anything.`
@@ -2512,21 +2498,31 @@ async function handleAi(
         .map((subject) => subject.name),
     };
     const history = Array.isArray(input.history) ? input.history.slice(-4) : [];
-    const prompt = `Workspace context: ${JSON.stringify(context)}\nRecent conversation: ${JSON.stringify(history)}\nUser request: ${message}`;
-    const configuredModel = import.meta.env.VITE_FIREBASE_AI_MODEL as string | undefined;
-    const candidates = [...new Set([configuredModel, "gemini-3.6-flash", "gemini-3.5-flash-lite"].filter(Boolean) as string[])];
-    let lastError: unknown = null;
-    for (const modelName of candidates) {
-      try {
-        const result = await getNimboModel(modelName).generateContent(prompt);
-        return json(normalizeAiJson(result.response.text()));
-      } catch (error) {
-        lastError = error;
-        console.warn(`Firebase AI Logic model ${modelName} failed`, error);
+    try {
+      const response = await aiRequest(
+        "task",
+        { message, history, context },
+        request.signal,
+      );
+      return json(normalizeAiJson(JSON.stringify(await response.json())));
+    } catch (error) {
+      // The deterministic parser still captures simple tasks without an AI connection.
+      if (
+        /^(?:please\s+)?(?:create|add|capture|remember|remind me to)\s+/i.test(
+          message,
+        ) &&
+        !/\b(project|plan|essay|code|explain)\b/i.test(message)
+      ) {
+        return json(localNimboFallback(message, tasks, projects, subjects));
       }
+      return json(
+        {
+          error:
+            error instanceof Error ? error.message : "Task AI is unavailable.",
+        },
+        503,
+      );
     }
-    console.error("Firebase AI Logic providers failed; using local safe fallback", lastError);
-    return json(localNimboFallback(message, tasks, projects, subjects));
   }
   if (path === "/api/ai/tasks/confirm" && request.method === "POST") {
     const previews = Array.isArray(input.tasks)
@@ -2943,6 +2939,67 @@ async function handleSocial(
   return json({ error: "Social action not found." }, 404);
 }
 
+async function handleGeneralChats(
+  uid: string,
+  request: Request,
+  path: string,
+  input: JsonObject,
+) {
+  if (path === "/api/ai/chats" && request.method === "GET") {
+    const snapshots = await getDocs(
+      query(child(uid, "aiChats"), orderBy("updatedAt", "desc"), limit(100)),
+    );
+    return json(
+      snapshots.docs.map((snapshot) => ({
+        ...snapshot.data(),
+        id: snapshot.id,
+      })),
+    );
+  }
+  if (!path.startsWith("/api/ai/chats/")) return null;
+  const id = path.slice("/api/ai/chats/".length);
+  if (!/^[a-f0-9-]{36}$/i.test(id))
+    return json({ error: "Invalid chat." }, 400);
+  const ref = childDoc(uid, "aiChats", id);
+  if (request.method === "DELETE") {
+    await deleteDoc(ref);
+    return json({ ok: true });
+  }
+  if (request.method !== "PUT")
+    return json({ error: "Method not allowed." }, 405);
+  const messages = input.messages;
+  if (
+    !Array.isArray(messages) ||
+    messages.length > 40 ||
+    messages.some(
+      (message) =>
+        !message ||
+        !["user", "assistant"].includes(message.role) ||
+        typeof message.id !== "string" ||
+        message.id.length > 64 ||
+        typeof message.content !== "string" ||
+        message.content.length > 24000,
+    )
+  )
+    return json({ error: "Invalid conversation." }, 400);
+  const data = {
+    title: String(input.title || "New chat").slice(0, 65),
+    assignmentPrompt: String(input.assignmentPrompt || "").slice(0, 8000),
+    rubric: String(input.rubric || "").slice(0, 8000),
+    messages: messages.map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      ...(message.incomplete ? { incomplete: true } : {}),
+    })),
+    updatedAt: now(),
+  };
+  if (new TextEncoder().encode(JSON.stringify(data)).length > 700000)
+    return json({ error: "Chat is too large. Start a new chat." }, 400);
+  await setDoc(ref, data);
+  return json({ ...data, id });
+}
+
 export async function handleFirebaseApi(request: Request): Promise<Response> {
   try {
     const path = new URL(request.url).pathname;
@@ -2951,8 +3008,10 @@ export async function handleFirebaseApi(request: Request): Promise<Response> {
     const current = firebaseAuth.currentUser;
     if (!current) return json({ error: "Unauthorized" }, 401);
     const uid = current.uid;
-    let user = await ensureUser(uid);
     const input = await body(request);
+    const chatResponse = await handleGeneralChats(uid, request, path, input);
+    if (chatResponse) return chatResponse;
+    let user = await ensureUser(uid);
     user = { ...user, ...(await getDoc(userPath(uid))).data() };
     if (path === "/api/auth/user")
       return json({

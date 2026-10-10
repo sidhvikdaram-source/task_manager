@@ -1,0 +1,11 @@
+{
+  "name": "nimbus-ai",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": true,
+  "vars": {
+    "FIREBASE_PROJECT_ID": "nimbusdo",
+    "ALLOWED_ORIGIN": "https://nimbusdo.web.app"
+  },
+  "ratelimits": [{ "name": "AI_LIMITER", "namespace_id": "1001", "simple": { "limit": 6, "period": 60 } }]
+}

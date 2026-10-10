@@ -157,6 +157,7 @@ export function TopNav({ onOpenSidebar }: { onOpenSidebar: () => void }) {
   const greeting =
     hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const pageTitles: Record<string, string> = {
+    "/general": "General AI",
     "/calendar": "Calendar",
     "/tasks": "My Day",
     "/school": "Academics",

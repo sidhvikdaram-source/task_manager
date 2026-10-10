@@ -53,3 +53,9 @@ Thumbs.db
 .local/
 .env
 .firebase/
+
+# Private AI credentials and local Worker state
+.env.*
+!.env.example
+.dev.vars*
+.wrangler/

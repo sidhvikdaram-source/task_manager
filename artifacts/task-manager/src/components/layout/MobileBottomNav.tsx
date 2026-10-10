@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   BarChart3,
   CalendarDays,
+  MessageSquare,
   Check,
   Ellipsis,
   GraduationCap,
@@ -33,6 +34,7 @@ const primary = [
 ] as const;
 
 const moreLinks = [
+  { href: "/general", label: "General AI", icon: MessageSquare },
   { href: "/social", label: "Social", icon: Users },
   { href: "/analytics", label: "Insights", icon: BarChart3 },
   { href: "/profile", label: "Profile", icon: UserRound },

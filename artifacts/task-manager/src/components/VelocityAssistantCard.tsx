@@ -1,5 +1,6 @@
+import { Link } from 'wouter';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Check, FolderKanban, Loader2, Send, Sparkles, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -9,6 +10,7 @@ import {
   type Task,
 } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
+import { subjectColor, useSubjects } from '@/hooks/useSubjects';
 import { NimbusMascot } from '@/components/NimbusMascot';
 
 type ChatRole = 'assistant' | 'user';
@@ -141,12 +143,12 @@ function seedCreatedTask(queryClient: ReturnType<typeof useQueryClient>, task: T
 
 export function VelocityAssistantCard() {
   const queryClient = useQueryClient();
-  const reduceMotion = useReducedMotion();
+  const { data: subjects = [] } = useSubjects();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'I am Nimbo, your Nimbus planning companion. Try: "Prioritize today\'s tasks" or "Create a science project with three study tasks."',
+      content: 'I am Task AI, your Nimbus planning companion. Try: "Prioritize today\'s tasks" or "Create a science project with three study tasks."',
     },
   ]);
   const [input, setInput] = useState('');
@@ -158,7 +160,7 @@ export function VelocityAssistantCard() {
   const mountedRef = useRef(true);
 
   const canSend = input.trim().length > 0 && !isSending;
-  const placeholder = useMemo(() => isSending ? 'Nimbo is thinking...' : 'Create, sort, schedule, or review work...', [isSending]);
+  const placeholder = useMemo(() => isSending ? 'Task AI is thinking...' : 'Create, sort, schedule, or review work...', [isSending]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -175,23 +177,7 @@ export function VelocityAssistantCard() {
     };
   }, []);
 
-  async function animateAssistantMessage(id: string, content: string) {
-    if (reduceMotion || content.length > 1600) {
-      setMessages((current) => current.map((message) => (
-        message.id === id ? { ...message, content, typing: false } : message
-      )));
-      return;
-    }
-
-    for (let i = 72; i < content.length; i += 72) {
-      if (!mountedRef.current) return;
-      const partial = content.slice(0, i);
-      setMessages((current) => current.map((message) => (
-        message.id === id ? { ...message, content: partial, typing: true } : message
-      )));
-      await new Promise((resolve) => window.setTimeout(resolve, 8));
-    }
-    if (!mountedRef.current) return;
+  async function showAssistantMessage(id: string, content: string) {
     setMessages((current) => current.map((message) => (
       message.id === id ? { ...message, content, typing: false } : message
     )));
@@ -308,7 +294,7 @@ export function VelocityAssistantCard() {
         queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() });
       }
 
-      await animateAssistantMessage(assistantId, data.reply);
+      await showAssistantMessage(assistantId, data.reply);
       if (data.taskPreview?.length) {
         setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, taskPreview: data.taskPreview } : message));
       }
@@ -323,9 +309,9 @@ export function VelocityAssistantCard() {
       }
     } catch (error) {
       const message = error instanceof DOMException && error.name === 'AbortError'
-        ? 'Nimbo took too long to respond. Please try that request again.'
-        : error instanceof Error ? error.message : 'Nimbo hit a snag. Please try again.';
-      await animateAssistantMessage(assistantId, message);
+        ? 'Task AI took too long to respond. Please try that request again.'
+        : error instanceof Error ? error.message : 'Task AI hit a snag. Please try again.';
+      await showAssistantMessage(assistantId, message);
     } finally {
       window.clearTimeout(timeout);
       setIsSending(false);
@@ -346,22 +332,23 @@ export function VelocityAssistantCard() {
             'bento-card fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-2 right-2 z-[70] flex h-[min(42rem,calc(100vh-6rem-env(safe-area-inset-bottom)))] h-[min(42rem,calc(100dvh-6rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden p-4 shadow-2xl sm:bottom-5 sm:left-auto sm:right-5 sm:w-[28rem] sm:p-5',
             isFocused && 'ring-2 ring-primary/35 shadow-[0_0_42px_hsl(var(--primary)/0.18)]',
           )}
-          aria-label="Nimbo assistant"
+          aria-label="Task AI assistant"
         >
           <div className="flex shrink-0 items-center gap-3 border-b border-border/70 pb-3">
             <AssistantLogo circular className="h-9 w-9 [&_svg]:h-4 [&_svg]:w-4" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h2 className="tech-title truncate text-base">Nimbo</h2>
+                <h2 className="tech-title truncate text-base">Task AI</h2>
                 <Sparkles className="h-3.5 w-3.5 shrink-0 text-secondary" />
               </div>
               <p className="text-[11px] text-muted-foreground">Nothing changes until you confirm.</p>
             </div>
+            <Link href="/general" onClick={() => setIsOpen(false)} className="rounded-lg px-2 py-2 text-xs font-semibold text-primary hover:bg-muted">General AI</Link>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Close Nimbo"
+              aria-label="Close Task AI"
               title="Close assistant"
             >
               <X className="h-4 w-4" />
@@ -375,6 +362,7 @@ export function VelocityAssistantCard() {
                 <div className={cn('max-w-[84%] rounded-2xl border px-3 py-2 text-sm leading-relaxed', message.role === 'assistant' ? 'border-primary/25 bg-primary/8 text-foreground' : 'border-secondary/30 bg-secondary/15 text-foreground')}>
                   {message.content ? <MarkdownMessage content={message.content} /> : (message.typing ? <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-.2s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-.1s]" /><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" /></span> : '')}
                   {message.typing && message.content && <span className="ml-0.5 animate-pulse text-primary">|</span>}
+                  {message.taskPreview && !message.typing && <div className="mt-3 space-y-2">{message.taskPreview.map((task, index) => <div key={index} className="rounded-lg border border-border bg-background/70 p-2.5"><p className="font-semibold">{task.title}</p><div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">{task.subject && <span style={{color:subjectColor(task.subject,subjects)}}>{task.subject}</span>}<span>{task.date || task.dueDate || 'No deadline'}</span>{task.estimatedMinutes != null && <span>{task.estimatedMinutes} min</span>}</div></div>)}</div>}
                   {message.taskPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmTaskPreview(message.id, message.taskPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Created</> : message.taskPreview.length === 1 ? 'Create task' : `Create ${message.taskPreview.length} tasks`}</button>}
                   {message.actionPreview && !message.typing && <button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmAction(message.id, message.actionPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-secondary px-3 py-2 text-xs font-black text-secondary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Updating</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Confirmed</> : `${message.actionPreview.label} (${message.actionPreview.count})`}</button>}
                   {message.planPreview && !message.typing && <div className="mt-3 rounded-xl border border-primary/25 bg-background/70 p-3"><div className="flex items-center gap-2 text-xs font-black"><FolderKanban className="h-3.5 w-3.5 text-primary"/>{message.planPreview.project?.name ?? 'Multi-step plan'}<span className="ml-auto text-muted-foreground">{message.planPreview.tasks.length > 0 ? `${message.planPreview.tasks.length} tasks` : 'Project'}</span></div><button type="button" disabled={message.previewConfirmed || confirmingId === message.id} onClick={() => confirmPlan(message.id, message.planPreview!)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground disabled:opacity-60">{confirmingId === message.id ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating plan</> : message.previewConfirmed ? <><Check className="h-3.5 w-3.5" />Plan created</> : planCommandLabel(message.planPreview)}</button></div>}
@@ -403,8 +391,8 @@ export function VelocityAssistantCard() {
           whileTap={{ scale: 0.94 }}
           onClick={() => setIsOpen(true)}
           className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-50 flex h-[3.25rem] w-[3.25rem] items-center justify-center rounded-full border border-white/15 bg-[#141414] text-white shadow-[0_12px_34px_rgba(0,0,0,0.34)] sm:bottom-5 sm:right-5 sm:h-14 sm:w-14"
-          aria-label="Open Nimbo"
-          title="Nimbo"
+          aria-label="Open Task AI"
+          title="Task AI"
         >
           <NimbusMascot state="assistant" className="h-12 w-13" />
         </motion.button>
