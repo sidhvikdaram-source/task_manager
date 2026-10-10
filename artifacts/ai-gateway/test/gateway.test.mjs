@@ -63,3 +63,19 @@ test("health probe needs no credentials and exposes no account data", async () =
   assert.equal(r.status, 200);
   assert.deepEqual(await r.json(), { service: "nimbus-ai", status: "ok" });
 });
+test("Firebase hosting alias forwards its origin and receives readable failures", async () => {
+  const origin = "https://nimbusdo.firebaseapp.com";
+  let forwarded;
+  const env = {
+    NIMBUS_AI: {
+      fetch: async (request) => {
+        forwarded = request.headers.get("Origin");
+        throw new Error("unavailable");
+      },
+    },
+  };
+  const response = await gateway.fetch(make("/general", "POST", origin), env);
+  assert.equal(forwarded, origin);
+  assert.equal(response.status, 502);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), origin);
+});

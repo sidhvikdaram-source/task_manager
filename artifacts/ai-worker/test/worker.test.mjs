@@ -344,3 +344,45 @@ test("simple task and project requests use deterministic capture without calling
   assert.equal(plan.tasks.length, 3);
   assert.ok(plan.tasks.every((t) => t.subject === "Science" && t.title === ""));
 });
+test("both official hosting origins pass preflight and retain authentication", async () => {
+  let providerCalls = 0;
+  const worker = createWorker({
+    fetcher: async () => {
+      providerCalls++;
+      throw new Error("Must not call provider");
+    },
+  });
+  const config = {
+    ...env,
+    ALLOWED_ORIGINS:
+      "https://nimbusdo.web.app,https://nimbusdo.firebaseapp.com",
+  };
+  for (const origin of config.ALLOWED_ORIGINS.split(",")) {
+    const preflight = await worker.fetch(
+      new Request("https://test.invalid/general", {
+        method: "OPTIONS",
+        headers: { Origin: origin },
+      }),
+      config,
+    );
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("Access-Control-Allow-Origin"), origin);
+    const response = await worker.fetch(
+      new Request("https://test.invalid/general", {
+        method: "POST",
+        headers: { Origin: origin },
+      }),
+      config,
+    );
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), origin);
+  }
+  assert.equal(providerCalls, 0);
+  const denied = await worker.fetch(
+    req("general", undefined, {
+      Origin: "https://nimbusdo.firebaseapp.com.evil.test",
+    }),
+    config,
+  );
+  assert.equal(denied.status, 403);
+});

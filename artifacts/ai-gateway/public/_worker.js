@@ -3,14 +3,20 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
-    const allowed = "https://nimbusdo.web.app";
+    const allowedOrigins = [
+      "https://nimbusdo.web.app",
+      "https://nimbusdo.firebaseapp.com",
+    ];
+    const allowed = allowedOrigins.includes(origin)
+      ? origin
+      : allowedOrigins[0];
     const headers = {
       "Access-Control-Allow-Origin": allowed,
       Vary: "Origin",
       "Cache-Control": "no-store",
     };
     const json = (value, status) => Response.json(value, { status, headers });
-    if (origin && origin !== allowed)
+    if (origin && !allowedOrigins.includes(origin))
       return json({ error: "Origin not allowed" }, 403);
     if (url.pathname === "/health" && request.method === "GET")
       return json({ service: "nimbus-ai", status: "ok" }, 200);

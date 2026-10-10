@@ -5,7 +5,14 @@
   "workers_dev": true,
   "vars": {
     "FIREBASE_PROJECT_ID": "nimbusdo",
-    "ALLOWED_ORIGIN": "https://nimbusdo.web.app"
+    "ALLOWED_ORIGIN": "https://nimbusdo.web.app",
+    "ALLOWED_ORIGINS": "https://nimbusdo.web.app,https://nimbusdo.firebaseapp.com",
   },
-  "ratelimits": [{ "name": "AI_LIMITER", "namespace_id": "1001", "simple": { "limit": 6, "period": 60 } }]
+  "ratelimits": [
+    {
+      "name": "AI_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 6, "period": 60 },
+    },
+  ],
 }

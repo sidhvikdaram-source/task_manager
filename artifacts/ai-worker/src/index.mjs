@@ -1,6 +1,4 @@
-import {
-  parseTaskCreation,
-} from "../../api-server/src/lib/taskCapture.ts";
+import { parseTaskCreation } from "../../api-server/src/lib/taskCapture.ts";
 import {
   GENERAL_SYSTEM,
   TASK_SYSTEM,
@@ -149,7 +147,17 @@ export function createWorker({
   return {
     async fetch(request, env) {
       const origin = request.headers.get("Origin");
-      const allowed = env.ALLOWED_ORIGIN || "https://nimbusdo.web.app";
+      const allowedOrigins = (
+        env.ALLOWED_ORIGINS ||
+        env.ALLOWED_ORIGIN ||
+        "https://nimbusdo.web.app"
+      )
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const allowed = allowedOrigins.includes(origin)
+        ? origin
+        : allowedOrigins[0];
       const headers = {
         "Access-Control-Allow-Origin": allowed,
         Vary: "Origin",
@@ -157,7 +165,7 @@ export function createWorker({
       };
       const json = (body, status = 200, extra = {}) =>
         Response.json(body, { status, headers: { ...headers, ...extra } });
-      if (origin && origin !== allowed)
+      if (origin && !allowedOrigins.includes(origin))
         return json({ error: "Origin not allowed" }, 403);
       if (request.method === "OPTIONS")
         return new Response(null, {
