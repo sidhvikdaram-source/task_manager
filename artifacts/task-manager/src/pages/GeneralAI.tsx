@@ -58,7 +58,17 @@ async function chatApi(path: string, method = "GET", body?: unknown) {
   if (!response.ok) throw new Error(data.error || "Could not save chat.");
   return data;
 }
-export default function GeneralAI() {
+export default function GeneralAI({
+  embedded = false,
+  visible = true,
+  onMinimize,
+  onTaskMode,
+}: {
+  embedded?: boolean;
+  visible?: boolean;
+  onMinimize?: () => void;
+  onTaskMode?: () => void;
+} = {}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const key = ["general-ai-chats", user?.id];
@@ -266,13 +276,28 @@ export default function GeneralAI() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {embedded && (
+            <button
+              type="button"
+              onClick={onTaskMode}
+              className="min-h-11 rounded-xl border border-border bg-background/60 px-3 text-sm font-semibold backdrop-blur-xl hover:bg-muted"
+            >
+              Task AI
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
-            aria-label={expanded ? "Exit fullscreen" : "Expand General AI"}
+            onClick={() => (embedded ? onMinimize?.() : setExpanded((v) => !v))}
+            aria-label={
+              embedded
+                ? "Minimize Nimbus"
+                : expanded
+                  ? "Exit fullscreen"
+                  : "Expand General AI"
+            }
             className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background/60 backdrop-blur-xl hover:bg-muted"
           >
-            {expanded ? (
+            {embedded || expanded ? (
               <Minimize2 className="h-4 w-4" />
             ) : (
               <Maximize2 className="h-4 w-4" />
@@ -552,8 +577,15 @@ export default function GeneralAI() {
       </AlertDialog>
     </div>
   );
-  return expanded ? (
-    <Dialog open onOpenChange={setExpanded}>
+  return embedded || expanded ? (
+    <Dialog
+      open={embedded ? visible : expanded}
+      onOpenChange={(open) => {
+        if (embedded) {
+          if (!open) onMinimize?.();
+        } else setExpanded(open);
+      }}
+    >
       <DialogContent
         className="general-ai-fullscreen"
         aria-describedby={undefined}

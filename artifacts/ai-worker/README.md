@@ -2,6 +2,8 @@
 
 Firebase Hosting stays on Spark. This native Cloudflare Worker runs on Workers Free; no Firebase Functions or billing changes are needed. The browser sends a Firebase ID token, and the Worker verifies the signature and Nimbus audience before calling Groq with its private server secret.
 
+The corner Nimbus bubble opens Task AI. Switching to General AI opens a fullscreen glass view over the current page; minimizing preserves the draft and conversation, and reopening restores that mode. Legacy `/general` links open this same overlay.
+
 General AI uses `openai/gpt-oss-120b` with streamed answers and the essay review harness in `src/prompts.mjs`. Task AI uses `openai/gpt-oss-20b`, low reasoning, and strict structured previews. General requests contain no workspace data. Task previews still require user confirmation in Nimbus.
 
 The deployed public URL is `https://nimbus-ai.nimbusdo-sidhvik-ai.workers.dev`. This URL is safe to put in browser configuration. **Never put a Groq key in a `VITE_*` variable.**

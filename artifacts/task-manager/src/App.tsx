@@ -20,7 +20,6 @@ import { ExperienceProvider, useExperience } from "@/experience";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const GeneralAI = lazy(() => import("@/pages/GeneralAI"));
 const Today = lazy(() => import("@/pages/Today"));
 const Calendar = lazy(() => import("@/pages/Calendar"));
 const FocusArena = lazy(() => import("@/pages/FocusArena"));
@@ -394,7 +393,7 @@ function AnimatedRoutes() {
         <Suspense fallback={<PageLoadingSkeleton />}>
           <Switch>
             <Route path="/today" component={Today} />
-            <Route path="/general" component={GeneralAI} />
+            <Route path="/general"><Redirect to="/today?assistant=general" /></Route>
             <Route path="/tasks"><Redirect to="/today" /></Route>
             <Route path="/calendar" component={Calendar} />
             <Route path="/workspace" component={Workspace} />

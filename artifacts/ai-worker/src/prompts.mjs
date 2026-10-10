@@ -9,6 +9,8 @@ Review these dimensions:
 - Sentence clarity: Examine each sentence for ambiguous wording, unclear references, unsupported claims, contradictions, and repetition. Explain the purpose of changes where useful, without narrating private reasoning or commenting on every sound sentence.
 - Actionable criticism: Quote the exact weak passage, identify the issue, explain why it matters, and suggest a specific revision. Prioritize major problems before small stylistic edits.
 - Accuracy: Do not invent flaws or demand extra detail where the sentence already does its job. Distinguish factual errors, uncertainty, missing evidence, and optional stylistic preferences. Preserve the author's intended meaning.
+When suggesting revisions, never insert a study, author, publication year, citation, percentage, statistic, or research finding unless it is present in the user's supplied evidence. Do not present invented evidence as an example. If evidence is missing, use explicit placeholders such as [specific technology], [student group], [measured outcome], and [source]. A revision must preserve only known facts; never fill evidence gaps with plausible sounding research.
+For criticism, prefer short sections and this format: exact quoted passage — issue; explain why it matters; give a specific fix. Avoid Markdown tables for reviews. A single weakness should not be inflated into several redundant criticisms.
 Examples of useful criticism:
 "Technology improves education." — Too broad. You have not identified which technology, which students, or what improvement means. Narrow the claim and connect it to your evidence. A possible revision is "In this study, weekly retrieval-practice quizzes improved students' retention scores." Use that revision only if the essay's evidence supports it.
 "This proves everyone learns better online." — Overclaim. Evidence from one class does not establish a result for everyone. Limit the conclusion to the population and outcome actually studied.
@@ -42,3 +44,26 @@ export const TASK_SCHEMA = {
     "workspacePreviewJson",
   ],
 };
+
+export const GENERAL_EXAMPLES = [
+  {
+    role: "user",
+    content:
+      "Review this sentence: Technology improves education. No sources or data have been provided.",
+  },
+  {
+    role: "assistant",
+    content:
+      "**“Technology improves education.” — Too broad.** Identify the technology, student group, and measured improvement. You have supplied no evidence, so I cannot add a study, date, or statistic. A revision template is: “[Specific technology] helps [student group] achieve [measured outcome], as shown by [your supporting evidence].” Fill the brackets only with facts your sources support.",
+  },
+  {
+    role: "user",
+    content:
+      "Can you invent a realistic study and percentage to make my claim stronger?",
+  },
+  {
+    role: "assistant",
+    content:
+      "No. Inventing a study or percentage would misrepresent evidence. Supply a real source, or use “[source] found [actual result]” as a placeholder until you have verified it.",
+  },
+];

@@ -2947,7 +2947,7 @@ async function handleGeneralChats(
 ) {
   if (path === "/api/ai/chats" && request.method === "GET") {
     const snapshots = await getDocs(
-      query(child(uid, "aiChats"), orderBy("updatedAt", "desc"), limit(100)),
+      query(child(uid, "aiChats"), orderBy("updatedAt", "desc")),
     );
     return json(
       snapshots.docs.map((snapshot) => ({

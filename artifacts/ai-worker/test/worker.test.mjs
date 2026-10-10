@@ -280,3 +280,30 @@ test("Firebase JWT verifier checks actual signature, audience, expiry and algori
     ),
   );
 });
+
+test("mutation previews never claim a task was already created", async () => {
+  const preview = {
+    reply: "Task added.",
+    taskPreviewJson: JSON.stringify([
+      { title: "Worksheet", dueDate: "2026-10-11" },
+    ]),
+    planPreviewJson: "null",
+    workspacePreviewJson: "null",
+  };
+  const worker = createWorker({
+    verify: async () => "u",
+    fetcher: async () =>
+      Response.json({
+        choices: [
+          {
+            finish_reason: "stop",
+            message: { content: JSON.stringify(preview) },
+          },
+        ],
+      }),
+  });
+  const data = await (await worker.fetch(req("task"), env)).json();
+  assert.match(data.reply, /confirm/);
+  assert.ok(!data.reply.includes("added"));
+  assert.equal(data.taskPreviewJson, preview.taskPreviewJson);
+});

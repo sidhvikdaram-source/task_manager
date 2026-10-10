@@ -1,4 +1,9 @@
-import { GENERAL_SYSTEM, TASK_SYSTEM, TASK_SCHEMA } from "./prompts.mjs";
+import {
+  GENERAL_SYSTEM,
+  TASK_SYSTEM,
+  TASK_SCHEMA,
+  GENERAL_EXAMPLES,
+} from "./prompts.mjs";
 const jwksCache = new Map();
 const JWKS_URL =
   "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
@@ -105,6 +110,7 @@ export function buildCompletion(input, mode) {
       content: mode === "general" ? GENERAL_SYSTEM : TASK_SYSTEM,
     },
     { role: "system", content: context },
+    ...(mode === "general" ? GENERAL_EXAMPLES : []),
     ...history,
     { role: "user", content: input.message.trim() },
   ];
@@ -268,6 +274,18 @@ export function createWorker({
           !TASK_SCHEMA.required.every((key) => typeof parsed[key] === "string")
         )
           throw new Error("Invalid preview");
+        const taskPreview = JSON.parse(parsed.taskPreviewJson);
+        const planPreview = JSON.parse(parsed.planPreviewJson);
+        const workspacePreview = JSON.parse(parsed.workspacePreviewJson);
+        if (
+          (Array.isArray(taskPreview) && taskPreview.length) ||
+          planPreview ||
+          workspacePreview
+        ) {
+          // A model response cannot imply that an unconfirmed preview changed the workspace.
+          parsed.reply =
+            "I prepared a preview. Review it below, then confirm to apply it.";
+        }
         return json(parsed);
       } catch {
         return json(
