@@ -1,4 +1,7 @@
 import {
+  parseTaskCreation,
+} from "../../api-server/src/lib/taskCapture.ts";
+import {
   GENERAL_SYSTEM,
   TASK_SYSTEM,
   TASK_SCHEMA,
@@ -210,7 +213,30 @@ export function createWorker({
         const body = await request.text();
         if (new TextEncoder().encode(body).length > 100000)
           return json({ error: "Request too large." }, 413);
-        completion = buildCompletion(JSON.parse(body), mode);
+        const input = JSON.parse(body);
+        completion = buildCompletion(input, mode);
+        if (mode === "task") {
+          const ctx = input.context ?? {};
+          const subjects = (
+            Array.isArray(ctx.subjects) ? ctx.subjects : []
+          ).map((name, id) => ({ id, name: String(name) }));
+          const captured = /^20\d{2}-\d{2}-\d{2}$/.test(ctx.today ?? "")
+            ? parseTaskCreation(
+                input.message,
+                Array.isArray(ctx.projects) ? ctx.projects : [],
+                subjects,
+                ctx.today,
+              )
+            : null;
+          if (captured)
+            return json({
+              reply:
+                "I prepared a preview. Review it below, then confirm to apply it.",
+              taskPreviewJson: JSON.stringify(captured.taskPreview),
+              planPreviewJson: JSON.stringify(captured.planPreview),
+              workspacePreviewJson: "null",
+            });
+        }
       } catch (error) {
         return json(
           {
@@ -274,8 +300,8 @@ export function createWorker({
           !TASK_SCHEMA.required.every((key) => typeof parsed[key] === "string")
         )
           throw new Error("Invalid preview");
-        const taskPreview = JSON.parse(parsed.taskPreviewJson);
-        const planPreview = JSON.parse(parsed.planPreviewJson);
+        let taskPreview = JSON.parse(parsed.taskPreviewJson);
+        let planPreview = JSON.parse(parsed.planPreviewJson);
         const workspacePreview = JSON.parse(parsed.workspacePreviewJson);
         if (
           (Array.isArray(taskPreview) && taskPreview.length) ||

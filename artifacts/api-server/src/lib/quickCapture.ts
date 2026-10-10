@@ -52,10 +52,17 @@ const weekdays = [
   "saturday",
 ];
 
-function parseDate(text: string, referenceDate: string) {
+export function parseCaptureDate(text: string, referenceDate: string) {
   const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
-  if (iso) return { value: iso[1], matched: iso[0] };
-  const numeric = text.match(/\b(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])(?:\/(\d{2}|20\d{2}))?\b/);
+  if (
+    iso &&
+    !Number.isNaN(calendarDateToUtc(iso[1]).getTime()) &&
+    calendarDateToUtc(iso[1]).toISOString().slice(0, 10) === iso[1]
+  )
+    return { value: iso[1], matched: iso[0] };
+  const numeric = text.match(
+    /\b(0?[1-9]|1[0-2])\/(0?[1-9]|[12]\d|3[01])(?:\/(\d{2}|20\d{2}))?\b/,
+  );
   if (numeric) {
     const month = Number(numeric[1]);
     const day = Number(numeric[2]);
@@ -65,13 +72,33 @@ function parseDate(text: string, referenceDate: string) {
         ? 2000 + Number(numeric[3])
         : Number(numeric[3])
       : referenceYear;
-    const formatCandidate = () => `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const formatCandidate = () =>
+      `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     if (!numeric[3] && formatCandidate() < referenceDate) year += 1;
     const candidate = formatCandidate();
     const parsed = calendarDateToUtc(candidate);
     if (parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day) {
       return { value: candidate, matched: numeric[0] };
     }
+  }
+  const relativePhrase = text.match(
+    /\b((?:the\s+)?day after tomorrow|(?:the\s+)?day before yesterday|yesterday|next week|last week)\b/i,
+  );
+  if (relativePhrase) {
+    const offsets: Record<string, number> = {
+      "day after tomorrow": 2,
+      "day before yesterday": -2,
+      yesterday: -1,
+      "next week": 7,
+      "last week": -7,
+    };
+    return {
+      value: addCalendarDays(
+        referenceDate,
+        offsets[relativePhrase[0].toLowerCase().replace(/^the\s+/, "")],
+      ),
+      matched: relativePhrase[0],
+    };
   }
   if (/\btoday\b/i.test(text))
     return { value: referenceDate, matched: text.match(/\btoday\b/i)![0] };
@@ -97,10 +124,13 @@ function parseDate(text: string, referenceDate: string) {
     let year = month[3] ? Number(month[3]) : currentYear;
     const candidate = `${year}-${String(monthNumbers[month[1].toLowerCase()]).padStart(2, "0")}-${String(Number(month[2])).padStart(2, "0")}`;
     if (!month[3] && candidate < referenceDate) year += 1;
-    return {
-      value: `${year}-${String(monthNumbers[month[1].toLowerCase()]).padStart(2, "0")}-${String(Number(month[2])).padStart(2, "0")}`,
-      matched: month[0],
-    };
+    const value = `${year}-${String(monthNumbers[month[1].toLowerCase()]).padStart(2, "0")}-${String(Number(month[2])).padStart(2, "0")}`;
+    const parsed = calendarDateToUtc(value);
+    if (
+      !Number.isNaN(parsed.getTime()) &&
+      parsed.toISOString().slice(0, 10) === value
+    )
+      return { value, matched: month[0] };
   }
   const weekday = text.match(
     /\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i,
@@ -209,7 +239,10 @@ export function parseQuickCapture(
   subjects: NamedRecord[],
   referenceDate = localDateKey(new Date(), "UTC"),
 ): QuickCaptureResult {
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
   // A leading number may be meaningful task text (for example "8. Practice set").
   // Only normalize list markers on the subsequent checklist lines.
   const sourceTitle = lines[0] ?? "";
@@ -234,7 +267,7 @@ export function parseQuickCapture(
   const estimatedMinutes = duration
     ? Math.min(480, Number(duration[1]) * (/^h/i.test(duration[2]) ? 60 : 1))
     : null;
-  const date = parseDate(sourceTitle, referenceDate);
+  const date = parseCaptureDate(sourceTitle, referenceDate);
   const time = parseTime(sourceTitle);
   const warnings: string[] = [];
   if (projectToken && !project && !subject)
@@ -246,7 +279,16 @@ export function parseQuickCapture(
     .replace(/(?:^|\s)@[\w-]+/g, " ")
     .replace(/(?:^|\s)p[1-4]\b/gi, " ")
     .replace(/(?:^|\s)~\d{1,3}\s*(?:m|min|minutes?|h|hours?)\b/gi, " ");
-  if (date) title = title.replace(date.matched, " ");
+  if (date) {
+    const escaped = date.matched.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    title = title.replace(
+      new RegExp(
+        `(?:\\b(?:due(?:\\s+(?:on|by))?|on|by|for)\\s+)?${escaped}`,
+        "i",
+      ),
+      " ",
+    );
+  }
   if (time) title = title.replace(time.matched, " ");
   if (priorityPhrase) title = title.replace(priorityPhrase.matched, " ");
   title = title

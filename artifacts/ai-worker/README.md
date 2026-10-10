@@ -24,4 +24,6 @@ Firebase uses local auth persistence. When a session is restored, visiting Nimbu
 
 ## Verification
 
-Run `node --test test/*.test.mjs` here. Worker tests cover actual Firebase JWT signatures, auth rejection, mode isolation, rate limiting, safe upstream failures, and structured responses. Frontend stream tests live in `artifacts/api-server/test/generalStream.test.mjs` alongside existing task tests. Browser verification exercises copying, saved chats, context, fullscreen, mobile layouts, and navigation. A real provider smoke test requires a configured Groq secret.
+From the repository root, run `pnpm --filter @workspace/api-server exec node --import tsx --test ../ai-worker/test/worker.test.mjs`. Worker tests cover actual Firebase JWT signatures, auth rejection, mode isolation, rate limiting, safe upstream failures, and structured responses. Frontend stream tests live in `artifacts/api-server/test/generalStream.test.mjs` alongside existing task tests. Browser verification exercises copying, saved chats, context, fullscreen, mobile layouts, and navigation. A real provider smoke test requires a configured Groq secret.
+
+Simple task dates and project containers use the shared deterministic capture parser before a model request. Unnamed tasks retain an empty title, displayed as “Untitled task” in the preview. Next week means seven days after the supplied local date, and next Monday is the next future Monday. Project confirmation saves each task with its project ID and subject.

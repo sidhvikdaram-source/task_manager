@@ -19,6 +19,7 @@ import {
 import { firebaseAuth, firebaseDb } from "@workspace/replit-auth-web";
 import { aiRequest } from "./aiTransport";
 import { parseQuickCapture } from "../../../api-server/src/lib/quickCapture";
+import { parseTaskCreation } from "../../../api-server/src/lib/taskCapture";
 import {
   scoreTaskRecommendation,
   type RecommendationEnergy,
@@ -2304,6 +2305,7 @@ async function createAiTask(
   const id = await nextId(uid, "task");
   const task = taskDefaults(uid, id, {
     title: value.title,
+    projectId: value.projectId ?? null,
     priority: value.priority ?? "medium",
     dueDate: value.date ?? value.dueDate ?? null,
     calendarDate: value.date ?? value.dueDate ?? null,
@@ -2497,6 +2499,27 @@ async function handleAi(
         .filter((subject) => !subject.archived)
         .map((subject) => subject.name),
     };
+    const captured = parseTaskCreation(
+      message,
+      projects
+        .filter((p) => !p.archived)
+        .map((p) => ({ id: Number(p.id), name: String(p.name) })),
+      subjects
+        .filter((s) => !s.archived)
+        .map((s) => ({ id: Number(s.id), name: String(s.name) })),
+      context.today,
+    );
+    if (captured)
+      return json({
+        reply:
+          "I prepared a preview. Review it below, then confirm to apply it.",
+        taskCreated: false,
+        task: null,
+        tasks: [],
+        actionPreview: null,
+        workspacePreview: null,
+        ...captured,
+      });
     const history = Array.isArray(input.history) ? input.history.slice(-4) : [];
     try {
       const response = await aiRequest(

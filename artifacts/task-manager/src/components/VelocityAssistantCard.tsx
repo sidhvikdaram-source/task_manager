@@ -691,7 +691,9 @@ export function VelocityAssistantCard() {
                             key={index}
                             className="rounded-lg border border-border bg-background/70 p-2.5"
                           >
-                            <p className="font-semibold">{task.title}</p>
+                            <p className="font-semibold">
+                              {task.title || "Untitled task"}
+                            </p>
                             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                               {task.subject && (
                                 <span
@@ -781,6 +783,49 @@ export function VelocityAssistantCard() {
                               : "Project"}
                           </span>
                         </div>
+                        {message.planPreview.project?.subject && (
+                          <p
+                            className="mt-2 text-xs font-semibold"
+                            style={{
+                              color: subjectColor(
+                                message.planPreview.project.subject,
+                                subjects,
+                              ),
+                            }}
+                          >
+                            {message.planPreview.project.subject}
+                          </p>
+                        )}
+                        <ul
+                          className="mt-3 max-h-48 space-y-2 overflow-y-auto text-xs"
+                          aria-label="Project task preview"
+                        >
+                          {message.planPreview.tasks.map((task, index) => (
+                            <li
+                              key={index}
+                              className="rounded-lg border border-border p-2"
+                            >
+                              <p className="font-semibold">
+                                {task.title || "Untitled task"}
+                              </p>
+                              <div className="mt-1 flex gap-2 text-muted-foreground">
+                                {task.subject && (
+                                  <span
+                                    style={{
+                                      color: subjectColor(
+                                        task.subject,
+                                        subjects,
+                                      ),
+                                    }}
+                                  >
+                                    {task.subject}
+                                  </span>
+                                )}
+                                <span>{task.dueDate || "No deadline"}</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
                         <button
                           type="button"
                           disabled={

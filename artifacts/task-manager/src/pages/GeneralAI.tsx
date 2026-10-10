@@ -267,7 +267,12 @@ export default function GeneralAI({
     }
   }
   const content = (
-    <div className={cn("mx-auto flex min-w-0 w-full max-w-6xl flex-col gap-3 md:gap-5", embedded || expanded ? "h-full min-h-0" : "min-h-[calc(100dvh-12rem)]")}>
+    <div
+      className={cn(
+        "mx-auto flex min-w-0 w-full max-w-6xl flex-col gap-3 md:gap-5",
+        embedded || expanded ? "h-full min-h-0" : "min-h-[calc(100dvh-12rem)]",
+      )}
+    >
       <header className="flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">General AI</h1>
@@ -489,7 +494,10 @@ export default function GeneralAI({
               ))
             )}
           </div>
-          <form onSubmit={send} className="shrink-0 border-t border-border p-3 md:p-4">
+          <form
+            onSubmit={send}
+            className="shrink-0 border-t border-border p-3 md:p-4"
+          >
             {!aiEndpoint() && (
               <p className="mb-3 text-sm text-muted-foreground">
                 The private AI connection is awaiting setup. Chats can still be
@@ -587,6 +595,7 @@ export default function GeneralAI({
       }}
     >
       <DialogContent
+        fullscreen
         className="general-ai-fullscreen"
         aria-describedby={undefined}
       >

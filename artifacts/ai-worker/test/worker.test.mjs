@@ -307,3 +307,40 @@ test("mutation previews never claim a task was already created", async () => {
   assert.ok(!data.reply.includes("added"));
   assert.equal(data.taskPreviewJson, preview.taskPreviewJson);
 });
+test("simple task and project requests use deterministic capture without calling Groq", async () => {
+  const worker = createWorker({
+    verify: async () => "test-user",
+    fetcher: async () => {
+      throw new Error("A model should not be needed");
+    },
+  });
+  const context = {
+    today: "2026-10-10",
+    subjects: ["Science", "Math"],
+    projects: [],
+  };
+  for (const [message, date] of [
+    ["create a task due yesterday", "2026-10-09"],
+    ["create a task due day after tomorrow", "2026-10-12"],
+    ["create a task due October 21", "2026-10-21"],
+  ]) {
+    const response = await worker.fetch(req("task", { message, context }), env);
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    const task = JSON.parse(data.taskPreviewJson)[0];
+    assert.equal(task.title, "");
+    assert.equal(task.dueDate, date);
+  }
+  const response = await worker.fetch(
+    req("task", {
+      message:
+        "create a project with 3 tasks in it it should be in the subject science",
+      context,
+    }),
+    env,
+  );
+  const plan = JSON.parse((await response.json()).planPreviewJson);
+  assert.equal(plan.project.subject, "Science");
+  assert.equal(plan.tasks.length, 3);
+  assert.ok(plan.tasks.every((t) => t.subject === "Science" && t.title === ""));
+});
