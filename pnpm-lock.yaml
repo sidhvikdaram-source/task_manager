@@ -96,6 +96,8 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
 
+  artifacts/ai-gateway: {}
+
   artifacts/api-server:
     dependencies:
       '@google/genai':

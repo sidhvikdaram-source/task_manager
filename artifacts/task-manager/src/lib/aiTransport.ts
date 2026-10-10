@@ -5,7 +5,7 @@ export function aiEndpoint() {
     import.meta.env.VITE_NIMBUS_AI_URL as string | undefined
   )?.trim();
   const productionEndpoint = import.meta.env.PROD
-    ? "https://nimbus-ai.nimbusdo-sidhvik-ai.workers.dev"
+    ? "https://nimbus-ai-gateway.pages.dev"
     : "";
   return (configured || productionEndpoint).replace(/\/+$/, "");
 }
