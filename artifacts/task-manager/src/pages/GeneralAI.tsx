@@ -267,8 +267,8 @@ export default function GeneralAI({
     }
   }
   const content = (
-    <div className="mx-auto flex min-h-[calc(100dvh-12rem)] min-w-0 w-full max-w-6xl flex-col gap-5">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+    <div className={cn("mx-auto flex min-w-0 w-full max-w-6xl flex-col gap-3 md:gap-5", embedded || expanded ? "h-full min-h-0" : "min-h-[calc(100dvh-12rem)]")}>
+      <header className="flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">General AI</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -312,8 +312,8 @@ export default function GeneralAI({
           </span>
         </div>
       </header>
-      <div className="grid min-h-0 min-w-0 grid-cols-1 flex-1 gap-4 md:grid-cols-[230px_minmax(0,1fr)]">
-        <aside className="min-w-0 rounded-2xl border border-border bg-card p-3">
+      <div className="grid min-h-0 min-w-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] flex-1 gap-3 md:grid-cols-[230px_minmax(0,1fr)] md:grid-rows-1 md:gap-4">
+        <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-3">
           <button
             disabled={busy || saving}
             onClick={() => {
@@ -327,7 +327,7 @@ export default function GeneralAI({
             New chat
           </button>
           <div
-            className="mt-3 max-h-40 space-y-1 overflow-y-auto md:max-h-[65dvh]"
+            className="mt-2 max-h-16 min-h-0 space-y-1 overflow-y-auto md:mt-3 md:max-h-none md:flex-1"
             aria-label="Saved chats"
           >
             {isLoading ? (
@@ -383,8 +383,8 @@ export default function GeneralAI({
             )}
           </div>
         </aside>
-        <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="border-b border-border p-4">
+        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="max-h-[35%] shrink-0 overflow-y-auto border-b border-border p-3 md:p-4">
             <button
               onClick={() => setContextOpen((v) => !v)}
               aria-expanded={contextOpen}
@@ -430,12 +430,12 @@ export default function GeneralAI({
           </div>
           <div
             ref={scroll}
-            className="min-h-64 flex-1 space-y-7 overflow-y-auto p-5 md:max-h-[55dvh] md:p-7"
+            className="min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-contain p-4 md:p-7"
             aria-label="General conversation"
             aria-busy={busy}
           >
             {!chat.messages.length ? (
-              <div className="mx-auto flex min-h-60 max-w-lg flex-col justify-center">
+              <div className="mx-auto flex min-h-full max-w-lg flex-col justify-center">
                 <MessageSquare className="mb-5 h-6 w-6 text-primary" />
                 <h2 className="text-2xl font-semibold tracking-tight">
                   What are you working on?
@@ -489,7 +489,7 @@ export default function GeneralAI({
               ))
             )}
           </div>
-          <form onSubmit={send} className="border-t border-border p-4">
+          <form onSubmit={send} className="shrink-0 border-t border-border p-3 md:p-4">
             {!aiEndpoint() && (
               <p className="mb-3 text-sm text-muted-foreground">
                 The private AI connection is awaiting setup. Chats can still be
@@ -519,7 +519,7 @@ export default function GeneralAI({
                 }}
                 aria-label="Message General AI"
                 placeholder="Ask, write, or paste your draft…"
-                className="max-h-56 min-h-16 min-w-0 flex-1 resize-y bg-transparent text-base outline-none"
+                className="max-h-32 min-h-12 min-w-0 flex-1 resize-none bg-transparent text-base outline-none"
               />
               {busy ? (
                 <button
