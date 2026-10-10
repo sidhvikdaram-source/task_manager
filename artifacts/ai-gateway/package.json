@@ -1,0 +1,8 @@
+{
+  "name": "@workspace/nimbus-ai-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

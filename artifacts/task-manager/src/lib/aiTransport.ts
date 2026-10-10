@@ -21,15 +21,26 @@ export async function aiRequest(
   await firebaseAuth.authStateReady();
   const token = await firebaseAuth.currentUser?.getIdToken();
   if (!token) throw new Error("Sign in to use AI.");
-  const response = await fetch(`${base}/${mode}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(input),
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${base}/${mode}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        `Nimbus could not connect to AI. The connection may be blocked by your browser or network. Please retry.${mode === "general" ? " Your chat is saved." : ""}`,
+        { cause: error },
+      );
+    }
+    throw error;
+  }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.error || "AI is temporarily unavailable.");
