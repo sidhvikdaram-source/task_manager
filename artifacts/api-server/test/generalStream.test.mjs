@@ -46,3 +46,23 @@ test("response limit is reported without marking a partial answer complete", asy
     /response limit/,
   );
 });
+test("Cloudflare native chunks stream answers while reasoning stays private", async () => {
+  const input =
+    'data: {"reasoning":"hidden"}\n\ndata: {"response":"Clear — "}\n\ndata: {"response":"feedback."}\n\ndata: [DONE]\n\n';
+  assert.equal(
+    await readGeneralStream(streamResponse(input), () => {}),
+    "Clear — feedback.",
+  );
+});
+test("Cloudflare native truncation cannot save an answer as complete", async () => {
+  await assert.rejects(
+    () =>
+      readGeneralStream(
+        streamResponse(
+          'data: {"response":"Partial"}\n\ndata: {"finish_reason":"length"}\n\ndata: [DONE]\n\n',
+        ),
+        () => {},
+      ),
+    /response limit/,
+  );
+});

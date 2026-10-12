@@ -12,7 +12,7 @@ Review these dimensions:
 When suggesting revisions, never insert a study, author, publication year, citation, percentage, statistic, or research finding unless it is present in the user's supplied evidence. Do not present invented evidence as an example. If evidence is missing, use explicit placeholders such as [specific technology], [student group], [measured outcome], and [source]. A revision must preserve only known facts; never fill evidence gaps with plausible sounding research.
 For criticism, prefer short sections and this format: exact quoted passage — issue; explain why it matters; give a specific fix. Avoid Markdown tables for reviews. A single weakness should not be inflated into several redundant criticisms.
 Examples of useful criticism:
-"Technology improves education." — Too broad. You have not identified which technology, which students, or what improvement means. Narrow the claim and connect it to your evidence. A possible revision is "In this study, weekly retrieval-practice quizzes improved students' retention scores." Use that revision only if the essay's evidence supports it.
+"Technology improves education." — Too broad. You have not identified which technology, which students, or what improvement means. Narrow the claim and connect it to your evidence. Use this template: "[Specific technology] helps [student group] achieve [measured outcome], as shown by [source]." Fill the brackets only with supplied evidence.
 "This proves everyone learns better online." — Overclaim. Evidence from one class does not establish a result for everyone. Limit the conclusion to the population and outcome actually studied.
 "The survey included 120 ninth-grade students." — Clear and specific. Do not flag this sentence merely to sound strict; assess the sampling method only if relevant to the assignment.
 When writing an essay, follow the requested prompt and rubric, produce a usable draft, and flag unsupported facts or citations that need verification. Put the essay itself in normal prose, separate from commentary.
@@ -47,6 +47,16 @@ export const TASK_SCHEMA = {
 };
 
 export const GENERAL_EXAMPLES = [
+  {
+    role: "user",
+    content:
+      'Check clarity: "When students spoke to teachers, they said it would hurt their schedules."',
+  },
+  {
+    role: "assistant",
+    content:
+      "**“When students spoke to teachers, they said it would hurt their schedules.” — Ambiguous references.** “They” and “their” could refer to either group, and “it” does not name the change. Name the speakers, the change, and whose schedules are affected. Use “[Speakers] said [specific change] would hurt [affected group]’s schedules,” filling in only what the author means. If the assignment requires supplied evidence, also check whether that conversation is supported; a sentence can have both a clarity problem and an evidence problem.",
+  },
   {
     role: "user",
     content:

@@ -19,11 +19,13 @@ export async function readGeneralStream(
     const event = JSON.parse(data);
     if (event.error)
       throw new Error("AI stopped before finishing. Please retry.");
-    if (event.choices?.[0]?.finish_reason === "length")
+    if ((event.choices?.[0]?.finish_reason ?? event.finish_reason) === "length")
       throw new Error(
         "The answer reached the free response limit. Ask to continue in your next message.",
       );
-    const content = event.choices?.[0]?.delta?.content;
+    // Cloudflare supports native response chunks as well as OpenAI deltas.
+    // Reasoning fields are intentionally never displayed or saved as answers.
+    const content = event.choices?.[0]?.delta?.content ?? event.response;
     if (typeof content === "string") {
       text += content;
       onText(text);

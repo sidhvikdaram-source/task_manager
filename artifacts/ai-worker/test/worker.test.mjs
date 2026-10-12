@@ -4,6 +4,7 @@ import {
   buildCompletion,
   createWorker,
   verifyFirebaseToken,
+  GENERAL_MODEL,
 } from "../src/index.mjs";
 const env = {
   FIREBASE_PROJECT_ID: "nimbusdo",
@@ -37,9 +38,9 @@ test("models and modes remain separate; general receives no task context", () =>
     },
     "general",
   );
-  assert.equal(general.model, "openai/gpt-oss-120b");
+  assert.equal(general.model, GENERAL_MODEL);
   assert.equal(general.stream, true);
-  assert.equal(general.reasoning_effort, "medium");
+  assert.equal(general.reasoning_effort, undefined);
   assert.ok(!JSON.stringify(general).includes("private task"));
   assert.ok(!JSON.stringify(general).includes("UNTRUSTED_SYSTEM_MARKER"));
   const task = buildCompletion(
@@ -145,32 +146,45 @@ test("rate limiter uses authenticated user id and blocks upstream", async () => 
   assert.equal(response.status, 429);
   assert.equal(response.headers.get("retry-after"), "60");
 });
-test("missing secret is a safe setup error", async () => {
+test("missing bindings and task secret are safe setup errors", async () => {
   const worker = createWorker({ verify: async () => "user-one" });
   const response = await worker.fetch(req(), { ...env, GROQ_API_KEY: "" });
   assert.equal(response.status, 503);
+  assert.equal(
+    (await worker.fetch(req("task"), { ...env, GROQ_API_KEY: "" })).status,
+    503,
+  );
 });
-test("general streams content without revealing server key", async () => {
+test("general runs only the free Cloudflare model and needs no Groq key", async () => {
   let upstream;
   const stream =
     'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\ndata: [DONE]\n\n';
   const worker = createWorker({
     verify: async () => "user-one",
-    fetcher: async (url, options) => {
-      upstream = { url, options };
-      return new Response(stream);
+    fetcher: async () => {
+      throw Error("General must never call Groq");
     },
   });
-  const response = await worker.fetch(req(), env);
+  const response = await worker.fetch(req(), {
+    ...env,
+    GROQ_API_KEY: "",
+    AI: {
+      run: async (model, options) => {
+        upstream = { model, options };
+        return new Response(stream).body;
+      },
+    },
+  });
   assert.equal(
     response.headers.get("content-type"),
     "text/event-stream; charset=utf-8",
   );
   assert.equal(await response.text(), stream);
-  assert.equal(
-    upstream.options.headers.Authorization,
-    `Bearer ${env.GROQ_API_KEY}`,
-  );
+  assert.equal(upstream.model, GENERAL_MODEL);
+  assert.equal(response.headers.get("X-Nimbus-Model"), GENERAL_MODEL);
+  assert.equal(upstream.options.stream, true);
+  assert.equal(upstream.options.max_completion_tokens, 4096);
+  assert.equal(upstream.options.chat_template_kwargs.enable_thinking, true);
 });
 test("task output is structured and upstream errors do not leak bodies", async () => {
   const preview = {
@@ -199,7 +213,7 @@ test("task output is structured and upstream errors do not leak bodies", async (
     verify: async () => "user-one",
     fetcher: async () => new Response("test-private-secret", { status: 401 }),
   });
-  const response = await failed.fetch(req(), env);
+  const response = await failed.fetch(req("task"), env);
   assert.equal(response.status, 502);
   assert.ok(!(await response.text()).includes(env.GROQ_API_KEY));
 });
@@ -212,10 +226,33 @@ test("free quota errors expose retry timing, not provider details", async () => 
         headers: { "retry-after": "17" },
       }),
   });
-  const response = await worker.fetch(req(), env);
+  const response = await worker.fetch(req("task"), env);
   assert.equal(response.status, 429);
   assert.equal(response.headers.get("retry-after"), "17");
   assert.ok(!(await response.text()).includes("private details"));
+});
+test("Cloudflare quota and failures never fall back to a paid endpoint or leak details", async () => {
+  const worker = createWorker({
+    verify: async () => "u",
+    fetcher: async () => {
+      throw Error("No external fallback is permitted");
+    },
+  });
+  for (const [message, status] of [
+    ["3040 daily neuron quota exceeded: private detail", 429],
+    ["private internal detail", 502],
+  ]) {
+    const response = await worker.fetch(req(), {
+      ...env,
+      AI: {
+        run: async () => {
+          throw Error(message);
+        },
+      },
+    });
+    assert.equal(response.status, status);
+    assert.ok(!(await response.text()).includes("private"));
+  }
 });
 test("Firebase JWT verifier checks actual signature, audience, expiry and algorithm", async () => {
   const pair = await crypto.subtle.generateKey(

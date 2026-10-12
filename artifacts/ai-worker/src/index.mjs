@@ -6,6 +6,7 @@ import {
   GENERAL_EXAMPLES,
 } from "./prompts.mjs";
 const jwksCache = new Map();
+export const GENERAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const JWKS_URL =
   "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 const decode = (value) =>
@@ -120,10 +121,10 @@ export function buildCompletion(input, mode) {
       "This conversation is too long for a free request. Start a new chat or shorten the prompt and rubric.",
     );
   return {
-    model: mode === "general" ? "openai/gpt-oss-120b" : "openai/gpt-oss-20b",
-    reasoning_effort: mode === "general" ? "medium" : "low",
+    model: mode === "general" ? GENERAL_MODEL : "openai/gpt-oss-20b",
+    ...(mode === "task" ? { reasoning_effort: "low" } : {}),
     messages,
-    max_completion_tokens: mode === "general" ? 2500 : 1600,
+    max_completion_tokens: mode === "general" ? 4096 : 1600,
     stream: mode === "general",
     ...(mode === "task"
       ? {
@@ -206,7 +207,12 @@ export function createWorker({
           429,
           { "Retry-After": "60" },
         );
-      if (!env.GROQ_API_KEY)
+      if (mode === "general" && !env.AI)
+        return json(
+          { error: "General AI is temporarily unavailable. Please retry." },
+          503,
+        );
+      if (mode === "task" && !env.GROQ_API_KEY)
         return json(
           {
             error:
@@ -254,6 +260,23 @@ export function createWorker({
         );
       }
       try {
+        if (mode === "general") {
+          // Native inference on Workers Free stops at the daily allowance.
+          // Never route a General request to a paid model or provider.
+          const stream = await env.AI.run(GENERAL_MODEL, {
+            messages: completion.messages,
+            max_completion_tokens: completion.max_completion_tokens,
+            chat_template_kwargs: { enable_thinking: true },
+            stream: true,
+          });
+          return new Response(stream, {
+            headers: {
+              ...headers,
+              "Content-Type": "text/event-stream; charset=utf-8",
+              "X-Nimbus-Model": GENERAL_MODEL,
+            },
+          });
+        }
         const upstream = await fetcher(
           "https://api.groq.com/openai/v1/chat/completions",
           {
@@ -289,13 +312,6 @@ export function createWorker({
             502,
           );
         }
-        if (mode === "general")
-          return new Response(upstream.body, {
-            headers: {
-              ...headers,
-              "Content-Type": "text/event-stream; charset=utf-8",
-            },
-          });
         const data = await upstream.json();
         if (data.choices?.[0]?.finish_reason === "length")
           return json(
@@ -321,7 +337,21 @@ export function createWorker({
             "I prepared a preview. Review it below, then confirm to apply it.";
         }
         return json(parsed);
-      } catch {
+      } catch (error) {
+        if (
+          mode === "general" &&
+          /quota|daily.*limit|neuron|rate.?limit|3040|429/i.test(
+            String(error?.message),
+          )
+        )
+          return json(
+            {
+              error:
+                "The free General AI allowance is currently unavailable. Please try again later; your chat is saved.",
+            },
+            429,
+            { "Retry-After": "60" },
+          );
         return json(
           { error: "AI could not finish this request. Please retry." },
           502,

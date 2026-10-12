@@ -1,10 +1,10 @@
 # Nimbus private AI endpoint
 
-Firebase Hosting stays on Spark. This native Cloudflare Worker runs on Workers Free; no Firebase Functions or billing changes are needed. The browser sends a Firebase ID token, and the Worker verifies the signature and Nimbus audience before calling Groq with its private server secret.
+Firebase Hosting stays on Spark. This native Cloudflare Worker runs on Workers Free; no Firebase Functions or billing changes are needed. The browser sends a Firebase ID token, and the Worker verifies the signature and Nimbus audience before calling the selected assistant.
 
 The corner Nimbus bubble opens Task AI. Switching to General AI opens a fullscreen glass view over the current page; minimizing preserves the draft and conversation, and reopening restores that mode. Legacy `/general` links open this same overlay.
 
-General AI uses `openai/gpt-oss-120b` with streamed answers and the essay review harness in `src/prompts.mjs`. Task AI uses `openai/gpt-oss-20b`, low reasoning, and strict structured previews. General requests contain no workspace data. Task previews still require user confirmation in Nimbus.
+General AI uses Cloudflare's native `@cf/google/gemma-4-26b-a4b-it` through the `AI` binding, with thinking enabled, a 4,096-token completion cap, streamed answers, and the essay review harness in `src/prompts.mjs`. No additional provider key is needed. This is the verified free capacity choice; it is not a claim of superiority over Gemini Flash. Task AI still uses Groq `openai/gpt-oss-20b`, low reasoning, and strict structured previews. General requests contain no workspace data. Task previews still require user confirmation in Nimbus. The model supports vision; the current chat composer remains text-only.
 
 The deployed public URL is `https://nimbus-ai.nimbusdo-sidhvik-ai.workers.dev`. This URL is safe to put in browser configuration. **Never put a Groq key in a `VITE_*` variable.**
 
@@ -14,7 +14,7 @@ Use the official Wrangler CLI, authorize Worker deployment, and deploy with this
 
 The Worker accepts the production origin only. For local development, use Wrangler's local server and set `ALLOWED_ORIGIN` to the exact local Nimbus origin. Set the frontend's `VITE_NIMBUS_AI_URL` to that local endpoint. Production defaults to the deployed endpoint and can be overridden by that public environment variable.
 
-A per-user limiter allows six requests per minute. Groq's shared free quota can impose tighter limits; Nimbus reports those limits and never upgrades to paid service or falls back to a paid provider. Free service is quota-limited and is not an unlimited availability guarantee. Use only accounts and application uses permitted by the providers' current terms.
+A per-user limiter allows six requests per minute. On Workers Free, General AI stops when the shared 10,000-neuron daily allowance is exhausted. Keep the account on Workers Free: upgrading the account would change that platform-enforced spending boundary. Task AI has Groq's separate shared free quota. Nimbus reports limits and never activates billing or automatically switches General requests to another provider. Free service is quota-limited and is not an unlimited availability guarantee. Use only accounts and application uses permitted by the providers' current terms.
 
 ## Chats and sign-in
 
