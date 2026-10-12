@@ -334,6 +334,7 @@ export default function GeneralAI({
           setRequestError(`${message} The partial answer could not be saved.`);
         }
       } else {
+        setChat(next);
         setInput(text);
         setImages(sentImages);
       }
