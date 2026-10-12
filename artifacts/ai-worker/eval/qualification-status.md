@@ -1,6 +1,6 @@
 # Qualification is still pending
 
-The implemented candidate is Qwen 3.8 27B on the existing private Groq connection with Nimbus harness v3.7. The ≥3.5/4 target has **not** been demonstrated for this final version. Do not describe the candidate as qualified or superior to Gemini or GLM.
+The implemented candidate is Qwen 3.8 27B on the existing private Groq connection with Nimbus harness v3.8. The ≥3.5/4 target has **not** been demonstrated for this final version. Do not describe the candidate as qualified or superior to Gemini or GLM.
 
 The v3.5 run completed all 17 synthetic cases. Three writing outputs met their word constraints, and generated Python median and JavaScript integer parsing passed execution checks (8 and 17 additional contract cases respectively). Review and vision failures remained: a missing argument response received a vague remedy, ambiguous speakers could be guessed, an unscaled chart's height ratio was omitted, and a truncated chart's visible ratio was misstated.
 
@@ -8,8 +8,12 @@ The v3.6 reruns corrected the truncated-axis calculation (64/76 values, baseline
 
 Version 3.7 adds a narrow check against diagnosing an ambiguous person reference and then silently guessing that person's identity, two bounded rewrites based on measured word counts, and removes a numerical vision example that could prime an irrelevant ratio. Images use two passes; reviews, writing and code use draft/audit/edit. Simple general questions use one pass. These changes have unit coverage, but their final provider qualification is pending.
 
-Groq rejected the final qualification requests at its free 200,000-token daily limit. No credits were purchased, billing enabled, additional keys registered, or paid fallback activated. Raw result files preserve service failures separately from quality outcomes. They omit provider account identifiers and credentials. Earlier runs are development evidence, not blind validation of v3.7. Do not erase earlier failures or relabel them as successful reruns.
+Groq rejected the final qualification requests at its free 200,000-token daily limit. No credits were purchased, billing enabled, additional keys registered, or paid fallback activated. Raw result files preserve service failures separately from quality outcomes. They omit provider account identifiers and credentials. Earlier runs are development evidence, not blind validation of the final version. Do not erase earlier failures or relabel them as successful reruns.
 
 Gemini 3.6 Flash and GLM 5.3 templates use the same tasks and harness with their supported high/max reasoning controls. They have not run because eligible free access is unavailable. GLM's native text-only profile cannot receive the image fixtures; a vision companion needs its own evaluation. There isn't enough research to assign reliable after-harness scores to either model or declare a cross-model winner.
 
 Completion still requires final live model qualification, appropriate generated-code execution, a light three-request capacity check, and live browser verification of the deployed Nimbus interaction. The score scale and test expectations are documented in this directory's README.
+
+A fresh v3.7 percentage-change case completed in 507 ms: 100 → 120 → 96, with the different percentage bases explained correctly. This is measured general-answer evidence, not the complete qualification gate. Version 3.8 also corrects code prompting so an explanation-only word limit excludes fenced code and required assertions, matching the existing runtime word counter.
+
+The live deployment has been checked in the existing in-app browser: root sign-in restoration, Task AI’s `tmrw` preview, same-tab fullscreen/minimize/restore, saved prompt/rubric/evidence, image attachment persistence, deletion confirmation (cancelled), and desktop/mobile bounds. A live Qwen text reply completed, and clipboard bytes matched it exactly. Image inference encountered the remaining free quota limit; its message/image stayed saved and the draft was restored. An empty Working placeholder after that error was fixed and verified. No new JavaScript console errors were observed; older App Check warnings belonged to the previous bundle.

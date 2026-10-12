@@ -97,5 +97,27 @@
     "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
     "status": 429,
     "retryAfter": "1183"
+  },
+  {
+    "id": "fresh-general-percent",
+    "category": "general",
+    "http": 200,
+    "milliseconds": 507,
+    "wallMilliseconds": 1101,
+    "intent": "general",
+    "harness": "nimbus-general-v3.7",
+    "calls": 1,
+    "usage": [
+      {
+        "queue_time": 0.138970137,
+        "prompt_tokens": 716,
+        "prompt_time": 0.050551669,
+        "completion_tokens": 130,
+        "completion_time": 0.24740815,
+        "total_tokens": 846,
+        "total_time": 0.297959819
+      }
+    ],
+    "answer": "Start at 100. A 20% rise adds 20, reaching 120. A 20% fall subtracts 24 (20% of 120), leaving 96.\n\nThe final amount is 96, not 100. Percentages are relative to the current base. The increase uses the original 100, while the decrease uses the larger 120. Since 20% of 120 exceeds 20% of 100, the drop outweighs the gain, resulting in a net loss."
   }
 ]

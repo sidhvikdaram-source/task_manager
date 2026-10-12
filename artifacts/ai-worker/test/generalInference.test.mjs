@@ -236,6 +236,14 @@ test("code explanation word count excludes code and preserves copyability", asyn
   );
   assert.equal(result.answer, answer);
   assert.equal(result.calls, 3);
+  const instructions = buildGeneralCompletion({
+    message: "Write Python code. Keep explanation under 30 words.",
+  }).messages[0].content;
+  assert.match(
+    instructions,
+    /Count only the explanation outside fenced code blocks/,
+  );
+  assert.doesNotMatch(instructions, /Count the entire visible answer/);
 });
 test("empty, truncated, malformed check and provider quota fail without exposing drafts or secrets", async () => {
   for (const fetcher of [

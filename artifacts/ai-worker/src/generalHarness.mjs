@@ -91,7 +91,7 @@ export const GENERAL_MODE_EXAMPLES = {
   ],
 };
 
-export const GENERAL_HARNESS_VERSION = "nimbus-general-v3.7";
+export const GENERAL_HARNESS_VERSION = "nimbus-general-v3.8";
 export const GENERAL_INTENTS = [
   "review",
   "writing",
@@ -186,7 +186,7 @@ export function buildGeneralHarness(input, history) {
   const intent = inferGeneralIntent(input);
   const constraint = wordConstraint(input);
   const format = constraint
-    ? `Word constraint: ${constraint.min ? `${constraint.min}–` : "at most "}${constraint.max} words. Aim near ${constraint.min ? Math.floor((constraint.min + constraint.max) / 2) : Math.max(20, Math.floor(constraint.max * 0.8))}. ${intent === "writing" ? "Return only the draft, without a heading, word-count claim or notes." : "Count the entire visible answer, including headings."}`
+    ? `Word constraint: ${constraint.min ? `${constraint.min}–` : "at most "}${constraint.max} words. Aim near ${constraint.min ? Math.floor((constraint.min + constraint.max) / 2) : Math.max(20, Math.floor(constraint.max * 0.8))}. ${intent === "writing" ? "Return only the draft, without a heading, word-count claim or notes." : intent === "code" && /\bexplanation\b/i.test(input.message) ? "Count only the explanation outside fenced code blocks. Preserve all required code and assertions." : "Count the entire visible answer, including headings."}`
     : "";
   const context = {
     assignment: input.assignmentPrompt || null,
