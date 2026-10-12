@@ -191,7 +191,7 @@ export default function GeneralAI({
     let answerComplete = false;
     const abort = new AbortController();
     controller.current = abort;
-    const timer = window.setTimeout(() => abort.abort(), 60000);
+    const timer = window.setTimeout(() => abort.abort(), 120000);
     try {
       await save(next);
       const response = await aiRequest(

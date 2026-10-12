@@ -200,3 +200,38 @@ test("weekday parsing stays anchored to the supplied date", () => {
 
   assert.equal(result.dueDate, "2026-07-27");
 });
+test("date normalization preserves tagged and quoted names and checklist spelling", () => {
+  const parsed = parseQuickCapture(
+    'Study "tmrw" #Tomorrow due tommorow\nReveiw tomorow',
+    [{ id: 9, name: "Tomorrow" }],
+    [],
+    "2026-12-31",
+  );
+  assert.equal(parsed.title, 'Study "tmrw"');
+  assert.equal(parsed.projectId, 9);
+  assert.equal(parsed.dueDate, "2027-01-01");
+  assert.deepEqual(parsed.checklist, ["Reveiw tomorow"]);
+  const tagged = parseQuickCapture(
+    "Read #tmrw",
+    [{ id: 10, name: "tmrw" }],
+    [],
+    referenceDate,
+  );
+  assert.equal(tagged.dueDate, null);
+  assert.equal(tagged.projectId, 10);
+});
+test("ordinary words, SAT titles, and invalid typo-corrected dates are not silently rescheduled", () => {
+  for (const text of [
+    "Study SAT vocabulary",
+    "Describe the sun",
+    "Review tomography",
+    "Read due Octomber 99",
+    "Read due Febuary 30",
+  ]) {
+    assert.equal(
+      parseQuickCapture(text, [], [], referenceDate).dueDate,
+      null,
+      text,
+    );
+  }
+});

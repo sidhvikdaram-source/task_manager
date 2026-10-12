@@ -7,6 +7,7 @@ import {
 } from "./prompts.mjs";
 const jwksCache = new Map();
 export const GENERAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+export const GLM_MODEL = "zai-glm-5-3";
 const JWKS_URL =
   "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 const decode = (value) =>
@@ -76,7 +77,7 @@ export async function verifyFirebaseToken(token, project, fetcher = fetch) {
   return claims.sub;
 }
 
-export function buildCompletion(input, mode) {
+export function buildCompletion(input, mode, generalProvider = "cloudflare") {
   if (
     !input ||
     typeof input !== "object" ||
@@ -121,10 +122,21 @@ export function buildCompletion(input, mode) {
       "This conversation is too long for a free request. Start a new chat or shorten the prompt and rubric.",
     );
   return {
-    model: mode === "general" ? GENERAL_MODEL : "openai/gpt-oss-20b",
-    ...(mode === "task" ? { reasoning_effort: "low" } : {}),
+    model:
+      mode === "general"
+        ? generalProvider === "mistral"
+          ? GLM_MODEL
+          : GENERAL_MODEL
+        : "openai/gpt-oss-20b",
+    ...(mode === "task"
+      ? { reasoning_effort: "low" }
+      : generalProvider === "mistral"
+        ? { reasoning_effort: "max" }
+        : {}),
     messages,
-    max_completion_tokens: mode === "general" ? 4096 : 1600,
+    ...(mode === "general" && generalProvider === "mistral"
+      ? { max_tokens: 8192 }
+      : { max_completion_tokens: mode === "general" ? 4096 : 1600 }),
     stream: mode === "general",
     ...(mode === "task"
       ? {
@@ -207,7 +219,25 @@ export function createWorker({
           429,
           { "Retry-After": "60" },
         );
-      if (mode === "general" && !env.AI)
+      const generalProvider = env.GENERAL_AI_PROVIDER || "cloudflare";
+      if (
+        mode === "general" &&
+        !["cloudflare", "mistral"].includes(generalProvider)
+      )
+        return json(
+          { error: "General AI configuration needs attention." },
+          503,
+        );
+      if (
+        mode === "general" &&
+        generalProvider === "mistral" &&
+        !env.MISTRAL_API_KEY
+      )
+        return json(
+          { error: "GLM 5.3 is not connected yet. Please retry after setup." },
+          503,
+        );
+      if (mode === "general" && generalProvider === "cloudflare" && !env.AI)
         return json(
           { error: "General AI is temporarily unavailable. Please retry." },
           503,
@@ -228,7 +258,7 @@ export function createWorker({
         if (new TextEncoder().encode(body).length > 100000)
           return json({ error: "Request too large." }, 413);
         const input = JSON.parse(body);
-        completion = buildCompletion(input, mode);
+        completion = buildCompletion(input, mode, generalProvider);
         if (mode === "task") {
           const ctx = input.context ?? {};
           const subjects = (
@@ -260,7 +290,7 @@ export function createWorker({
         );
       }
       try {
-        if (mode === "general") {
+        if (mode === "general" && generalProvider === "cloudflare") {
           // Native inference on Workers Free stops at the daily allowance.
           // Never route a General request to a paid model or provider.
           const stream = await env.AI.run(GENERAL_MODEL, {
@@ -278,21 +308,31 @@ export function createWorker({
           });
         }
         const upstream = await fetcher(
-          "https://api.groq.com/openai/v1/chat/completions",
+          mode === "general"
+            ? "https://api.mistral.ai/v1/chat/completions"
+            : "https://api.groq.com/openai/v1/chat/completions",
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${env.GROQ_API_KEY}`,
+              Authorization: `Bearer ${mode === "general" ? env.MISTRAL_API_KEY : env.GROQ_API_KEY}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify(completion),
             signal: AbortSignal.any([
               request.signal,
-              AbortSignal.timeout(45000),
+              AbortSignal.timeout(mode === "general" ? 90000 : 45000),
             ]),
           },
         );
         if (!upstream.ok) {
+          if (mode === "general" && upstream.status === 403)
+            return json(
+              {
+                error:
+                  "GLM 5.3 is not available on the connected Mistral subscription. Your chat is saved.",
+              },
+              503,
+            );
           if (upstream.status === 429)
             return json(
               {
@@ -312,6 +352,14 @@ export function createWorker({
             502,
           );
         }
+        if (mode === "general")
+          return new Response(upstream.body, {
+            headers: {
+              ...headers,
+              "Content-Type": "text/event-stream; charset=utf-8",
+              "X-Nimbus-Model": GLM_MODEL,
+            },
+          });
         const data = await upstream.json();
         if (data.choices?.[0]?.finish_reason === "length")
           return json(

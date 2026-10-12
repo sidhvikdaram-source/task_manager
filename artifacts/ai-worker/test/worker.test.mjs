@@ -5,6 +5,7 @@ import {
   createWorker,
   verifyFirebaseToken,
   GENERAL_MODEL,
+  GLM_MODEL,
 } from "../src/index.mjs";
 const env = {
   FIREBASE_PROJECT_ID: "nimbusdo",
@@ -253,6 +254,86 @@ test("Cloudflare quota and failures never fall back to a paid endpoint or leak d
     assert.equal(response.status, status);
     assert.ok(!(await response.text()).includes("private"));
   }
+});
+test("GLM requests use Mistral's model and parameters while Task AI stays on Groq", async () => {
+  const general = buildCompletion(
+    { message: "Review my essay" },
+    "general",
+    "mistral",
+  );
+  assert.equal(general.model, GLM_MODEL);
+  assert.equal(general.reasoning_effort, "max");
+  assert.equal(general.max_tokens, 8192);
+  assert.equal(general.max_completion_tokens, undefined);
+  assert.equal(
+    buildCompletion({ message: "track homework" }, "task", "mistral").model,
+    "openai/gpt-oss-20b",
+  );
+  let upstream;
+  const stream =
+    'data: {"choices":[{"delta":{"content":[{"type":"text","text":"Answer"}]}}]}\n\ndata: [DONE]\n\n';
+  const worker = createWorker({
+    verify: async () => "u",
+    fetcher: async (url, options) => {
+      upstream = { url, options };
+      return new Response(stream);
+    },
+  });
+  const response = await worker.fetch(req(), {
+    ...env,
+    GENERAL_AI_PROVIDER: "mistral",
+    MISTRAL_API_KEY: "test-mistral-secret",
+    AI: {
+      run: async () => {
+        throw Error("Must not silently fall back to Gemma");
+      },
+    },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("X-Nimbus-Model"), GLM_MODEL);
+  assert.equal(await response.text(), stream);
+  assert.equal(upstream.url, "https://api.mistral.ai/v1/chat/completions");
+  assert.equal(
+    upstream.options.headers.Authorization,
+    "Bearer test-mistral-secret",
+  );
+  assert.equal(JSON.parse(upstream.options.body).model, GLM_MODEL);
+});
+test("missing GLM key and invalid server provider fail closed without a model fallback", async () => {
+  const worker = createWorker({
+    verify: async () => "u",
+    fetcher: async () => {
+      throw Error("Must not call upstream");
+    },
+  });
+  for (const GENERAL_AI_PROVIDER of ["mistral", "invalid"]) {
+    const response = await worker.fetch(req(), {
+      ...env,
+      GENERAL_AI_PROVIDER,
+      AI: {
+        run: async () => {
+          throw Error("Must not fall back");
+        },
+      },
+    });
+    assert.equal(response.status, 503);
+  }
+});
+test("GLM subscription rejection is clear and does not activate another provider", async () => {
+  const worker = createWorker({
+    verify: async () => "u",
+    fetcher: async () =>
+      new Response("private subscription detail", { status: 403 }),
+  });
+  const response = await worker.fetch(req(), {
+    ...env,
+    GENERAL_AI_PROVIDER: "mistral",
+    MISTRAL_API_KEY: "test-private-key",
+  });
+  assert.equal(response.status, 503);
+  const data = await response.json();
+  assert.match(data.error, /subscription/);
+  assert.ok(!data.error.includes("private"));
 });
 test("Firebase JWT verifier checks actual signature, audience, expiry and algorithm", async () => {
   const pair = await crypto.subtle.generateKey(

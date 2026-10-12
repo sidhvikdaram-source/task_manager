@@ -52,7 +52,114 @@ const weekdays = [
   "saturday",
 ];
 
+const scheduleAliases: Record<string, string> = {
+  tmrw: "tomorrow",
+  tmr: "tomorrow",
+  tmw: "tomorrow",
+  "2morrow": "tomorrow",
+  tomorow: "tomorrow",
+  tommorow: "tomorrow",
+  tommorrow: "tomorrow",
+  tommorrrow: "tomorrow",
+  tomorroww: "tomorrow",
+  tomorrw: "tomorrow",
+  yday: "yesterday",
+  yest: "yesterday",
+  yesturday: "yesterday",
+  yestarday: "yesterday",
+  tdy: "today",
+  "2day": "today",
+  todya: "today",
+  nxt: "next",
+  wekk: "week",
+  weeek: "week",
+  mondya: "monday",
+  tusday: "tuesday",
+  tuseday: "tuesday",
+  wednsday: "wednesday",
+  wensday: "wednesday",
+  wendesday: "wednesday",
+  thrusday: "thursday",
+  thirsday: "thursday",
+  fridy: "friday",
+  saterday: "saturday",
+  saturady: "saturday",
+  sundya: "sunday",
+  janurary: "january",
+  febuary: "february",
+  feburary: "february",
+  septemeber: "september",
+  septmber: "september",
+  octomber: "october",
+  octber: "october",
+  octobr: "october",
+  novemeber: "november",
+  decemeber: "december",
+};
+const scheduleShortDays: Record<string, string> = {
+  mon: "monday",
+  tue: "tuesday",
+  tues: "tuesday",
+  wed: "wednesday",
+  thu: "thursday",
+  thur: "thursday",
+  thurs: "thursday",
+  fri: "friday",
+  sat: "saturday",
+  sun: "sunday",
+};
+
+/** Normalize only the date parser's view, preserving original text and token offsets. */
 export function parseCaptureDate(text: string, referenceDate: string) {
+  let normalized = "";
+  const boundaries = [0];
+  let cursor = 0;
+  const append = (
+    value: string,
+    originalStart: number,
+    originalLength: number,
+  ) => {
+    normalized += value;
+    for (let i = 1; i <= value.length; i++)
+      boundaries.push(
+        originalStart + Math.round((i * originalLength) / value.length),
+      );
+  };
+  // Names in tags and quoted titles are data, not scheduling instructions.
+  const tokens =
+    /[#@][\w-]+|"[^"\n]*"|“[^”\n]*”|'[^'\n]*'|‘[^’\n]*’|[a-z0-9]+/gi;
+  for (const match of text.matchAll(tokens)) {
+    const start = match.index!;
+    append(text.slice(cursor, start), cursor, start - cursor);
+    const token = match[0];
+    const lower = token.toLowerCase();
+    const protectedToken = /^[#@"“'‘]/.test(token);
+    const schedulePrefix =
+      /\b(?:due(?:\s+(?:on|by))?|on|by|next|last)\s+$/i.test(normalized);
+    const replacement = protectedToken
+      ? " ".repeat(token.length)
+      : (scheduleAliases[lower] ??
+        (schedulePrefix
+          ? (scheduleShortDays[lower] ?? (lower === "wk" ? "week" : undefined))
+          : undefined) ??
+        token);
+    append(replacement, start, token.length);
+    cursor = start + token.length;
+  }
+  append(text.slice(cursor), cursor, text.length - cursor);
+  const parsed = parseCanonicalCaptureDate(normalized, referenceDate);
+  if (!parsed) return null;
+  const start = normalized.indexOf(parsed.matched);
+  return {
+    value: parsed.value,
+    matched: text.slice(
+      boundaries[start],
+      boundaries[start + parsed.matched.length],
+    ),
+  };
+}
+
+function parseCanonicalCaptureDate(text: string, referenceDate: string) {
   const iso = text.match(/\b(20\d{2}-\d{2}-\d{2})\b/);
   if (
     iso &&

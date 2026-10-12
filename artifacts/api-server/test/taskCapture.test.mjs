@@ -103,3 +103,56 @@ test("invalid dates are not silently saved and 'the day after tomorrow' is recog
   assert.equal(task.title, "");
   assert.equal(task.dueDate, "2026-10-12");
 });
+test("date spelling corrections and short forms preserve unnamed tasks and original titles", () => {
+  for (const phrase of [
+    "tmrw",
+    "TMR",
+    "tmw",
+    "2morrow",
+    "tomorow",
+    "tommorow",
+    "tommorrow",
+    "tomorrw",
+  ]) {
+    const task = capture(`create a task due ${phrase}`).taskPreview[0];
+    assert.equal(task.title, "");
+    assert.equal(task.dueDate, "2026-10-11");
+    const quick = parseQuickCapture(
+      `Reveiw scince due ${phrase}`,
+      [],
+      subjects,
+      "2026-10-10",
+    );
+    assert.equal(quick.title, "Reveiw scince");
+    assert.equal(quick.dueDate, "2026-10-11");
+  }
+});
+test("corrected compound dates use the entire original phrase", () => {
+  for (const [phrase, date] of [
+    ["day after tmrw", "2026-10-12"],
+    ["yday", "2026-10-09"],
+    ["yesturday", "2026-10-09"],
+    ["tdy", "2026-10-10"],
+    ["next mon", "2026-10-12"],
+    ["nxt mondya", "2026-10-12"],
+    ["next wk", "2026-10-17"],
+    ["next wekk", "2026-10-17"],
+    ["Octomber 21", "2026-10-21"],
+  ]) {
+    const task = capture(`create a task called Worksheet due ${phrase}`)
+      .taskPreview[0];
+    assert.equal(task.title, "Worksheet", phrase);
+    assert.equal(task.dueDate, date, phrase);
+  }
+});
+test("project-container dates accept spelling mistakes without changing count or subject", () => {
+  const plan = capture(
+    "create a science project with 3 tasks due day after tmrw",
+  ).planPreview;
+  assert.equal(plan.tasks.length, 3);
+  assert.equal(plan.project.subject, "Science");
+  assert.equal(plan.project.dueDate, "2026-10-12");
+  assert.ok(
+    plan.tasks.every((t) => t.title === "" && t.dueDate === "2026-10-12"),
+  );
+});

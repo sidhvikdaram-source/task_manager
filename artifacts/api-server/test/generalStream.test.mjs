@@ -66,3 +66,13 @@ test("Cloudflare native truncation cannot save an answer as complete", async () 
     /response limit/,
   );
 });
+test("GLM thinking chunks stay private and final text chunks remain copyable", async () => {
+  const input =
+    'data: {"choices":[{"delta":{"content":[{"type":"thinking","thinking":[{"type":"text","text":"Private reasoning"}]}]}}]}\n\ndata: {"choices":[{"delta":{"content":[{"type":"text","text":"Specific "},{"type":"text","text":"criticism."}]}}]}\n\ndata: [DONE]\n\n';
+  let latest = "";
+  assert.equal(
+    await readGeneralStream(streamResponse(input), (v) => (latest = v)),
+    "Specific criticism.",
+  );
+  assert.equal(latest, "Specific criticism.");
+});

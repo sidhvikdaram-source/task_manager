@@ -25,7 +25,15 @@ export async function readGeneralStream(
       );
     // Cloudflare supports native response chunks as well as OpenAI deltas.
     // Reasoning fields are intentionally never displayed or saved as answers.
-    const content = event.choices?.[0]?.delta?.content ?? event.response;
+    const rawContent = event.choices?.[0]?.delta?.content ?? event.response;
+    const content = Array.isArray(rawContent)
+      ? rawContent
+          .filter(
+            (part) => part?.type === "text" && typeof part.text === "string",
+          )
+          .map((part) => part.text)
+          .join("")
+      : rawContent;
     if (typeof content === "string") {
       text += content;
       onText(text);
