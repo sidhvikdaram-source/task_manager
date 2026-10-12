@@ -1,13 +1,15 @@
 import { parseTaskCreation } from "../../api-server/src/lib/taskCapture.ts";
+import { TASK_SYSTEM, TASK_SCHEMA } from "./prompts.mjs";
 import {
-  GENERAL_SYSTEM,
-  TASK_SYSTEM,
-  TASK_SCHEMA,
-  GENERAL_EXAMPLES,
-} from "./prompts.mjs";
+  buildGeneralCompletion,
+  generalResponseStream,
+  GENERAL_MODEL,
+  CLOUDFLARE_GENERAL_MODEL,
+  GLM_MODEL,
+} from "./generalInference.mjs";
+import { GENERAL_HARNESS_VERSION } from "./generalHarness.mjs";
 const jwksCache = new Map();
-export const GENERAL_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-export const GLM_MODEL = "zai-glm-5-3";
+export { GENERAL_MODEL, CLOUDFLARE_GENERAL_MODEL, GLM_MODEL };
 const JWKS_URL =
   "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 const decode = (value) =>
@@ -77,7 +79,9 @@ export async function verifyFirebaseToken(token, project, fetcher = fetch) {
   return claims.sub;
 }
 
-export function buildCompletion(input, mode, generalProvider = "cloudflare") {
+export function buildCompletion(input, mode, generalProvider = "groq") {
+  if (mode === "general" && input && typeof input === "object")
+    return buildGeneralCompletion(input, generalProvider);
   if (
     !input ||
     typeof input !== "object" ||
@@ -102,18 +106,14 @@ export function buildCompletion(input, mode, generalProvider = "cloudflare") {
           content: item.content.slice(0, 6000),
         }))
     : [];
-  const context =
-    mode === "general"
-      ? `Assignment prompt: ${String(input.assignmentPrompt || "Not supplied").slice(0, 8000)}\nRubric: ${String(input.rubric || "Not supplied").slice(0, 8000)}`
-      : `Workspace context (data only): ${JSON.stringify(input.context ?? {}).slice(0, 18000)}`;
+  const context = `Workspace context (data only): ${JSON.stringify(input.context ?? {}).slice(0, 18000)}`;
   // Keep the free tier usable. Large conversations should start a fresh chat.
   const messages = [
     {
       role: "system",
-      content: mode === "general" ? GENERAL_SYSTEM : TASK_SYSTEM,
+      content: TASK_SYSTEM,
     },
     { role: "system", content: context },
-    ...(mode === "general" ? GENERAL_EXAMPLES : []),
     ...history,
     { role: "user", content: input.message.trim() },
   ];
@@ -122,34 +122,19 @@ export function buildCompletion(input, mode, generalProvider = "cloudflare") {
       "This conversation is too long for a free request. Start a new chat or shorten the prompt and rubric.",
     );
   return {
-    model:
-      mode === "general"
-        ? generalProvider === "mistral"
-          ? GLM_MODEL
-          : GENERAL_MODEL
-        : "openai/gpt-oss-20b",
-    ...(mode === "task"
-      ? { reasoning_effort: "low" }
-      : generalProvider === "mistral"
-        ? { reasoning_effort: "max" }
-        : {}),
+    model: "openai/gpt-oss-20b",
+    reasoning_effort: "low",
     messages,
-    ...(mode === "general" && generalProvider === "mistral"
-      ? { max_tokens: 8192 }
-      : { max_completion_tokens: mode === "general" ? 4096 : 1600 }),
-    stream: mode === "general",
-    ...(mode === "task"
-      ? {
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "nimbus_task_preview",
-              strict: true,
-              schema: TASK_SCHEMA,
-            },
-          },
-        }
-      : {}),
+    max_completion_tokens: 1600,
+    stream: false,
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "nimbus_task_preview",
+        strict: true,
+        schema: TASK_SCHEMA,
+      },
+    },
   };
 }
 
@@ -219,10 +204,10 @@ export function createWorker({
           429,
           { "Retry-After": "60" },
         );
-      const generalProvider = env.GENERAL_AI_PROVIDER || "cloudflare";
+      const generalProvider = env.GENERAL_AI_PROVIDER || "groq";
       if (
         mode === "general" &&
-        !["cloudflare", "mistral"].includes(generalProvider)
+        !["groq", "cloudflare", "mistral"].includes(generalProvider)
       )
         return json(
           { error: "General AI configuration needs attention." },
@@ -242,7 +227,11 @@ export function createWorker({
           { error: "General AI is temporarily unavailable. Please retry." },
           503,
         );
-      if (mode === "task" && !env.GROQ_API_KEY)
+      if (
+        (mode === "task" ||
+          (mode === "general" && generalProvider === "groq")) &&
+        !env.GROQ_API_KEY
+      )
         return json(
           {
             error:
@@ -252,10 +241,11 @@ export function createWorker({
         );
       let completion;
       try {
-        if (Number(request.headers.get("Content-Length")) > 100000)
+        const maxBytes = mode === "general" ? 450000 : 100000;
+        if (Number(request.headers.get("Content-Length")) > maxBytes)
           return json({ error: "Request too large." }, 413);
         const body = await request.text();
-        if (new TextEncoder().encode(body).length > 100000)
+        if (new TextEncoder().encode(body).length > maxBytes)
           return json({ error: "Request too large." }, 413);
         const input = JSON.parse(body);
         completion = buildCompletion(input, mode, generalProvider);
@@ -290,49 +280,39 @@ export function createWorker({
         );
       }
       try {
-        if (mode === "general" && generalProvider === "cloudflare") {
-          // Native inference on Workers Free stops at the daily allowance.
-          // Never route a General request to a paid model or provider.
-          const stream = await env.AI.run(GENERAL_MODEL, {
-            messages: completion.messages,
-            max_completion_tokens: completion.max_completion_tokens,
-            chat_template_kwargs: { enable_thinking: true },
-            stream: true,
-          });
-          return new Response(stream, {
-            headers: {
-              ...headers,
-              "Content-Type": "text/event-stream; charset=utf-8",
-              "X-Nimbus-Model": GENERAL_MODEL,
+        if (mode === "general")
+          return new Response(
+            generalResponseStream(completion, {
+              env,
+              provider: generalProvider,
+              fetcher,
+              signal: request.signal,
+            }),
+            {
+              headers: {
+                ...headers,
+                "Content-Type": "text/event-stream; charset=utf-8",
+                "X-Nimbus-Model": completion.model,
+                "X-Nimbus-Harness": GENERAL_HARNESS_VERSION,
+              },
             },
-          });
-        }
+          );
         const upstream = await fetcher(
-          mode === "general"
-            ? "https://api.mistral.ai/v1/chat/completions"
-            : "https://api.groq.com/openai/v1/chat/completions",
+          "https://api.groq.com/openai/v1/chat/completions",
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${mode === "general" ? env.MISTRAL_API_KEY : env.GROQ_API_KEY}`,
+              Authorization: `Bearer ${env.GROQ_API_KEY}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify(completion),
             signal: AbortSignal.any([
               request.signal,
-              AbortSignal.timeout(mode === "general" ? 90000 : 45000),
+              AbortSignal.timeout(45000),
             ]),
           },
         );
         if (!upstream.ok) {
-          if (mode === "general" && upstream.status === 403)
-            return json(
-              {
-                error:
-                  "GLM 5.3 is not available on the connected Mistral subscription. Your chat is saved.",
-              },
-              503,
-            );
           if (upstream.status === 429)
             return json(
               {
@@ -352,14 +332,6 @@ export function createWorker({
             502,
           );
         }
-        if (mode === "general")
-          return new Response(upstream.body, {
-            headers: {
-              ...headers,
-              "Content-Type": "text/event-stream; charset=utf-8",
-              "X-Nimbus-Model": GLM_MODEL,
-            },
-          });
         const data = await upstream.json();
         if (data.choices?.[0]?.finish_reason === "length")
           return json(

@@ -8,6 +8,8 @@ import {
   MessageSquare,
   Maximize2,
   Minimize2,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -25,18 +27,21 @@ import { CopyableAnswer } from "@/components/CopyableAnswer";
 import { aiEndpoint, aiRequest, readGeneralStream } from "@/lib/aiTransport";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { prepareGeneralImage, type GeneralImage } from "@/lib/generalImages";
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   incomplete?: boolean;
+  images?: GeneralImage[];
 };
 type Chat = {
   id: string;
   title: string;
   assignmentPrompt: string;
   rubric: string;
+  evidence: string;
   messages: Message[];
   updatedAt: string;
 };
@@ -45,6 +50,7 @@ const emptyChat = (): Chat => ({
   title: "New chat",
   assignmentPrompt: "",
   rubric: "",
+  evidence: "",
   messages: [],
   updatedAt: new Date().toISOString(),
 });
@@ -89,6 +95,10 @@ export default function GeneralAI({
   const [requestError, setRequestError] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [contextOpen, setContextOpen] = useState(false);
+  const [images, setImages] = useState<GeneralImage[]>([]);
+  const [preparingImage, setPreparingImage] = useState(false);
+  const [responseStage, setResponseStage] = useState("Working…");
+  const imageInput = useRef<HTMLInputElement>(null);
   const controller = useRef<AbortController | null>(null);
   const busyRef = useRef(false);
   const scroll = useRef<HTMLDivElement>(null);
@@ -101,6 +111,7 @@ export default function GeneralAI({
     setChat(emptyChat());
     setInput("");
     setRequestError("");
+    setImages([]);
   }, [user?.id]);
   useEffect(() => {
     scroll.current?.scrollTo({ top: scroll.current.scrollHeight });
@@ -151,29 +162,67 @@ export default function GeneralAI({
       toast.error(e instanceof Error ? e.message : "Could not delete chat.");
     }
   }
+  async function attachImage(file?: File) {
+    if (!file || busy || preparingImage) return;
+    setPreparingImage(true);
+    const expectedOwner = user?.id;
+    try {
+      const image = await prepareGeneralImage(file);
+      if (owner.current === expectedOwner) {
+        setImages([image]);
+        setRequestError("");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "This image could not be attached.",
+      );
+    } finally {
+      setPreparingImage(false);
+      if (imageInput.current) imageInput.current.value = "";
+    }
+  }
   async function send(event?: React.FormEvent) {
     event?.preventDefault();
-    const text = input.trim();
-    if (!text || busyRef.current || saving) return;
+    const text = input.trim() || (images.length ? "Describe this image." : "");
+    if (!text || busyRef.current || saving || preparingImage) return;
     if (chat.messages.length >= 39) {
       setRequestError(
         "Start a new chat to keep conversations within the free limits.",
       );
       return;
     }
+    if (
+      new TextEncoder().encode(
+        JSON.stringify({ ...chat, draft: text, attachment: images }),
+      ).length > 660000
+    ) {
+      setRequestError(
+        "This chat is full. Start a new chat; your current draft and image are kept.",
+      );
+      return;
+    }
+    const expectedOwner = user?.id;
     busyRef.current = true;
     setBusy(true);
     setRequestError("");
+    setResponseStage("Working…");
     setInput("");
+    const sentImages = images;
+    setImages([]);
     const previous = chat.messages.at(-1);
     const baseMessages =
-      previous?.role === "user" && previous.content === text
+      previous?.role === "user" &&
+      previous.content === text &&
+      JSON.stringify(previous.images || []) === JSON.stringify(sentImages)
         ? chat.messages.slice(0, -1)
         : chat.messages;
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: "user",
       content: text,
+      ...(sentImages.length ? { images: sentImages } : {}),
     };
     const assistantId = crypto.randomUUID();
     let next: Chat = {
@@ -182,10 +231,19 @@ export default function GeneralAI({
       updatedAt: new Date().toISOString(),
       messages: [...baseMessages, userMessage],
     };
+    const lastImageId = [...baseMessages]
+      .reverse()
+      .find((message) => message.role === "user" && message.images?.length)?.id;
     const history = baseMessages
       .filter((m) => !m.incomplete)
       .slice(-8)
-      .map(({ role, content }) => ({ role, content }));
+      .map(({ id, role, content, images }) => ({
+        role,
+        content,
+        ...(!sentImages.length && id === lastImageId && images?.length
+          ? { images }
+          : {}),
+      }));
     setChat(next);
     let answer = "";
     let answerComplete = false;
@@ -194,6 +252,7 @@ export default function GeneralAI({
     const timer = window.setTimeout(() => abort.abort(), 120000);
     try {
       await save(next);
+      if (owner.current !== expectedOwner) return;
       const response = await aiRequest(
         "general",
         {
@@ -201,6 +260,8 @@ export default function GeneralAI({
           history,
           assignmentPrompt: chat.assignmentPrompt,
           rubric: chat.rubric,
+          evidence: chat.evidence || "",
+          images: sentImages,
         },
         abort.signal,
       );
@@ -211,16 +272,29 @@ export default function GeneralAI({
           { id: assistantId, role: "assistant", content: "" },
         ],
       });
-      await readGeneralStream(response, (value) => {
-        answer = value;
-        setChat({
-          ...next,
-          messages: [
-            ...next.messages,
-            { id: assistantId, role: "assistant", content: value },
-          ],
-        });
-      });
+      await readGeneralStream(
+        response,
+        (value) => {
+          if (owner.current !== expectedOwner) return;
+          answer = value;
+          setChat({
+            ...next,
+            messages: [
+              ...next.messages,
+              { id: assistantId, role: "assistant", content: value },
+            ],
+          });
+        },
+        (stage) =>
+          setResponseStage(
+            stage === "checking"
+              ? "Checking the answer…"
+              : stage === "waiting"
+                ? "Waiting for the free allowance…"
+                : "Working…",
+          ),
+      );
+      if (owner.current !== expectedOwner) return;
       answerComplete = true;
       next = {
         ...next,
@@ -233,6 +307,7 @@ export default function GeneralAI({
       setChat(next);
       await save(next);
     } catch (e) {
+      if (owner.current !== expectedOwner) return;
       const message = abort.signal.aborted
         ? "Response stopped. You can send another message."
         : e instanceof Error
@@ -258,7 +333,10 @@ export default function GeneralAI({
         } catch {
           setRequestError(`${message} The partial answer could not be saved.`);
         }
-      } else setInput(text);
+      } else {
+        setInput(text);
+        setImages(sentImages);
+      }
     } finally {
       window.clearTimeout(timer);
       busyRef.current = false;
@@ -320,9 +398,10 @@ export default function GeneralAI({
       <div className="grid min-h-0 min-w-0 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] flex-1 gap-3 md:grid-cols-[230px_minmax(0,1fr)] md:grid-rows-1 md:gap-4">
         <aside className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-3">
           <button
-            disabled={busy || saving}
+            disabled={busy || saving || preparingImage}
             onClick={() => {
               setChat(emptyChat());
+              setImages([]);
               setInput("");
               setRequestError("");
             }}
@@ -365,9 +444,10 @@ export default function GeneralAI({
                   )}
                 >
                   <button
-                    disabled={busy || saving}
+                    disabled={busy || saving || preparingImage}
                     onClick={() => {
                       setChat(c);
+                      setImages([]);
                       setInput("");
                       setRequestError("");
                     }}
@@ -376,7 +456,7 @@ export default function GeneralAI({
                     {c.title}
                   </button>
                   <button
-                    disabled={busy || saving}
+                    disabled={busy || saving || preparingImage}
                     onClick={() => setDeleteId(c.id)}
                     aria-label={`Delete ${c.title}`}
                     className="mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
@@ -395,13 +475,13 @@ export default function GeneralAI({
               aria-expanded={contextOpen}
               className="text-sm font-semibold"
             >
-              Assignment prompt & rubric{" "}
+              Assignment, rubric & sources{" "}
               <span className="ml-2 font-normal text-muted-foreground">
                 {contextOpen ? "Hide" : "Optional"}
               </span>
             </button>
             {contextOpen && (
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <div className="mt-3 grid gap-3 lg:grid-cols-3">
                 <label className="text-xs font-semibold">
                   Assignment prompt
                   <textarea
@@ -428,6 +508,20 @@ export default function GeneralAI({
                     }
                     className="mt-2 min-h-28 w-full resize-y rounded-xl border border-border bg-background p-3 text-sm font-normal outline-none focus:border-primary"
                     placeholder="Paste the grading criteria…"
+                  />
+                </label>
+                <label className="text-xs font-semibold">
+                  Sources & evidence
+                  <textarea
+                    disabled={busy}
+                    maxLength={8000}
+                    value={chat.evidence || ""}
+                    onBlur={saveContext}
+                    onChange={(e) =>
+                      setChat({ ...chat, evidence: e.target.value })
+                    }
+                    className="mt-2 min-h-28 w-full resize-y rounded-xl border border-border bg-background p-3 text-sm font-normal outline-none focus:border-primary"
+                    placeholder="Paste facts, quotations, or sources the answer must use…"
                   />
                 </label>
               </div>
@@ -477,13 +571,23 @@ export default function GeneralAI({
                         role="status"
                         className="text-sm text-muted-foreground"
                       >
-                        Thinking…
+                        {responseStage}
                       </span>
                     )
                   ) : (
-                    <p className="whitespace-pre-wrap break-words text-sm leading-7">
-                      {m.content}
-                    </p>
+                    <div className="space-y-3">
+                      {m.images?.map((image) => (
+                        <img
+                          key={image.dataUrl}
+                          src={image.dataUrl}
+                          alt={image.name}
+                          className="max-h-64 max-w-full rounded-lg border border-border object-contain"
+                        />
+                      ))}
+                      <p className="whitespace-pre-wrap break-words text-sm leading-7">
+                        {m.content}
+                      </p>
+                    </div>
                   )}
                   {m.incomplete && (
                     <p className="mt-2 text-xs text-muted-foreground">
@@ -509,7 +613,49 @@ export default function GeneralAI({
                 {requestError}
               </p>
             )}
+            {!!images.length && (
+              <div className="mb-3 flex min-w-0 items-center gap-3 rounded-xl border border-border bg-background/60 p-2">
+                <img
+                  src={images[0].dataUrl}
+                  alt={images[0].name}
+                  className="h-14 w-16 shrink-0 rounded-lg object-contain"
+                />
+                <span className="min-w-0 flex-1 truncate text-sm">
+                  {images[0].name}
+                </span>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setImages([])}
+                  aria-label="Remove attached image"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
             <div className="flex items-end gap-3 rounded-xl border border-border bg-background p-3 focus-within:border-primary">
+              <input
+                ref={imageInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                tabIndex={-1}
+                aria-label="Choose image for General AI"
+                onChange={(event) => {
+                  void attachImage(event.target.files?.[0]);
+                }}
+              />
+              <button
+                type="button"
+                disabled={busy || preparingImage || saving}
+                onClick={() => imageInput.current?.click()}
+                aria-label={preparingImage ? "Preparing image" : "Attach image"}
+                title="Attach one image"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+              >
+                <ImagePlus className="h-5 w-5" />
+              </button>
               <textarea
                 value={input}
                 maxLength={16000}
@@ -541,7 +687,11 @@ export default function GeneralAI({
               ) : (
                 <button
                   type="submit"
-                  disabled={!input.trim() || saving}
+                  disabled={
+                    (!input.trim() && !images.length) ||
+                    saving ||
+                    preparingImage
+                  }
                   aria-label="Send to General AI"
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40"
                 >

@@ -1,6 +1,7 @@
 export async function readGeneralStream(
   response: Response,
   onText: (text: string) => void,
+  onStatus?: (status: "working" | "checking" | "waiting") => void,
 ) {
   if (!response.body) throw new Error("AI returned no response.");
   const reader = response.body.getReader();
@@ -17,8 +18,14 @@ export async function readGeneralStream(
       return;
     }
     const event = JSON.parse(data);
+    if (["working", "checking", "waiting"].includes(event.status))
+      onStatus?.(event.status);
     if (event.error)
-      throw new Error("AI stopped before finishing. Please retry.");
+      throw new Error(
+        typeof event.error.message === "string"
+          ? event.error.message
+          : "AI stopped before finishing. Please retry.",
+      );
     if ((event.choices?.[0]?.finish_reason ?? event.finish_reason) === "length")
       throw new Error(
         "The answer reached the free response limit. Ask to continue in your next message.",

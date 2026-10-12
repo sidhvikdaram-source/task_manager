@@ -1,0 +1,368 @@
+[
+  {
+    "id": "qualified-study-space",
+    "category": "review",
+    "http": 200,
+    "attempt": 1,
+    "milliseconds": 2721,
+    "wallMilliseconds": 3286,
+    "intent": "review",
+    "harness": "nimbus-general-v3.6",
+    "calls": 3,
+    "usage": [
+      {
+        "queue_time": 0.00413222,
+        "prompt_tokens": 1727,
+        "prompt_time": 0.144016046,
+        "completion_tokens": 249,
+        "completion_time": 0.496296866,
+        "total_tokens": 1976,
+        "total_time": 0.640312912
+      },
+      {
+        "queue_time": 0.004121798,
+        "prompt_tokens": 975,
+        "prompt_time": 0.087678882,
+        "completion_tokens": 249,
+        "completion_time": 0.531482292,
+        "total_tokens": 1224,
+        "total_time": 0.619161174
+      },
+      {
+        "queue_time": 0.064544036,
+        "prompt_tokens": 1531,
+        "prompt_time": 0.106525654,
+        "completion_tokens": 249,
+        "completion_time": 0.473225758,
+        "total_tokens": 1780,
+        "total_time": 0.579751412
+      }
+    ],
+    "answer": "**Coverage verdict:** The essay meets all rubric requirements.\n\n**Strengths to preserve:**\n*   **Qualified thesis:** \"if it can cover staffing and evaluate demand\" correctly conditions the recommendation.\n*   **Accurate evidence:** The 22 attendees and $90 cost match the supplied data.\n*   **Limitation:** Explicitly notes the lack of grade measurements and control group.\n*   **Cost response:** Correctly identifies the missing budget as a dependency and proposes a feasible next step (identifying funding) rather than promising affordability.\n\n**Required fixes:** None.\n\n**Optional improvements:**\n*   **Precision:** \"This shows some demand there\" is slightly informal. Consider \"This indicates local demand at that school.\"\n*   **Flow:** The transition from cost to budget could be smoother: \"Staffing costs $90 monthly. Because our budget is unspecified, affordability is unverified; therefore, the trial should proceed only after a funding source is identified.\"\n\nThe essay accurately separates the external evidence from local assumptions. It does not overclaim causation or affordability. The proposed response is realistic and directly addresses the stated cost limitation. No factual errors or logical contradictions were found."
+  },
+  {
+    "id": "bus-survey-errors",
+    "category": "review",
+    "http": 200,
+    "attempt": 1,
+    "milliseconds": 2606,
+    "wallMilliseconds": 3084,
+    "intent": "review",
+    "harness": "nimbus-general-v3.6",
+    "calls": 3,
+    "usage": [
+      {
+        "queue_time": 0.097090703,
+        "prompt_tokens": 1736,
+        "prompt_time": 0.119402849,
+        "completion_tokens": 237,
+        "completion_time": 0.487645634,
+        "total_tokens": 1973,
+        "total_time": 0.607048483
+      },
+      {
+        "queue_time": 0.032260859,
+        "prompt_tokens": 972,
+        "prompt_time": 0.08243913,
+        "completion_tokens": 237,
+        "completion_time": 0.541776191,
+        "total_tokens": 1209,
+        "total_time": 0.624215321
+      },
+      {
+        "queue_time": 0.157739543,
+        "prompt_tokens": 1515,
+        "prompt_time": 0.131520388,
+        "completion_tokens": 321,
+        "completion_time": 0.658659301,
+        "total_tokens": 1836,
+        "total_time": 0.790179689
+      }
+    ],
+    "answer": "**Coverage:** The draft fails to meet the rubric requirements for causal limits and a real counterargument response.\n\n**Required fixes:**\n1.  **Causal Limits:** The draft states, \"This proves the change caused the improvement and guarantees it for every school.\" This ignores the lack of a comparison school. Revise to: \"The rise is consistent with a benefit, but without a comparison school, causation and universal applicability are unproven.\"\n2.  **Arithmetic Accuracy:** The draft claims, \"The increase was 14 percent.\" This is a unit error. Revise to: \"The increase was 14 percentage points.\"\n3.  **Ambiguous Reference:** The draft writes, \"When riders told coaches about the change, they said their schedule would suffer.\" The pronoun \"they\" is ambiguous. Revise to: \"When riders told coaches about the change, the coaches said the riders' schedules would suffer.\"\n4.  **Factual Contradiction:** The draft asserts, \"However, no rider reported a scheduling problem.\" This directly contradicts the evidence that nine riders reported conflicts. Delete this sentence entirely.\n5.  **Counterargument Response:** The draft lacks a substantive response to the drawback. Add: \"The school could coordinate with coaches to adjust practice times or provide transportation to practices, addressing the conflicts without abandoning the later arrival.\"\n\n**Sound sentence to preserve:**\n\"Nine of 60 riders reported practice conflicts.\" This sentence accurately reflects the observational data and should remain in the final text."
+  },
+  {
+    "id": "concern-and-support",
+    "category": "review",
+    "http": 200,
+    "attempt": 1,
+    "milliseconds": 954,
+    "wallMilliseconds": 1282,
+    "intent": "review",
+    "harness": "nimbus-general-v3.6",
+    "calls": 3,
+    "usage": [
+      {
+        "queue_time": 0.096870292,
+        "prompt_tokens": 1619,
+        "prompt_time": 0.130266419,
+        "completion_tokens": 54,
+        "completion_time": 0.109550213,
+        "total_tokens": 1673,
+        "total_time": 0.239816632
+      },
+      {
+        "queue_time": 0.096903838,
+        "prompt_tokens": 665,
+        "prompt_time": 0.04562031,
+        "completion_tokens": 7,
+        "completion_time": 0.013577024,
+        "total_tokens": 672,
+        "total_time": 0.059197334
+      },
+      {
+        "queue_time": 0.065992736,
+        "prompt_tokens": 968,
+        "prompt_time": 0.077752988,
+        "completion_tokens": 58,
+        "completion_time": 0.113859456,
+        "total_tokens": 1026,
+        "total_time": 0.191612444
+      }
+    ],
+    "answer": "No logical contradiction exists. The document correctly states that eight of twenty members had noise concerns while all twenty voted in favor. Supporting a proposal despite specific drawbacks is logically consistent. The explanation accurately distinguishes partial concern from overall rejection. There are no factual or logical errors in the provided text."
+  },
+  {
+    "id": "review-no-rubric",
+    "category": "review",
+    "http": 200,
+    "attempt": 1,
+    "milliseconds": 1099,
+    "wallMilliseconds": 1522,
+    "intent": "review",
+    "harness": "nimbus-general-v3.6",
+    "calls": 3,
+    "usage": [
+      {
+        "queue_time": 0.066606983,
+        "prompt_tokens": 1585,
+        "prompt_time": 0.131815533,
+        "completion_tokens": 62,
+        "completion_time": 0.125608296,
+        "total_tokens": 1647,
+        "total_time": 0.257423829
+      },
+      {
+        "queue_time": 0.114508768,
+        "prompt_tokens": 639,
+        "prompt_time": 0.054248669,
+        "completion_tokens": 7,
+        "completion_time": 0.01554752,
+        "total_tokens": 646,
+        "total_time": 0.069796189
+      },
+      {
+        "queue_time": 0.156831066,
+        "prompt_tokens": 942,
+        "prompt_time": 0.0788272,
+        "completion_tokens": 73,
+        "completion_time": 0.14271391,
+        "total_tokens": 1015,
+        "total_time": 0.22154111
+      }
+    ],
+    "answer": "The conclusion that the lights \"definitely reduced eye strain\" is unsupported. Visitor impressions of brightness do not measure eye strain, and no brightness readings were taken. Revise the final sentence to: \"Visitors perceived the room as brighter, but no data on brightness or eye strain were collected.\" Without an assignment or rubric, full coverage cannot be assessed."
+  },
+  {
+    "id": "vision-zero-axis",
+    "category": "vision",
+    "http": 200,
+    "attempt": 1,
+    "milliseconds": 26280,
+    "wallMilliseconds": 26607,
+    "intent": "vision",
+    "harness": "nimbus-general-v3.6",
+    "calls": 2,
+    "usage": [
+      {
+        "queue_time": 0.162667237,
+        "prompt_tokens": 2763,
+        "prompt_time": 0.248585665,
+        "completion_tokens": 49,
+        "completion_time": 0.096484188,
+        "total_tokens": 2812,
+        "total_time": 0.345069853
+      },
+      {
+        "queue_time": 0.196231983,
+        "prompt_tokens": 2646,
+        "prompt_time": 0.229046897,
+        "completion_tokens": 49,
+        "completion_time": 0.097553438,
+        "total_tokens": 2695,
+        "total_time": 0.326600335
+      }
+    ],
+    "answer": "Category B is higher. The chart labels A as 4 and B as 10. Dividing 10 by 4 gives 2.5, so B\u2019s value is approximately 2.5 times A\u2019s value."
+  },
+  {
+    "id": "vision-no-axis",
+    "category": "vision",
+    "http": 429,
+    "attempt": 1,
+    "milliseconds": 1233,
+    "wallMilliseconds": 1624,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "2"
+  },
+  {
+    "id": "vision-no-axis",
+    "category": "vision",
+    "http": 200,
+    "attempt": 2,
+    "milliseconds": 25399,
+    "wallMilliseconds": 25712,
+    "intent": "vision",
+    "harness": "nimbus-general-v3.6",
+    "calls": 2,
+    "usage": [
+      {
+        "queue_time": 0.282929168,
+        "prompt_tokens": 2761,
+        "prompt_time": 0.200991348,
+        "completion_tokens": 54,
+        "completion_time": 0.11444254,
+        "total_tokens": 2815,
+        "total_time": 0.315433888
+      },
+      {
+        "queue_time": 0.156003339,
+        "prompt_tokens": 2649,
+        "prompt_time": 0.182347127,
+        "completion_tokens": 60,
+        "completion_time": 0.114334602,
+        "total_tokens": 2709,
+        "total_time": 0.296681729
+      }
+    ],
+    "answer": "The chart shows a shorter blue bar and a taller orange bar. Visually, the orange bar\u2019s height is approximately 2.5 times the blue bar\u2019s. This geometric ratio does not establish the ratio of the represented quantities because the chart lacks a numerical scale, making the actual values unknown."
+  },
+  {
+    "id": "vision-truncated-axis",
+    "category": "vision",
+    "http": 429,
+    "attempt": 1,
+    "milliseconds": 1264,
+    "wallMilliseconds": 1659,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "3"
+  },
+  {
+    "id": "vision-truncated-axis",
+    "category": "vision",
+    "http": 200,
+    "attempt": 2,
+    "milliseconds": 25858,
+    "wallMilliseconds": 26135,
+    "intent": "vision",
+    "harness": "nimbus-general-v3.6",
+    "calls": 2,
+    "usage": [
+      {
+        "queue_time": 0.246899511,
+        "prompt_tokens": 2765,
+        "prompt_time": 0.203861195,
+        "completion_tokens": 131,
+        "completion_time": 0.258287621,
+        "total_tokens": 2896,
+        "total_time": 0.462148816
+      },
+      {
+        "queue_time": 0.22464831,
+        "prompt_tokens": 2732,
+        "prompt_time": 0.188027488,
+        "completion_tokens": 129,
+        "completion_time": 0.252505011,
+        "total_tokens": 2861,
+        "total_time": 0.440532499
+      }
+    ],
+    "answer": "The actual values are 64 (A) and 76 (B), giving a value ratio of 76/64 = 1.1875.\n\nThe chart is misleading because the y-axis starts at 60, not 0. The visible bar height for A is 4 units (64\u221260), while B\u2019s is 16 units (76\u221260), producing a visible-height ratio of 16/4 = 4. This makes B look four times taller than A, even though its value is only 18.75% larger."
+  },
+  {
+    "id": "vision-missing",
+    "category": "vision",
+    "http": 200,
+    "attempt": 1,
+    "milliseconds": 403,
+    "wallMilliseconds": 766,
+    "intent": "vision",
+    "harness": "nimbus-general-v3.6",
+    "calls": 2,
+    "usage": [
+      {
+        "queue_time": 0.00436275,
+        "prompt_tokens": 932,
+        "prompt_time": 0.074941788,
+        "completion_tokens": 12,
+        "completion_time": 0.030024642,
+        "total_tokens": 944,
+        "total_time": 0.10496643
+      },
+      {
+        "queue_time": 0.063873224,
+        "prompt_tokens": 724,
+        "prompt_time": 0.049548044,
+        "completion_tokens": 12,
+        "completion_time": 0.026484839,
+        "total_tokens": 736,
+        "total_time": 0.076032883
+      }
+    ],
+    "answer": "No score can be determined because no image was attached."
+  },
+  {
+    "id": "fresh-review-response",
+    "category": "review",
+    "http": 200,
+    "attempt": 1,
+    "milliseconds": 1536,
+    "wallMilliseconds": 1833,
+    "intent": "review",
+    "harness": "nimbus-general-v3.6",
+    "calls": 3,
+    "usage": [
+      {
+        "queue_time": 0.031985914,
+        "prompt_tokens": 1705,
+        "prompt_time": 0.154663238,
+        "completion_tokens": 196,
+        "completion_time": 0.38389481,
+        "total_tokens": 1901,
+        "total_time": 0.538558048
+      },
+      {
+        "queue_time": 0.083159967,
+        "prompt_tokens": 905,
+        "prompt_time": 0.061906977,
+        "completion_tokens": 7,
+        "completion_time": 0.013600579,
+        "total_tokens": 912,
+        "total_time": 0.075507556
+      },
+      {
+        "queue_time": 0.032158063,
+        "prompt_tokens": 1211,
+        "prompt_time": 0.104779844,
+        "completion_tokens": 215,
+        "completion_time": 0.466868539,
+        "total_tokens": 1426,
+        "total_time": 0.571648383
+      }
+    ],
+    "answer": "**Coverage:** The draft meets the qualified recommendation and evidence limits criteria, but its responses to cost and access objections are inadequate.\n\n**Required fixes**\n\n1.  **\u201cStaffing cost $25 per weekend, which is obviously affordable.\u201d**\n    *   *Defect:* The text asserts affordability without providing the local budget data required to support that claim.\n    *   *Repair:* \u201cStaffing cost $25 per weekend; whether this is affordable depends on the library\u2019s specific budget.\u201d\n\n2.  **\u201cTherefore, the travel problem does not matter.\u201d**\n    *   *Defect:* This sentence dismisses the reported access barrier rather than addressing it realistically.\n    *   *Repair:* \u201cTravel difficulties remain a barrier; the library should assess feasible accommodations, such as shuttle information or adjusted hours, before expanding.\u201d\n\n**Preserve**\n*   \u201cThe library should consider weekend opening if it can fund staffing and improve access.\u201d\n*   \u201cThis suggests demand at that library, but does not establish demand everywhere.\u201d"
+  },
+  {
+    "id": "fresh-writing-budget",
+    "category": "writing",
+    "http": 422,
+    "attempt": 1,
+    "milliseconds": 4750,
+    "wallMilliseconds": 5058,
+    "error": "AI could not meet the requested word limit. Please retry; your chat is saved.",
+    "status": 422,
+    "retryAfter": null
+  }
+]

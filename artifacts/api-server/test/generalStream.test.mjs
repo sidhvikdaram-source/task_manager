@@ -12,6 +12,30 @@ const streamResponse = (text) =>
       },
     }),
   );
+test("checking and quota progress never become answer text; safe server failures remain actionable", async () => {
+  const statuses = [];
+  const input =
+    'data: {"status":"working"}\n\ndata: {"status":"waiting"}\n\ndata: {"status":"checking"}\n\ndata: {"choices":[{"delta":{"content":"Checked answer."}}]}\n\ndata: [DONE]\n\n';
+  assert.equal(
+    await readGeneralStream(
+      streamResponse(input),
+      () => {},
+      (value) => statuses.push(value),
+    ),
+    "Checked answer.",
+  );
+  assert.deepEqual(statuses, ["working", "waiting", "checking"]);
+  await assert.rejects(
+    () =>
+      readGeneralStream(
+        streamResponse(
+          'data: {"error":{"message":"The free AI allowance is busy. Your chat is saved."}}\n\ndata: [DONE]\n\n',
+        ),
+        () => {},
+      ),
+    /free AI allowance/,
+  );
+});
 test("general stream handles fragmented UTF-8 and ignores reasoning fields", async () => {
   const input =
     'data: {"choices":[{"delta":{"reasoning":"private thought"}}]}\r\n\r\ndata: {"choices":[{"delta":{"content":"Clarity — matters."}}]}\r\n\r\ndata: [DONE]\r\n\r\n';

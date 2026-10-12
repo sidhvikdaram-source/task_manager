@@ -5,6 +5,7 @@
   "workers_dev": true,
   "ai": { "binding": "AI" },
   "vars": {
+    "GENERAL_AI_PROVIDER": "groq",
     "FIREBASE_PROJECT_ID": "nimbusdo",
     "ALLOWED_ORIGIN": "https://nimbusdo.web.app",
     "ALLOWED_ORIGINS": "https://nimbusdo.web.app,https://nimbusdo.firebaseapp.com",

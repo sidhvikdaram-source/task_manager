@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { firebaseAuth, firebaseDb } from "@workspace/replit-auth-web";
 import { aiRequest } from "./aiTransport";
+import { validGeneralImages } from "./generalImages";
 import { parseQuickCapture } from "../../../api-server/src/lib/quickCapture";
 import { parseTaskCreation } from "../../../api-server/src/lib/taskCapture";
 import {
@@ -3002,18 +3003,38 @@ async function handleGeneralChats(
         message.id.length > 64 ||
         typeof message.content !== "string" ||
         message.content.length > 24000,
+      // attachments are validated below along with the complete document size.
     )
   )
     return json({ error: "Invalid conversation." }, 400);
+  if (
+    messages.some(
+      (message) =>
+        message.images !== undefined &&
+        (message.role !== "user" || !validGeneralImages(message.images)),
+    )
+  )
+    return json({ error: "Invalid chat image." }, 400);
   const data = {
     title: String(input.title || "New chat").slice(0, 65),
     assignmentPrompt: String(input.assignmentPrompt || "").slice(0, 8000),
     rubric: String(input.rubric || "").slice(0, 8000),
+    evidence: String(input.evidence || "").slice(0, 8000),
     messages: messages.map((message) => ({
       id: message.id,
       role: message.role,
       content: message.content,
       ...(message.incomplete ? { incomplete: true } : {}),
+      ...(message.images?.length
+        ? {
+            images: message.images.map(
+              (image: { name: string; dataUrl: string }) => ({
+                name: image.name,
+                dataUrl: image.dataUrl,
+              }),
+            ),
+          }
+        : {}),
     })),
     updatedAt: now(),
   };

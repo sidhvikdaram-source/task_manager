@@ -1,0 +1,101 @@
+[
+  {
+    "id": "qualified-study-space",
+    "category": "review",
+    "http": 429,
+    "attempt": 1,
+    "milliseconds": 138,
+    "wallMilliseconds": 628,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "59"
+  },
+  {
+    "id": "qualified-study-space",
+    "category": "review",
+    "http": 429,
+    "attempt": 2,
+    "milliseconds": 93,
+    "wallMilliseconds": 487,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "52"
+  },
+  {
+    "id": "bus-survey-errors",
+    "category": "review",
+    "http": 429,
+    "attempt": 1,
+    "milliseconds": 379,
+    "wallMilliseconds": 805,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "74"
+  },
+  {
+    "id": "bus-survey-errors",
+    "category": "review",
+    "http": 429,
+    "attempt": 2,
+    "milliseconds": 897,
+    "wallMilliseconds": 1234,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "546"
+  },
+  {
+    "id": "concern-and-support",
+    "category": "review",
+    "http": 429,
+    "attempt": 1,
+    "milliseconds": 52,
+    "wallMilliseconds": 979,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "760"
+  },
+  {
+    "id": "concern-and-support",
+    "category": "review",
+    "http": 429,
+    "attempt": 2,
+    "milliseconds": 58,
+    "wallMilliseconds": 780,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "679"
+  },
+  {
+    "id": "review-no-rubric",
+    "category": "review",
+    "http": 429,
+    "attempt": 1,
+    "milliseconds": 60,
+    "wallMilliseconds": 324,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "621"
+  },
+  {
+    "id": "review-no-rubric",
+    "category": "review",
+    "http": 429,
+    "attempt": 2,
+    "milliseconds": 110,
+    "wallMilliseconds": 1062,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "722"
+  },
+  {
+    "id": "vision-zero-axis",
+    "category": "vision",
+    "http": 429,
+    "attempt": 1,
+    "milliseconds": 58,
+    "wallMilliseconds": 355,
+    "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+    "status": 429,
+    "retryAfter": "1183"
+  }
+]

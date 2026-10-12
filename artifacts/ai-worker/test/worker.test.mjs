@@ -5,6 +5,7 @@ import {
   createWorker,
   verifyFirebaseToken,
   GENERAL_MODEL,
+  CLOUDFLARE_GENERAL_MODEL,
   GLM_MODEL,
 } from "../src/index.mjs";
 const env = {
@@ -40,8 +41,8 @@ test("models and modes remain separate; general receives no task context", () =>
     "general",
   );
   assert.equal(general.model, GENERAL_MODEL);
-  assert.equal(general.stream, true);
-  assert.equal(general.reasoning_effort, undefined);
+  assert.equal(general.stream, false);
+  assert.equal(general.reasoning_effort, "none");
   assert.ok(!JSON.stringify(general).includes("private task"));
   assert.ok(!JSON.stringify(general).includes("UNTRUSTED_SYSTEM_MARKER"));
   const task = buildCompletion(
@@ -67,12 +68,12 @@ test("harness includes accurate quoted criticism and provided assignment", () =>
     "Prompt coverage",
     "Argument",
     "Paragraph logic",
-    "Sentence clarity",
-    "Actionable criticism",
-    "Accuracy",
+    "Clarity",
+    "Action",
+    "Precision",
     "Compare two sources",
     "Evidence and reasoning",
-    "120 ninth-grade",
+    "library should extend",
   ])
     assert.ok(text.includes(requirement));
 });
@@ -156,23 +157,31 @@ test("missing bindings and task secret are safe setup errors", async () => {
     503,
   );
 });
-test("general runs only the free Cloudflare model and needs no Groq key", async () => {
-  let upstream;
-  const stream =
-    'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\ndata: [DONE]\n\n';
+test("explicit Cloudflare mode stays on free Qwen and checks before streaming", async () => {
+  const seen = [];
   const worker = createWorker({
     verify: async () => "user-one",
     fetcher: async () => {
-      throw Error("General must never call Groq");
+      throw Error("No provider fallback");
     },
   });
   const response = await worker.fetch(req(), {
     ...env,
+    GENERAL_AI_PROVIDER: "cloudflare",
     GROQ_API_KEY: "",
     AI: {
       run: async (model, options) => {
-        upstream = { model, options };
-        return new Response(stream).body;
+        seen.push({ model, options });
+        return {
+          choices: [
+            {
+              finish_reason: "stop",
+              message: {
+                content: seen.length >= 2 ? "Checked answer" : "First draft",
+              },
+            },
+          ],
+        };
       },
     },
   });
@@ -180,12 +189,13 @@ test("general runs only the free Cloudflare model and needs no Groq key", async 
     response.headers.get("content-type"),
     "text/event-stream; charset=utf-8",
   );
-  assert.equal(await response.text(), stream);
-  assert.equal(upstream.model, GENERAL_MODEL);
-  assert.equal(response.headers.get("X-Nimbus-Model"), GENERAL_MODEL);
-  assert.equal(upstream.options.stream, true);
-  assert.equal(upstream.options.max_completion_tokens, 4096);
-  assert.equal(upstream.options.chat_template_kwargs.enable_thinking, true);
+  const text = await response.text();
+  assert.match(text, /Checked answer/);
+  assert.doesNotMatch(text, /First draft/);
+  assert.equal(seen.length, 3);
+  assert.equal(seen[0].model, CLOUDFLARE_GENERAL_MODEL);
+  assert.equal(seen[0].options.stream, false);
+  assert.equal(seen[0].options.chat_template_kwargs.enable_thinking, false);
 });
 test("task output is structured and upstream errors do not leak bodies", async () => {
   const preview = {
@@ -232,27 +242,30 @@ test("free quota errors expose retry timing, not provider details", async () => 
   assert.equal(response.headers.get("retry-after"), "17");
   assert.ok(!(await response.text()).includes("private details"));
 });
-test("Cloudflare quota and failures never fall back to a paid endpoint or leak details", async () => {
+test("Cloudflare stream failures never fall back or leak provider details", async () => {
   const worker = createWorker({
     verify: async () => "u",
     fetcher: async () => {
-      throw Error("No external fallback is permitted");
+      throw Error("No external fallback");
     },
   });
-  for (const [message, status] of [
-    ["3040 daily neuron quota exceeded: private detail", 429],
-    ["private internal detail", 502],
+  for (const message of [
+    "3040 daily neuron quota exceeded: private detail",
+    "private internal detail",
   ]) {
     const response = await worker.fetch(req(), {
       ...env,
+      GENERAL_AI_PROVIDER: "cloudflare",
       AI: {
         run: async () => {
           throw Error(message);
         },
       },
     });
-    assert.equal(response.status, status);
-    assert.ok(!(await response.text()).includes("private"));
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert.match(text, /"error"/);
+    assert.doesNotMatch(text, /private/);
   }
 });
 test("GLM requests use Mistral's model and parameters while Task AI stays on Groq", async () => {
@@ -263,20 +276,34 @@ test("GLM requests use Mistral's model and parameters while Task AI stays on Gro
   );
   assert.equal(general.model, GLM_MODEL);
   assert.equal(general.reasoning_effort, "max");
-  assert.equal(general.max_tokens, 8192);
+  assert.equal(general.max_tokens, 4096);
   assert.equal(general.max_completion_tokens, undefined);
   assert.equal(
     buildCompletion({ message: "track homework" }, "task", "mistral").model,
     "openai/gpt-oss-20b",
   );
   let upstream;
-  const stream =
-    'data: {"choices":[{"delta":{"content":[{"type":"text","text":"Answer"}]}}]}\n\ndata: [DONE]\n\n';
   const worker = createWorker({
     verify: async () => "u",
     fetcher: async (url, options) => {
       upstream = { url, options };
-      return new Response(stream);
+      const body = JSON.parse(options.body);
+      return Response.json({
+        choices: [
+          {
+            finish_reason: "stop",
+            message: {
+              content: [
+                {
+                  type: "text",
+                  text:
+                    body.reasoning_effort === "max" ? "Answer" : "Candidate",
+                },
+              ],
+            },
+          },
+        ],
+      });
     },
   });
   const response = await worker.fetch(req(), {
@@ -291,7 +318,7 @@ test("GLM requests use Mistral's model and parameters while Task AI stays on Gro
   });
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("X-Nimbus-Model"), GLM_MODEL);
-  assert.equal(await response.text(), stream);
+  assert.match(await response.text(), /Answer/);
   assert.equal(upstream.url, "https://api.mistral.ai/v1/chat/completions");
   assert.equal(
     upstream.options.headers.Authorization,
@@ -330,10 +357,10 @@ test("GLM subscription rejection is clear and does not activate another provider
     GENERAL_AI_PROVIDER: "mistral",
     MISTRAL_API_KEY: "test-private-key",
   });
-  assert.equal(response.status, 503);
-  const data = await response.json();
-  assert.match(data.error, /subscription/);
-  assert.ok(!data.error.includes("private"));
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  assert.match(text, /subscription/);
+  assert.ok(!text.includes("private"));
 });
 test("Firebase JWT verifier checks actual signature, audience, expiry and algorithm", async () => {
   const pair = await crypto.subtle.generateKey(

@@ -21,7 +21,8 @@ const privacySections: LegalSection[] = [
   {
     title: "AI assistance",
     paragraphs: [
-      "When you ask Nimbo for help, the text you submit and the minimum workspace context needed to answer it are sent to Firebase AI Logic and Google's Gemini service. Nimbo previews proposed workspace changes and does not apply them until you confirm.",
+      "Nimbus sends AI requests through its private Cloudflare endpoint to Groq. General AI receives the message, any image you attach, assignment prompt, rubric, supplied evidence, and relevant recent chat history. It does not receive your task workspace. Task AI receives only the workspace context needed for its request and previews proposed changes for you to confirm.",
+      "General conversations and their attached images are saved in your own Firebase account data so you can reopen them. Deleting a conversation removes the saved Nimbus copy; it does not promise deletion of data already processed by an AI provider. AI responses can contain errors, including after Nimbus checks them, so review important facts, citations and generated code.",
     ],
   },
   {

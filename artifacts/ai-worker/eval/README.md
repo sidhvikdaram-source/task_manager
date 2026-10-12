@@ -1,0 +1,13 @@
+# Nimbus model qualification
+
+The 17 original synthetic cases and six additional holdout cases cover grounded essay criticism, writing constraints, executable basic code, chart interpretation, scope isolation and general explanations. Expected findings are grader-only. The chart images have known geometry and labels. No private Nimbus data is used.
+
+Grade each complete response on a 0–4 scale: 4 meets every substantive requirement; 3.5 has only a minor presentational omission; 3 contains a material omission or unsupported correction; 2 has major errors; 1 is mostly unusable; 0 has no usable answer. A request failure remains a service failure and must not be silently dropped. Record word counts, provider latency, quota waits and code execution separately. Category averages alone must not hide a failing case.
+
+The first five cases were observed during harness development. Later reruns of those are regressions, not blind tests. Preserve initial failures and freeze the harness before testing the remaining cases. The study-space case's expected-clean label is advisory: an unsupported source identity in “another school” may warrant a narrowly qualified clarification, not an invented factual correction.
+
+`node artifacts/ai-worker/eval/prepare-comparison.mjs /tmp/nimbus-prepared-comparison` prepares Gemini 3.6 Flash and GLM 5.3 requests without credentials or network calls. Both remain unrun until eligible zero-cost access exists. Gemini uses high thinking and native images; GLM uses maximum reasoning. GLM's image cases require a separately evaluated vision model, so a text-only GLM score is not a full Nimbus vision comparison. Templates mark the candidate field for replacement with the actual first response; never substitute a reference answer.
+
+Prepared requests are not experimental results. Gemini/GLM scores must stay blank, and public benchmark scores must not be adjusted numerically by an imagined harness benefit. Sources: [Groq Qwen model guide](https://console.groq.com/docs/model/qwen/qwen3.8-27b), [Gemini thinking](https://ai.google.dev/gemini-api/docs/thinking), [GLM 5.3 announcement](https://z.ai/blog/glm-5.3).
+
+The six additional cases were frozen before their v3.6 runs. The writing case exposed a word-limit failure; later retries of that case are regressions. Code, scope, general and new-chart holdouts remained unseen when the v3.7 fixes were prepared. Vision uses two image passes to reduce quota pressure. Final reviews have a narrow guard against diagnosing an ambiguous person reference and then guessing that person in the correction. The guard is a lexical check, not a guarantee of factual accuracy.
