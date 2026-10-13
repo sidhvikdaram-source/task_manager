@@ -1,0 +1,198 @@
+{
+  "harness": "nimbus-general-v3.9",
+  "date": "2026-10-13 UTC",
+  "method": "Author assessment against frozen synthetic expectations; non-code fixtures only. No generated snippets executed. Wall times include provider waits. Stop on first service failure. This is partial qualification, not a model-ranking benchmark.",
+  "records": [
+    {
+      "id": "fresh-scope-recall",
+      "milliseconds": 1036,
+      "answer": "No, I did not create a project. I cannot create tasks or modify Nimbus. Please use Task AI to create the project.",
+      "intent": "review",
+      "calls": 3,
+      "usage": [
+        {
+          "queue_time": 0.237597178,
+          "prompt_tokens": 1556,
+          "prompt_time": 0.13126415,
+          "completion_tokens": 27,
+          "completion_time": 0.061391978,
+          "total_tokens": 1583,
+          "total_time": 0.192656128
+        },
+        {
+          "queue_time": 0.050134314,
+          "prompt_tokens": 594,
+          "prompt_time": 0.047609554,
+          "completion_tokens": 7,
+          "completion_time": 0.014062239,
+          "total_tokens": 601,
+          "total_time": 0.061671793
+        },
+        {
+          "queue_time": 0.215385194,
+          "prompt_tokens": 824,
+          "prompt_time": 0.069157094,
+          "completion_tokens": 27,
+          "completion_time": 0.057753046,
+          "total_tokens": 851,
+          "total_time": 0.12691014
+        }
+      ],
+      "harness": "nimbus-general-v3.9",
+      "cachedCalls": 0,
+      "actualNewCalls": 3,
+      "drafts": [
+        {
+          "stage": "draft",
+          "answer": "No, I did not create a project. I cannot create tasks or modify Nimbus. Please use Task AI to create the project."
+        },
+        {
+          "stage": "audit",
+          "answer": "No demonstrable error found."
+        },
+        {
+          "stage": "checked",
+          "answer": "No, I did not create a project. I cannot create tasks or modify Nimbus. Please use Task AI to create the project."
+        }
+      ],
+      "http": 200,
+      "category": "scope",
+      "wallMilliseconds": 1810,
+      "upstreamStatuses": [
+        200,
+        200,
+        200
+      ],
+      "quotaFailure": false,
+      "words": 22,
+      "grade": 4,
+      "assessment": "Fresh holdout. Corrected the earlier false claim and directed the user to Task AI without inventing saved data."
+    },
+    {
+      "id": "vision-no-axis",
+      "milliseconds": 26494,
+      "answer": "The chart shows two vertical bars: a shorter blue bar on the left and a taller orange bar on the right. Visually, the orange bar is approximately twice as tall as the blue one. Because the chart lacks a numerical axis, scale, or baseline, this visible height comparison does not establish the actual ratio of the represented quantities.",
+      "intent": "vision",
+      "calls": 2,
+      "usage": [
+        {
+          "queue_time": 0.293338565,
+          "prompt_tokens": 2663,
+          "prompt_time": 0.219152865,
+          "completion_tokens": 65,
+          "completion_time": 0.133192274,
+          "total_tokens": 2728,
+          "total_time": 0.352345139
+        },
+        {
+          "queue_time": 0.233436729,
+          "prompt_tokens": 2660,
+          "prompt_time": 0.214318646,
+          "completion_tokens": 68,
+          "completion_time": 0.149522299,
+          "total_tokens": 2728,
+          "total_time": 0.363840945
+        }
+      ],
+      "harness": "nimbus-general-v3.9",
+      "cachedCalls": 0,
+      "actualNewCalls": 3,
+      "drafts": [
+        {
+          "stage": "draft",
+          "answer": "The chart displays two vertical bars: a shorter blue bar on the left and a taller orange bar on the right. Visually, the orange bar appears approximately twice as tall as the blue one. However, without a numerical axis, baseline, or scale, this geometric observation cannot establish the actual ratio of the represented quantities."
+        },
+        {
+          "stage": "checked",
+          "answer": "The chart shows two vertical bars: a shorter blue bar on the left and a taller orange bar on the right. Visually, the orange bar is approximately twice as tall as the blue one. Because the chart lacks a numerical axis, scale, or baseline, this visible height comparison does not establish the actual ratio of the represented quantities."
+        }
+      ],
+      "http": 200,
+      "category": "vision",
+      "wallMilliseconds": 26553,
+      "upstreamStatuses": [
+        200,
+        429,
+        200
+      ],
+      "quotaFailure": true,
+      "words": 58,
+      "grade": 4,
+      "assessment": "Regression. Approximately 2:1 visible height, with represented-value ratio explicitly unknown."
+    },
+    {
+      "id": "fresh-writing-budget",
+      "milliseconds": 20922,
+      "answer": "A limited book-swap trial is worth considering, but only after funding is resolved. In a voluntary survey, 28 of 40 classmates expressed interest, suggesting reasonable support. However, supplies would cost $24, while the class has only $18 available. This shortfall means the trial cannot proceed without additional funding. A cost objection is valid: spending limited class money on a swap with no measured outcomes is risky. A conditional response is to seek a small contribution or sponsor to cover the $6 gap before launching. A key limitation is that the survey was voluntary and did not measure actual participation or reading outcomes. Interest does not guarantee attendance or engagement. Therefore, the trial should be small-scale, time-bound, and evaluated after funding is secured. If the $24 cost is met and initial participation is strong, the class can decide whether to continue. This approach respects the budget constraint while allowing a fair test of the idea.",
+      "intent": "writing",
+      "calls": 2,
+      "usage": [
+        {
+          "queue_time": 0.320732576,
+          "prompt_tokens": 1034,
+          "prompt_time": 0.090274572,
+          "completion_tokens": 191,
+          "completion_time": 0.407949136,
+          "total_tokens": 1225,
+          "total_time": 0.498223708
+        },
+        {
+          "queue_time": 0.170887641,
+          "prompt_tokens": 944,
+          "prompt_time": 0.081663072,
+          "completion_tokens": 191,
+          "completion_time": 0.406084691,
+          "total_tokens": 1135,
+          "total_time": 0.487747763
+        }
+      ],
+      "harness": "nimbus-general-v3.9",
+      "cachedCalls": 0,
+      "actualNewCalls": 4,
+      "drafts": [
+        {
+          "stage": "draft",
+          "answer": "A limited book-swap trial is worth considering, but only after funding is resolved. In a voluntary survey, 28 of 40 classmates expressed interest, suggesting reasonable support. However, supplies would cost $24, while the class has only $18 available. This shortfall means the trial cannot proceed without additional funding. A cost objection is valid: spending limited class money on a swap with no measured outcomes is risky. A conditional response is to seek a small contribution or sponsor to cover the $6 gap before launching. A key limitation is that the survey was voluntary and did not measure actual participation or reading outcomes. Interest does not guarantee attendance or engagement. Therefore, the trial should be small-scale, time-bound, and evaluated after funding is secured. If the $24 cost is met and initial participation is strong, the class can decide whether to continue. This approach respects the budget constraint while allowing a fair test of the idea."
+        },
+        {
+          "stage": "checked",
+          "answer": "A limited book-swap trial is worth considering, but only after funding is resolved. In a voluntary survey, 28 of 40 classmates expressed interest, suggesting reasonable support. However, supplies would cost $24, while the class has only $18 available. This shortfall means the trial cannot proceed without additional funding. A cost objection is valid: spending limited class money on a swap with no measured outcomes is risky. A conditional response is to seek a small contribution or sponsor to cover the $6 gap before launching. A key limitation is that the survey was voluntary and did not measure actual participation or reading outcomes. Interest does not guarantee attendance or engagement. Therefore, the trial should be small-scale, time-bound, and evaluated after funding is secured. If the $24 cost is met and initial participation is strong, the class can decide whether to continue. This approach respects the budget constraint while allowing a fair test of the idea."
+        }
+      ],
+      "http": 200,
+      "category": "writing",
+      "wallMilliseconds": 21235,
+      "upstreamStatuses": [
+        429,
+        200,
+        429,
+        200
+      ],
+      "quotaFailure": true,
+      "words": 154,
+      "grade": 3.5,
+      "assessment": "Regression. 140\u2013170-word range, accurate $6 gap, conditional funding and evidence limitations; formulaic transition wording is a minor style weakness."
+    },
+    {
+      "id": "fresh-review-response",
+      "milliseconds": 11198,
+      "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+      "status": 429,
+      "retryAfter": "2",
+      "cachedCalls": 0,
+      "actualNewCalls": 2,
+      "drafts": [],
+      "http": 429,
+      "category": "review",
+      "wallMilliseconds": 11486,
+      "upstreamStatuses": [
+        429,
+        429
+      ],
+      "quotaFailure": true,
+      "words": null,
+      "grade": null,
+      "assessment": "No completed answer; service failure, not a quality score."
+    }
+  ]
+}

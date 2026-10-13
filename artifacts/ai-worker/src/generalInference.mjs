@@ -335,7 +335,9 @@ export async function runGeneralInference(
             })),
           ]
         : text;
-    if (completion.nimbus.intent !== "vision") {
+    // A separate evidence audit is reserved for strict text reviews. Other
+    // substantive work still receives the final grounded editor check.
+    if (completion.nimbus.intent === "review") {
       const audit = await generate(
         {
           ...completion,

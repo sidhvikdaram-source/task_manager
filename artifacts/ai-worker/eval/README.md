@@ -1,8 +1,8 @@
 # Nimbus model qualification
 
-The 17 original synthetic cases and six additional holdout cases cover grounded essay criticism, writing constraints, executable basic code, chart interpretation, scope isolation and general explanations. Expected findings are grader-only. The chart images have known geometry and labels. No private Nimbus data is used.
+The 17 original synthetic cases and six additional holdout cases cover grounded essay criticism, writing constraints, basic code, chart interpretation, scope isolation and general explanations. Expected findings are grader-only. The chart images have known geometry and labels. No private Nimbus data is used.
 
-Grade each complete response on a 0–4 scale: 4 meets every substantive requirement; 3.5 has only a minor presentational omission; 3 contains a material omission or unsupported correction; 2 has major errors; 1 is mostly unusable; 0 has no usable answer. A request failure remains a service failure and must not be silently dropped. Record word counts, provider latency, quota waits and code execution separately. Category averages alone must not hide a failing case.
+Grade each complete response on a 0–4 scale: 4 meets every substantive requirement; 3.5 has only a minor presentational omission; 3 contains a material omission or unsupported correction; 2 has major errors; 1 is mostly unusable; 0 has no usable answer. A request failure remains a service failure and must not be silently dropped. Record word counts, provider latency and quota waits separately. Further generated-code tests are excluded at the user’s request; earlier code evidence remains historical, not a final-version qualification. Category averages alone must not hide a failing case.
 
 The first five cases were observed during harness development. Later reruns of those are regressions, not blind tests. Preserve initial failures and freeze the harness before testing the remaining cases. The study-space case's expected-clean label is advisory: an unsupported source identity in “another school” may warrant a narrowly qualified clarification, not an invented factual correction.
 

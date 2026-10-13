@@ -77,7 +77,7 @@ const manifest = {
     .digest("hex"),
   profiles,
   protocol:
-    "Use the first response as candidate, run the evidence audit, count visible words, then build the final editor request with the actual audit report. Never send grader expectations. Preserve all failures and quota waits. Score outputs blind to provider identity; run generated code in isolation. Vision cases require the actual fixture image. No cross-model winner can be declared before actual eligible runs.",
+    "Use the first response as candidate, run the evidence audit, count visible words, then build the final editor request with the actual audit report. Never send grader expectations. Preserve all failures and quota waits. Score outputs blind to provider identity; Evaluate generated code by inspection only; the user excluded snippet execution. Vision cases require the actual fixture image. No cross-model winner can be declared before actual eligible runs.",
 };
 for (const [name, profile] of Object.entries(profiles)) {
   const records = [];
@@ -154,7 +154,7 @@ for (const [name, profile] of Object.entries(profiles)) {
       status: profile.status,
       firstRequest: request(harness.messages, profile),
       auditTemplate:
-        harness.intent === "vision"
+        harness.intent !== "review"
           ? null
           : request(
               [

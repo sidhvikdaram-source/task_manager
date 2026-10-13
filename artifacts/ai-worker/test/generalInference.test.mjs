@@ -204,7 +204,7 @@ test("bounded drafts are counted and rewritten, never mechanically truncated", a
       },
     },
   );
-  assert.equal(result.calls, 3);
+  assert.equal(result.calls, 2);
   assert.equal(result.answer, sentence);
   await assert.rejects(
     () =>
@@ -235,7 +235,7 @@ test("code explanation word count excludes code and preserves copyability", asyn
     },
   );
   assert.equal(result.answer, answer);
-  assert.equal(result.calls, 3);
+  assert.equal(result.calls, 2);
   const instructions = buildGeneralCompletion({
     message: "Write Python code. Keep explanation under 30 words.",
   }).messages[0].content;
@@ -267,4 +267,27 @@ test("empty, truncated, malformed check and provider quota fail without exposing
       /private secret|test-secret|\"content\":\"partial/,
     );
   }
+});
+
+test("writing uses a grounded final edit without the separate review audit", async () => {
+  const bodies = [];
+  const result = await runGeneralInference(
+    buildGeneralCompletion({ message: "Write a paragraph", evidence: "The club has $18." }),
+    { env, provider: "groq", fetcher: async (_url, options) => {
+      bodies.push(JSON.parse(options.body));
+      return reply(bodies.length === 1 ? "An unsupported draft" : "A grounded paragraph");
+    } },
+  );
+  assert.equal(result.calls, 2);
+  assert.equal(result.answer, "A grounded paragraph");
+  assert.match(bodies[1].messages[0].content, /final-answer editor/);
+  assert.match(bodies[1].messages[1].content, /The club has \$18/);
+  assert.match(bodies[1].messages[1].content, /An unsupported draft/);
+  assert.doesNotMatch(bodies[1].messages[1].content, /errorReport/);
+});
+test("ordinary questions stay on one call", async () => {
+  const result = await runGeneralInference(buildGeneralCompletion({ message: "What is a percentage point?" }), {
+    env, provider: "groq", fetcher: async () => reply("A difference between percentages."),
+  });
+  assert.equal(result.calls, 1);
 });

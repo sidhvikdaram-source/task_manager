@@ -91,7 +91,7 @@ export const GENERAL_MODE_EXAMPLES = {
   ],
 };
 
-export const GENERAL_HARNESS_VERSION = "nimbus-general-v3.8";
+export const GENERAL_HARNESS_VERSION = "nimbus-general-v3.9";
 export const GENERAL_INTENTS = [
   "review",
   "writing",
