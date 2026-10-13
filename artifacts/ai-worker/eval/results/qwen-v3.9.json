@@ -1,7 +1,7 @@
 {
   "harness": "nimbus-general-v3.9",
   "date": "2026-10-13 UTC",
-  "method": "Author assessment against frozen synthetic expectations; non-code fixtures only. No generated snippets executed. Wall times include provider waits. Stop on first service failure. This is partial qualification, not a model-ranking benchmark.",
+  "method": "Author assessment against frozen synthetic expectations; non-code fixtures only. No generated snippets tested. Wall times include provider waits. A later single retry completed after allowance recovery; a paced continuation then stopped on an explicit daily limit. This is partial qualification, not a model-ranking benchmark.",
   "records": [
     {
       "id": "fresh-scope-recall",
@@ -193,6 +193,174 @@
       "words": null,
       "grade": null,
       "assessment": "No completed answer; service failure, not a quality score."
+    },
+    {
+      "id": "fresh-review-response",
+      "milliseconds": 1290,
+      "answer": "**Coverage:** The draft addresses the pilot, cost, and access but fails the rubric\u2019s requirement for a realistic response to the access drawback.\n\n**Required fixes:**\n\n1.  **Unsupported affordability claim:** \u201cStaffing cost $25 per weekend, which is obviously affordable.\u201d No budget evidence was supplied. Revise to: \u201cStaffing cost $25 per weekend; whether this is affordable depends on the library\u2019s budget.\u201d\n2.  **Unaddressed access objection:** \u201cTherefore, the travel problem does not matter.\u201d This denies the stated drawback rather than responding to it. Revise to: \u201cThe travel difficulty suggests the library should evaluate shuttle options or partner with local transit before expanding weekend hours.\u201d\n\n**Preserve:** \u201cThe pilot averaged 18 visitors per weekend. This suggests demand at that library, but does not establish demand everywhere.\u201d This correctly limits the evidence.",
+      "intent": "review",
+      "calls": 3,
+      "usage": [
+        {
+          "queue_time": 0.021135754,
+          "prompt_tokens": 1705,
+          "prompt_time": 0.13727022,
+          "completion_tokens": 183,
+          "completion_time": 0.357502413,
+          "total_tokens": 1888,
+          "total_time": 0.494772633
+        },
+        {
+          "queue_time": 0.021203143,
+          "prompt_tokens": 885,
+          "prompt_time": 0.070934171,
+          "completion_tokens": 7,
+          "completion_time": 0.013996734,
+          "total_tokens": 892,
+          "total_time": 0.084930905
+        },
+        {
+          "queue_time": 0.022269456,
+          "prompt_tokens": 1191,
+          "prompt_time": 0.081616759,
+          "completion_tokens": 183,
+          "completion_time": 0.347774517,
+          "total_tokens": 1374,
+          "total_time": 0.429391276
+        }
+      ],
+      "harness": "nimbus-general-v3.9",
+      "cachedCalls": 0,
+      "actualNewCalls": 3,
+      "drafts": [
+        {
+          "stage": "draft",
+          "answer": "**Coverage:** The draft addresses the pilot, cost, and access but fails the rubric\u2019s requirement for a realistic response to the access drawback.\n\n**Required fixes:**\n\n1.  **Unsupported affordability claim:** \u201cStaffing cost $25 per weekend, which is obviously affordable.\u201d No budget evidence was supplied. Revise to: \u201cStaffing cost $25 per weekend; whether this is affordable depends on the library\u2019s budget.\u201d\n2.  **Unaddressed access objection:** \u201cTherefore, the travel problem does not matter.\u201d This denies the stated drawback rather than responding to it. Revise to: \u201cThe travel difficulty suggests the library should evaluate shuttle options or partner with local transit before expanding weekend hours.\u201d\n\n**Preserve:** \u201cThe pilot averaged 18 visitors per weekend. This suggests demand at that library, but does not establish demand everywhere.\u201d This correctly limits the evidence."
+        },
+        {
+          "stage": "audit",
+          "answer": "No demonstrable error found."
+        },
+        {
+          "stage": "checked",
+          "answer": "**Coverage:** The draft addresses the pilot, cost, and access but fails the rubric\u2019s requirement for a realistic response to the access drawback.\n\n**Required fixes:**\n\n1.  **Unsupported affordability claim:** \u201cStaffing cost $25 per weekend, which is obviously affordable.\u201d No budget evidence was supplied. Revise to: \u201cStaffing cost $25 per weekend; whether this is affordable depends on the library\u2019s budget.\u201d\n2.  **Unaddressed access objection:** \u201cTherefore, the travel problem does not matter.\u201d This denies the stated drawback rather than responding to it. Revise to: \u201cThe travel difficulty suggests the library should evaluate shuttle options or partner with local transit before expanding weekend hours.\u201d\n\n**Preserve:** \u201cThe pilot averaged 18 visitors per weekend. This suggests demand at that library, but does not establish demand everywhere.\u201d This correctly limits the evidence."
+        }
+      ],
+      "http": 200,
+      "limits": [
+        {
+          "status": 200,
+          "remainingTokens": "5395",
+          "resetTokens": "19.537s",
+          "quotaType": null
+        },
+        {
+          "status": 200,
+          "remainingTokens": "5010",
+          "resetTokens": "22.425s",
+          "quotaType": null
+        },
+        {
+          "status": 200,
+          "remainingTokens": "3443",
+          "resetTokens": "51.78s",
+          "quotaType": null
+        }
+      ],
+      "category": "review",
+      "words": 125,
+      "grade": 4,
+      "assessment": "Regression. Exact quotes, unsupported affordability corrected, concrete conditional access response, correct qualified evidence preserved."
+    },
+    {
+      "id": "fresh-vision-baseline",
+      "milliseconds": 7456,
+      "answer": "A = 12 and B = 18. Their actual value ratio is 18/12 = 1.5. The visible bar-height ratio is (18\u22128)/(12\u22128) = 10/4 = 2.5, so the bars do not show the same ratio. This happens because the baseline is 8, not 0.",
+      "intent": "vision",
+      "calls": 2,
+      "usage": [
+        {
+          "queue_time": 1.0978737650000001,
+          "prompt_tokens": 2674,
+          "prompt_time": 0.221412658,
+          "completion_tokens": 75,
+          "completion_time": 0.17660965,
+          "total_tokens": 2749,
+          "total_time": 0.398022308
+        },
+        {
+          "queue_time": 0.262612407,
+          "prompt_tokens": 2682,
+          "prompt_time": 0.224887693,
+          "completion_tokens": 82,
+          "completion_time": 0.185961867,
+          "total_tokens": 2764,
+          "total_time": 0.41084956
+        }
+      ],
+      "harness": "nimbus-general-v3.9",
+      "cachedCalls": 0,
+      "actualNewCalls": 3,
+      "drafts": [
+        {
+          "stage": "draft",
+          "answer": "The chart shows A = 12 and B = 18. The actual value ratio is 18/12 = 1.5. The visible bar-height ratio is (18-8)/(12-8) = 10/4 = 2.5. They differ because the baseline is 8, not 0."
+        },
+        {
+          "stage": "checked",
+          "answer": "A = 12 and B = 18. Their actual value ratio is 18/12 = 1.5. The visible bar-height ratio is (18\u22128)/(12\u22128) = 10/4 = 2.5, so the bars do not show the same ratio. This happens because the baseline is 8, not 0."
+        }
+      ],
+      "http": 200,
+      "category": "vision",
+      "wallMilliseconds": 7961,
+      "limits": [
+        {
+          "status": 200,
+          "remainingTokens": "4509",
+          "resetTokens": "26.182s",
+          "quotaType": null
+        },
+        {
+          "status": 429,
+          "remainingTokens": "3407",
+          "resetTokens": "38.931s",
+          "quotaType": "minute"
+        },
+        {
+          "status": 200,
+          "remainingTokens": "930",
+          "resetTokens": "58.962s",
+          "quotaType": null
+        }
+      ],
+      "words": 43,
+      "grade": 4,
+      "assessment": "Fresh holdout. Correct A12/B18, actual1.5 ratio, baseline8 and visible-height2.5 ratio."
+    },
+    {
+      "id": "qualified-study-space",
+      "milliseconds": 94,
+      "error": "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+      "status": 429,
+      "retryAfter": "896",
+      "cachedCalls": 0,
+      "actualNewCalls": 1,
+      "drafts": [],
+      "http": 429,
+      "category": "review",
+      "wallMilliseconds": 477,
+      "limits": [
+        {
+          "status": 429,
+          "remainingTokens": "5387",
+          "resetTokens": "19.597s",
+          "quotaType": "daily"
+        }
+      ],
+      "words": null,
+      "grade": null,
+      "assessment": "No completed answer. Explicit daily-token rejection despite available minute-level tokens; service failure, not a quality grade."
     }
   ]
 }
