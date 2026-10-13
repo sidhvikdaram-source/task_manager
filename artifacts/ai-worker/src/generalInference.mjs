@@ -25,7 +25,8 @@ export class GeneralAIError extends Error {
 // A review that calls a person reference ambiguous must not silently pick a person.
 // Known alternatives, explicit placeholders and requests for clarification are valid.
 export function needsActorClarification(answer) {
-  return answer.split(/\n(?=\s*\d+[.)]\s)/).some((section) => {
+  return answer.split(/\n(?=\s*\d+[.)]\s)/).some((rawSection) => {
+    const section = rawSection.replace(/[*_`]/g, "");
     const ambiguity = section.search(/ambigu(?:ity|ous)/i);
     if (ambiguity < 0) return false;
     const quoted = [...section.matchAll(/["“]([^"”\n]+)["”]/g)].some((match) =>
@@ -39,7 +40,7 @@ export function needsActorClarification(answer) {
       )?.[1];
     return (
       !!fix &&
-      !/\[[^\]]+\]|clarif|\bif\b[\s\S]*\b(?:intended|mean|speaker)\b|\bdepending\b|\?/i.test(
+      !/\[[^\]]+\]|\bask\b[\s\S]*\b(?:clarif|choose|identify)|\bclarify\s+(?:who|which|whose|the intended)\b|\bif\b[\s\S]*\b(?:intended|mean|speaker)\b|\bdepending\b|\?/i.test(
         fix,
       )
     );
@@ -193,9 +194,23 @@ function visibleWords(answer, completion) {
   return countWords(intent === "writing" ? draftText(answer) : answer);
 }
 
+// Classify provider limits locally. Never expose the upstream body, account ID or key.
+async function rateLimitDetails(response) {
+  let message = "";
+  try {
+    const data = await response.clone().json();
+    message = typeof data.error?.message === "string" ? data.error.message : "";
+  } catch { /* Some gateways return an empty or non-JSON rate-limit body. */ }
+  const seconds = Number(response.headers.get("retry-after"));
+  return {
+    daily: /tokens per day|requests per day|\bTPD\b|\bRPD\b|daily/i.test(message),
+    retrySeconds: Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 0,
+  };
+}
+
 async function generate(
   completion,
-  { env, provider, fetcher, signal, onWait },
+  { env, provider, fetcher, signal, onWait, deadline },
 ) {
   const { nimbus, ...body } = completion;
   let data;
@@ -235,11 +250,14 @@ async function generate(
         },
       );
     let response = await send();
-    const retrySeconds = Number(response.headers.get("retry-after"));
+    let limit = response.status === 429 ? await rateLimitDetails(response) : null;
+    const retrySeconds = limit?.retrySeconds || 0;
     if (
       response.status === 429 &&
       retrySeconds > 0 &&
-      retrySeconds <= 35 &&
+      !limit.daily &&
+      retrySeconds <= 60 &&
+      (!deadline || Date.now() + retrySeconds * 1000 + 10000 < deadline) &&
       !signal?.aborted
     ) {
       onWait?.();
@@ -258,13 +276,16 @@ async function generate(
         signal?.addEventListener("abort", abort, { once: true });
       });
       response = await send();
+      limit = response.status === 429 ? await rateLimitDetails(response) : null;
     }
     if (!response.ok) {
       if (response.status === 429)
         throw new GeneralAIError(
-          "The free AI allowance is busy. Please retry shortly; your chat is saved.",
+          limit.daily
+            ? "The provider’s daily free AI allowance is exhausted. More messages cannot go through until it refills. Your chat is saved."
+            : `The provider’s free AI rate limit was reached. ${limit.retrySeconds ? `Try again in ${limit.retrySeconds} seconds.` : "Please wait a minute before retrying."} Your chat is saved.`,
           429,
-          response.headers.get("retry-after") || "60",
+          limit.retrySeconds ? String(limit.retrySeconds) : null,
         );
       if (provider === "mistral" && response.status === 403)
         throw new GeneralAIError(
@@ -304,7 +325,12 @@ export async function runGeneralInference(
     options.signal || new AbortController().signal,
     AbortSignal.timeout(85000),
   ]);
-  const settings = { ...options, signal, onWait: () => onStatus("waiting") };
+  const settings = {
+    ...options,
+    signal,
+    deadline: Date.now() + 85000,
+    onWait: () => onStatus("waiting"),
+  };
   onStatus("working");
   const first = await generate(completion, settings);
   options.onDebug?.({ stage: "draft", answer: first.answer });
@@ -312,7 +338,7 @@ export async function runGeneralInference(
   let calls = 1;
   const usages = [first.usage];
   if (
-    ["review", "writing", "code", "vision"].includes(completion.nimbus.intent)
+    ["review", "writing", "code"].includes(completion.nimbus.intent)
   ) {
     onStatus("checking");
     const data = {

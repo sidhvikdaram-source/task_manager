@@ -130,7 +130,7 @@ test("image follow-up reuses only the latest attached image; missing-new-image r
     0,
   );
 });
-test("vision verifies the actual image twice without a third image-token audit", async () => {
+test("vision reads the actual image once with baseline and ratio checks", async () => {
   const image = { name: "chart.png", dataUrl: "data:image/png;base64,YWJj" };
   const bodies = [];
   const result = await runGeneralInference(
@@ -151,8 +151,8 @@ test("vision verifies the actual image twice without a third image-token audit",
       },
     },
   );
-  assert.equal(result.calls, 2);
-  assert.match(bodies[1].messages[0].content, /visible-height ratio/);
+  assert.equal(result.calls, 1);
+  assert.match(bodies[0].messages[0].content, /visible-height ratio/);
   assert.equal(bodies[0].max_completion_tokens, 900);
 });
 test("pipeline checks before exposing output and keeps internal metadata off the provider request", async () => {
@@ -253,7 +253,7 @@ test("empty, truncated, malformed check and provider quota fail without exposing
     async () =>
       new Response("private secret", {
         status: 429,
-        headers: { "retry-after": "45" },
+        headers: { "retry-after": "70" },
       }),
   ]) {
     const stream = generalResponseStream(
@@ -290,4 +290,51 @@ test("ordinary questions stay on one call", async () => {
     env, provider: "groq", fetcher: async () => reply("A difference between percentages."),
   });
   assert.equal(result.calls, 1);
+});
+
+test("daily limit is identified without retrying or exposing provider credentials", async () => {
+  let calls = 0;
+  const stream = generalResponseStream(buildGeneralCompletion({ message: "hello" }), {
+    env, provider: "groq", fetcher: async () => {
+      calls++;
+      return new Response(JSON.stringify({error:{message:"tokens per day (TPD) reached for org_private test-secret"}}),{status:429,headers:{"retry-after":"1","Content-Type":"application/json"}});
+    },
+  });
+  const text = await new Response(stream).text();
+  assert.equal(calls, 1);
+  assert.match(text, /daily free AI allowance is exhausted/);
+  assert.doesNotMatch(text, /org_private|test-secret/);
+});
+test("minute limit names the cooldown and does not promise a daily reset", async () => {
+  const stream = generalResponseStream(buildGeneralCompletion({ message: "hello" }), {
+    env, provider: "groq", fetcher: async () => new Response(JSON.stringify({error:{message:"tokens per minute (TPM) org_private"}}),{status:429,headers:{"retry-after":"70","Content-Type":"application/json"}}),
+  });
+  const text = await new Response(stream).text();
+  assert.match(text, /Try again in 70 seconds/);
+  assert.doesNotMatch(text, /daily|org_private/);
+});
+test("a short minute cooldown retries once, announces waiting and preserves the answer", async () => {
+  let calls = 0;
+  const statuses = [];
+  const result = await runGeneralInference(buildGeneralCompletion({message:"hello"}), {
+    env, provider:"groq", fetcher: async () => ++calls === 1
+      ? new Response(JSON.stringify({error:{message:"tokens per minute (TPM)"}}),{status:429,headers:{"retry-after":"0.01","Content-Type":"application/json"}})
+      : reply("Hello."),
+  }, status=>statuses.push(status));
+  assert.equal(calls,2);
+  assert.equal(result.answer,"Hello.");
+  assert.deepEqual(statuses,["working","waiting"]);
+});
+test("ordinary prompts omit essay-specific instructions and retain honesty and context", () => {
+  const completion=buildGeneralCompletion({message:"hello",history:[{role:"user",content:"My name is Example."}]});
+  const system=completion.messages[0].content;
+  assert.doesNotMatch(system,/control group|staffing|rubric asks for a limitation/);
+  assert.match(system,/Never invent evidence/);
+  assert.match(JSON.stringify(completion.messages),/My name is Example/);
+});
+
+test("ambiguity guard rejects guessed actors inside Markdown criticism", () => {
+ const unsafe='5. **Clear references:** The pronoun "they" in "they said their schedule would suffer" is ambiguous.\n * *Correction:* Clarify the actor: "the coaches said the schedule would suffer."';
+ assert.equal(needsActorClarification(unsafe),true);
+ assert.equal(needsActorClarification(unsafe.replace('"the coaches said the schedule would suffer."','"[speaker] said [owner]’s schedule would suffer."')),false);
 });

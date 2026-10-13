@@ -1,0 +1,240 @@
+{
+  "method": "Fixed non-code diagnostics and targeted regressions. Final policy keeps strict reviews at three passes; images and general questions at one. Experimental review failures retained. No code snippets tested. Not full qualification.",
+  "records": [
+    {
+      "records": [
+        {
+          "answer": "Hello!",
+          "intent": "general",
+          "calls": 1,
+          "usage": [
+            {
+              "queue_time": 0.004830117,
+              "prompt_tokens": 371,
+              "prompt_time": 0.031917258,
+              "completion_tokens": 3,
+              "completion_time": 0.00616246,
+              "total_tokens": 374,
+              "total_time": 0.038079718
+            }
+          ],
+          "harness": "nimbus-general-v3.10",
+          "milliseconds": 84
+        },
+        {
+          "answer": "4",
+          "intent": "general",
+          "calls": 1,
+          "usage": [
+            {
+              "queue_time": 0.05640983,
+              "prompt_tokens": 397,
+              "prompt_time": 0.035752719,
+              "completion_tokens": 2,
+              "completion_time": 0.004185495,
+              "total_tokens": 399,
+              "total_time": 0.039938214
+            }
+          ],
+          "harness": "nimbus-general-v3.10",
+          "milliseconds": 135
+        },
+        {
+          "answer": "A is 12; B is 18. Actual value ratio: 18/12 = 1.5. Visible bar-height ratio: (18\u22128)/(12\u22128) = 10/4 = 2.5. They differ because the y-axis baseline is 8, not 0.",
+          "intent": "vision",
+          "calls": 1,
+          "usage": [
+            {
+              "queue_time": 0.222531103,
+              "prompt_tokens": 2841,
+              "prompt_time": 0.195240024,
+              "completion_tokens": 72,
+              "completion_time": 0.146394044,
+              "total_tokens": 2913,
+              "total_time": 0.341634068
+            }
+          ],
+          "harness": "nimbus-general-v3.10",
+          "milliseconds": 711
+        }
+      ],
+      "limits": [
+        {
+          "status": 200,
+          "remainingTokens": "7515",
+          "retryAfter": null,
+          "quotaType": null
+        },
+        {
+          "status": 200,
+          "remainingTokens": "7008",
+          "retryAfter": null,
+          "quotaType": null
+        },
+        {
+          "status": 200,
+          "remainingTokens": "3835",
+          "retryAfter": null,
+          "quotaType": null
+        }
+      ],
+      "id": "short-image-sequence",
+      "http": 200,
+      "assessment": "Three consecutive requests completed with no429: two short questions then known chart. Chart values/ratios correct. 3,686tokens total; one provider call per message. This is one-session capacity evidence, not a three-user guarantee."
+    },
+    {
+      "id": "bus-survey-errors",
+      "milliseconds": 1908,
+      "answer": "**Coverage:** The draft fails the rubric on accurate arithmetic, causal limits, clear references, and a substantive counterargument response.\n\n**Required fixes:**\n\n1.  **Causal certainty:** The claim that the change \"proves\" the improvement and \"guarantees\" it for every school is invalid.\n    *   *Correction:* State that the 14-point rise is consistent with a benefit, but without a comparison school, other causes remain possible and results may not generalize.\n2.  **Arithmetic:** The phrase \"The increase was 14 percent\" is mathematically imprecise.\n    *   *Correction:* Change to \"On-time arrivals rose by 14 percentage points.\"\n3.  **Contradiction:** The sentence \"However, no rider reported a scheduling problem\" directly contradicts the evidence.\n    *   *Correction:* Delete this sentence entirely.\n4.  **Counterargument response:** The draft mentions coaches' concerns but does not address the specific drawback of practice conflicts.\n    *   *Correction:* Add a conditional response, such as: \"Although nine riders reported practice conflicts, the school could adjust practice times or provide transportation, addressing the drawback without assuming universal harm.\"\n5.  **Clear references:** The pronoun \"they\" in \"they said their schedule would suffer\" is ambiguous.\n    *   *Correction:* Clarify the actor: \"the coaches said the schedule would suffer.\"\n\n**Sound sentence to preserve:** \"Nine of 60 riders reported practice conflicts.\" This accurately reports the supplied observational data without overclaiming.",
+      "intent": "review",
+      "calls": 2,
+      "usage": [
+        {
+          "queue_time": 0.095073352,
+          "prompt_tokens": 1736,
+          "prompt_time": 0.152978816,
+          "completion_tokens": 298,
+          "completion_time": 0.695614924,
+          "total_tokens": 2034,
+          "total_time": 0.84859374
+        },
+        {
+          "queue_time": 0.065627152,
+          "prompt_tokens": 1334,
+          "prompt_time": 0.11149605,
+          "completion_tokens": 334,
+          "completion_time": 0.691963156,
+          "total_tokens": 1668,
+          "total_time": 0.803459206
+        }
+      ],
+      "harness": "nimbus-general-v3.10",
+      "cachedCalls": 0,
+      "actualNewCalls": 2,
+      "drafts": [
+        {
+          "stage": "draft",
+          "answer": "**Coverage:** The draft misses accurate arithmetic, causal limits, clear references, and a real counterargument response.\n\n**Required fixes:**\n\n1.  **Causal certainty:** \"This proves the change caused the improvement and guarantees it for every school.\"\n    *   *Correction:* \"The increase is consistent with a benefit, but without a comparison school, other causes remain possible; results may not generalize.\"\n2.  **Arithmetic:** \"The increase was 14 percent.\"\n    *   *Correction:* \"On-time arrivals rose by 14 percentage points.\"\n3.  **Contradiction:** \"However, no rider reported a scheduling problem.\"\n    *   *Correction:* Delete this sentence. It contradicts the supplied evidence that nine riders reported conflicts.\n4.  **Counterargument response:** \"When riders told coaches about the change, they said their schedule would suffer.\"\n    *   *Correction:* \"Although nine riders reported practice conflicts, the school could adjust practice times or provide transportation, addressing the drawback without assuming universal harm.\"\n5.  **Clear references:** \"When riders told coaches about the change, they said their schedule would suffer.\"\n    *   *Correction:* \"When riders told coaches about the change, the coaches said the schedule would suffer.\"\n\n**Sound sentence to preserve:** \"Nine of 60 riders reported practice conflicts.\" This accurately reports the supplied observational data without overclaiming."
+        },
+        {
+          "stage": "checked",
+          "answer": "**Coverage:** The draft fails the rubric on accurate arithmetic, causal limits, clear references, and a substantive counterargument response.\n\n**Required fixes:**\n\n1.  **Causal certainty:** The claim that the change \"proves\" the improvement and \"guarantees\" it for every school is invalid.\n    *   *Correction:* State that the 14-point rise is consistent with a benefit, but without a comparison school, other causes remain possible and results may not generalize.\n2.  **Arithmetic:** The phrase \"The increase was 14 percent\" is mathematically imprecise.\n    *   *Correction:* Change to \"On-time arrivals rose by 14 percentage points.\"\n3.  **Contradiction:** The sentence \"However, no rider reported a scheduling problem\" directly contradicts the evidence.\n    *   *Correction:* Delete this sentence entirely.\n4.  **Counterargument response:** The draft mentions coaches' concerns but does not address the specific drawback of practice conflicts.\n    *   *Correction:* Add a conditional response, such as: \"Although nine riders reported practice conflicts, the school could adjust practice times or provide transportation, addressing the drawback without assuming universal harm.\"\n5.  **Clear references:** The pronoun \"they\" in \"they said their schedule would suffer\" is ambiguous.\n    *   *Correction:* Clarify the actor: \"the coaches said the schedule would suffer.\"\n\n**Sound sentence to preserve:** \"Nine of 60 riders reported practice conflicts.\" This accurately reports the supplied observational data without overclaiming."
+        }
+      ],
+      "http": 200,
+      "limits": [
+        {
+          "status": 200,
+          "remainingTokens": "3438",
+          "quotaType": null
+        },
+        {
+          "status": 200,
+          "remainingTokens": "1504",
+          "quotaType": null
+        }
+      ],
+      "grade": 3,
+      "assessment": "Experimental two-pass review guessed an ambiguous speaker; Markdown guard subsequently strengthened. Not shipped without restoring the audit."
+    },
+    {
+      "id": "vision-no-axis",
+      "milliseconds": 17748,
+      "answer": "The chart displays two bars: a shorter blue one and a taller orange one. The orange bar appears roughly twice the visible height of the blue bar. However, without a numerical axis or baseline, these geometric heights do not establish the actual ratio of the represented quantities.",
+      "intent": "vision",
+      "calls": 1,
+      "usage": [
+        {
+          "queue_time": 0.192500305,
+          "prompt_tokens": 2782,
+          "prompt_time": 0.240446763,
+          "completion_tokens": 54,
+          "completion_time": 0.126039348,
+          "total_tokens": 2836,
+          "total_time": 0.366486111
+        }
+      ],
+      "harness": "nimbus-general-v3.10",
+      "cachedCalls": 0,
+      "actualNewCalls": 2,
+      "drafts": [
+        {
+          "stage": "draft",
+          "answer": "The chart displays two bars: a shorter blue one and a taller orange one. The orange bar appears roughly twice the visible height of the blue bar. However, without a numerical axis or baseline, these geometric heights do not establish the actual ratio of the represented quantities."
+        }
+      ],
+      "http": 200,
+      "limits": [
+        {
+          "status": 429,
+          "remainingTokens": "1973",
+          "quotaType": "minute-or-other"
+        },
+        {
+          "status": 200,
+          "remainingTokens": "555",
+          "quotaType": null
+        }
+      ],
+      "grade": 4,
+      "assessment": "Correct approximate geometric2:1 ratio and unknown represented-value ratio; one pass. Minute-limit wait retried once."
+    },
+    {
+      "id": "bus-survey-errors",
+      "milliseconds": 1649,
+      "answer": "**Coverage:** The draft misses the required causal limits, accurate arithmetic, and a real counterargument response.\n\n**Required fixes**\n1. **\u201cThis proves the change caused the improvement and guarantees it for every school.\u201d** The single-school pilot lacks a comparison group, so causation is unproven and universal guarantees are unsupported. Revise: \u201cThe rise is consistent with a benefit, but without a comparison school, causation is unproven and generalization is uncertain.\u201d\n2. **\u201cThe increase was 14 percent.\u201d** The change is 14 percentage points, not 14 percent. Revise: \u201cThe increase was 14 percentage points.\u201d\n3. **\u201cWhen riders told coaches about the change, they said their schedule would suffer. Nine of 60 riders reported practice conflicts. However, no rider reported a scheduling problem.\u201d** The final sentence contradicts the supplied evidence. Revise: \u201cNine of 60 riders reported practice conflicts, indicating a real drawback.\u201d\n4. **\u201cHowever, no rider reported a scheduling problem.\u201d** This claim is unsupported by the evidence and contradicts the reported conflicts. Delete it.\n\n**Sound sentence to preserve**\n\u201cThe bus should arrive later if the school can address practice conflicts.\u201d This qualified thesis meets the rubric requirement.",
+      "intent": "review",
+      "calls": 2,
+      "usage": [
+        {
+          "queue_time": 0.102865567,
+          "prompt_tokens": 1736,
+          "prompt_time": 0.150396934,
+          "completion_tokens": 271,
+          "completion_time": 0.592318173,
+          "total_tokens": 2007,
+          "total_time": 0.742715107
+        },
+        {
+          "queue_time": 0.056285432,
+          "prompt_tokens": 1301,
+          "prompt_time": 0.117099185,
+          "completion_tokens": 267,
+          "completion_time": 0.545785823,
+          "total_tokens": 1568,
+          "total_time": 0.662885008
+        }
+      ],
+      "harness": "nimbus-general-v3.10",
+      "cachedCalls": 0,
+      "actualNewCalls": 2,
+      "drafts": [
+        {
+          "stage": "draft",
+          "answer": "**Coverage:** The draft misses the required causal limits, accurate arithmetic, and a real counterargument response.\n\n**Required fixes**\n1.  **\u201cThis proves the change caused the improvement and guarantees it for every school.\u201d** The single-school pilot lacks a comparison group, so causation is unproven and universal guarantees are unsupported. Revise: \u201cThe rise is consistent with a benefit, but without a comparison school, causation is unproven and generalization is uncertain.\u201d\n2.  **\u201cThe increase was 14 percent.\u201d** The change is 14 percentage points, not 14 percent. Revise: \u201cThe increase was 14 percentage points.\u201d\n3.  **\u201cWhen riders told coaches about the change, they said their schedule would suffer. Nine of 60 riders reported practice conflicts. However, no rider reported a scheduling problem.\u201d** The final sentence contradicts the supplied evidence. Revise: \u201cNine of 60 riders reported practice conflicts, indicating a real drawback.\u201d\n4.  **\u201cHowever, no rider reported a scheduling problem.\u201d** This claim is unsupported by the evidence and contradicts the reported conflicts. Delete it.\n\n**Sound sentence to preserve**\n\u201cThe bus should arrive later if the school can address practice conflicts.\u201d This qualified thesis meets the rubric requirement."
+        },
+        {
+          "stage": "checked",
+          "answer": "**Coverage:** The draft misses the required causal limits, accurate arithmetic, and a real counterargument response.\n\n**Required fixes**\n1. **\u201cThis proves the change caused the improvement and guarantees it for every school.\u201d** The single-school pilot lacks a comparison group, so causation is unproven and universal guarantees are unsupported. Revise: \u201cThe rise is consistent with a benefit, but without a comparison school, causation is unproven and generalization is uncertain.\u201d\n2. **\u201cThe increase was 14 percent.\u201d** The change is 14 percentage points, not 14 percent. Revise: \u201cThe increase was 14 percentage points.\u201d\n3. **\u201cWhen riders told coaches about the change, they said their schedule would suffer. Nine of 60 riders reported practice conflicts. However, no rider reported a scheduling problem.\u201d** The final sentence contradicts the supplied evidence. Revise: \u201cNine of 60 riders reported practice conflicts, indicating a real drawback.\u201d\n4. **\u201cHowever, no rider reported a scheduling problem.\u201d** This claim is unsupported by the evidence and contradicts the reported conflicts. Delete it.\n\n**Sound sentence to preserve**\n\u201cThe bus should arrive later if the school can address practice conflicts.\u201d This qualified thesis meets the rubric requirement."
+        }
+      ],
+      "http": 200,
+      "limits": [
+        {
+          "status": 200,
+          "remainingTokens": "5966",
+          "resetTokens": "15.254s",
+          "quotaType": null
+        },
+        {
+          "status": 200,
+          "remainingTokens": "4142",
+          "resetTokens": "28.935s",
+          "quotaType": null
+        }
+      ],
+      "grade": 3,
+      "assessment": "Experimental two-pass review omitted concrete response to a named counterargument flaw and duplicated contradiction criticism. Final policy restores audit."
+    }
+  ]
+}

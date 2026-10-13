@@ -91,7 +91,7 @@ export const GENERAL_MODE_EXAMPLES = {
   ],
 };
 
-export const GENERAL_HARNESS_VERSION = "nimbus-general-v3.9";
+export const GENERAL_HARNESS_VERSION = "nimbus-general-v3.10";
 export const GENERAL_INTENTS = [
   "review",
   "writing",
@@ -194,7 +194,13 @@ export function buildGeneralHarness(input, history) {
     evidence: input.evidence || null,
     request: input.message,
   };
-  const system = [GENERAL_CORE, GENERAL_MODULES[intent], RELIABILITY, format]
+  const system = [
+    GENERAL_CORE,
+    GENERAL_MODULES[intent],
+    intent === "general" ? "" : RELIABILITY,
+    intent === "vision" ? VISION_CHECK : "",
+    format,
+  ]
     .filter(Boolean)
     .join("\n\n");
   const examples = GENERAL_MODE_EXAMPLES[intent] || [];
