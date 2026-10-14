@@ -178,9 +178,30 @@ export function createWorker({
       const mode = new URL(request.url).pathname.split("/").pop();
       if (request.method !== "POST" || !["general", "task"].includes(mode))
         return json({ error: "Not found" }, 404);
-      const token = request.headers
+      let token = request.headers
         .get("Authorization")
         ?.match(/^Bearer (.+)$/i)?.[1];
+      let transportInput;
+      // A CORS-safelisted POST avoids an extra OPTIONS exchange on managed
+      // networks. This still requires the same signed Firebase identity token.
+      if (!token && mode === "general" &&
+          request.headers.get("Content-Type")?.split(";")[0].trim() === "text/plain") {
+        if (Number(request.headers.get("Content-Length")) > 450000)
+          return json({ error: "Request too large." }, 413);
+        const raw = await request.text();
+        if (new TextEncoder().encode(raw).length > 450000)
+          return json({ error: "Request too large." }, 413);
+        try {
+          transportInput = JSON.parse(raw);
+          if (!transportInput || typeof transportInput !== "object" || Array.isArray(transportInput))
+            return json({ error: "Invalid request." }, 400);
+          token = transportInput.firebaseIdToken;
+          delete transportInput.firebaseIdToken;
+        } catch {
+          return json({ error: "Invalid request." }, 400);
+        }
+      }
+      if (typeof token !== "string") token = undefined;
       if (!token) return json({ error: "Sign in to use AI." }, 401);
       let uid;
       try {
@@ -244,10 +265,10 @@ export function createWorker({
         const maxBytes = mode === "general" ? 450000 : 100000;
         if (Number(request.headers.get("Content-Length")) > maxBytes)
           return json({ error: "Request too large." }, 413);
-        const body = await request.text();
-        if (new TextEncoder().encode(body).length > maxBytes)
+        const body = transportInput ? null : await request.text();
+        if (body !== null && new TextEncoder().encode(body).length > maxBytes)
           return json({ error: "Request too large." }, 413);
-        const input = JSON.parse(body);
+        const input = transportInput || JSON.parse(body);
         completion = buildCompletion(input, mode, generalProvider);
         if (mode === "task") {
           const ctx = input.context ?? {};

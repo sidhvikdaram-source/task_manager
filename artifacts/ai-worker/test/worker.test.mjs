@@ -28,6 +28,46 @@ const req = (
     },
     body: JSON.stringify(body),
   });
+const plainRequest = (body, origin = env.ALLOWED_ORIGIN, mode = "general") =>
+  new Request(`https://test.invalid/${mode}`, {
+    method: "POST",
+    headers: { Origin: origin, "Content-Type": "text/plain;charset=UTF-8" },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+test("managed-browser transport verifies the same Firebase token and never forwards it to AI", async () => {
+  const seen = [];
+  const worker = createWorker({ verify: async token => {
+    assert.equal(token, "private-fixture-identity");
+    return "school-user";
+  } });
+  const response = await worker.fetch(plainRequest({
+    message: "Hello", firebaseIdToken: "private-fixture-identity",
+  }, "https://nimbusdo.firebaseapp.com"), {
+    ...env, ALLOWED_ORIGINS: `${env.ALLOWED_ORIGIN},https://nimbusdo.firebaseapp.com`,
+    GENERAL_AI_PROVIDER: "cloudflare",
+    AI: { run: async (_model, input) => {
+      seen.push(input);
+      return { choices: [{ finish_reason: "stop", message: { content: "Hello!" } }] };
+    } },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://nimbusdo.firebaseapp.com");
+  assert.match(await response.text(), /Hello!/);
+  assert.ok(seen.length > 0);
+  assert.doesNotMatch(JSON.stringify(seen), /private-fixture-identity|firebaseIdToken/);
+});
+test("plain transport retains authentication, size, origin, and task restrictions", async () => {
+  const worker = createWorker({ verify: async () => { throw Error("Invalid identity"); } });
+  for (const [body, status] of [
+    [{ message: "Hello" }, 401],
+    [{ message: "Hello", firebaseIdToken: "invalid" }, 401],
+    ["{broken", 400],
+    ["null", 400],
+    [{ message: "x".repeat(450001), firebaseIdToken: "invalid" }, 413],
+  ]) assert.equal((await worker.fetch(plainRequest(body), env)).status, status);
+  assert.equal((await worker.fetch(plainRequest({firebaseIdToken:"invalid"},"https://evil.invalid"), env)).status, 403);
+  assert.equal((await worker.fetch(plainRequest({firebaseIdToken:"invalid"},env.ALLOWED_ORIGIN,"task"), env)).status, 401);
+});
 test("models and modes remain separate; general receives no task context", () => {
   const general = buildCompletion(
     {

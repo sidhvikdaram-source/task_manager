@@ -24,6 +24,8 @@ A per-user limiter allows six requests per minute. General shares the connected 
 
 ## Chats and sign-in
 
+General AI uses a CORS-safelisted HTTPS POST (`text/plain` containing JSON) so managed browsers do not need an extra OPTIONS exchange. Its Firebase ID token travels in the request body, is verified exactly like the existing bearer header, and is removed before prompt construction. The token is not a provider API key and is never saved in chat data or forwarded to inference. Task AI retains bearer-header transport. Both official Firebase hostnames are allowed; other origins remain rejected. This improves preflight compatibility but cannot make an endpoint reachable if a school blocks its domain.
+
 General chats, the assignment prompt, rubric, source evidence and small attached images are stored under `users/{uid}/aiChats/{chatId}` in Firestore. Existing rules restrict this path to the signed-in owner. Users can delete conversations, start new ones, and reopen saved ones. Only the last eight messages are sent to the model; incomplete assistant answers are excluded. Long conversations and requests are bounded to protect free allowances. A deleted Nimbus chat is removed from Firestore; deletion does not promise removal from provider logs.
 
 Firebase uses local auth persistence. When a session is restored, visiting Nimbus's root redirects to My Day. Signing out, clearing browser storage, using a different browser, or private browsing can require a new login.
