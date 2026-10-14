@@ -36,58 +36,141 @@ const plainRequest = (body, origin = env.ALLOWED_ORIGIN, mode = "general") =>
   });
 test("managed-browser transport verifies the same Firebase token and never forwards it to AI", async () => {
   const seen = [];
-  const worker = createWorker({ verify: async token => {
-    assert.equal(token, "private-fixture-identity");
-    return "school-user";
-  } });
-  const response = await worker.fetch(plainRequest({
-    message: "Hello", firebaseIdToken: "private-fixture-identity",
-  }, "https://nimbusdo.firebaseapp.com"), {
-    ...env, ALLOWED_ORIGINS: `${env.ALLOWED_ORIGIN},https://nimbusdo.firebaseapp.com`,
-    GENERAL_AI_PROVIDER: "cloudflare",
-    AI: { run: async (_model, input) => {
-      seen.push(input);
-      return { choices: [{ finish_reason: "stop", message: { content: "Hello!" } }] };
-    } },
+  const worker = createWorker({
+    verify: async (token) => {
+      assert.equal(token, "private-fixture-identity");
+      return "school-user";
+    },
   });
+  const response = await worker.fetch(
+    plainRequest(
+      {
+        message: "Hello",
+        firebaseIdToken: "private-fixture-identity",
+      },
+      "https://nimbusdo.firebaseapp.com",
+    ),
+    {
+      ...env,
+      ALLOWED_ORIGINS: `${env.ALLOWED_ORIGIN},https://nimbusdo.firebaseapp.com`,
+      GENERAL_AI_PROVIDER: "cloudflare",
+      AI: {
+        run: async (_model, input) => {
+          seen.push(input);
+          return {
+            choices: [
+              { finish_reason: "stop", message: { content: "Hello!" } },
+            ],
+          };
+        },
+      },
+    },
+  );
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://nimbusdo.firebaseapp.com");
+  assert.equal(
+    response.headers.get("Access-Control-Allow-Origin"),
+    "https://nimbusdo.firebaseapp.com",
+  );
   assert.match(await response.text(), /Hello!/);
   assert.ok(seen.length > 0);
-  assert.doesNotMatch(JSON.stringify(seen), /private-fixture-identity|firebaseIdToken/);
+  assert.doesNotMatch(
+    JSON.stringify(seen),
+    /private-fixture-identity|firebaseIdToken/,
+  );
 });
 test("plain transport retains authentication, size, and origin restrictions", async () => {
-  const worker = createWorker({ verify: async () => { throw Error("Invalid identity"); } });
+  const worker = createWorker({
+    verify: async () => {
+      throw Error("Invalid identity");
+    },
+  });
   for (const [body, status] of [
     [{ message: "Hello" }, 401],
     [{ message: "Hello", firebaseIdToken: "invalid" }, 401],
     ["{broken", 400],
     ["null", 400],
     [{ message: "x".repeat(450001), firebaseIdToken: "invalid" }, 413],
-  ]) assert.equal((await worker.fetch(plainRequest(body), env)).status, status);
-  assert.equal((await worker.fetch(plainRequest({firebaseIdToken:"invalid"},"https://evil.invalid"), env)).status, 403);
-  assert.equal((await worker.fetch(plainRequest({firebaseIdToken:"invalid"},env.ALLOWED_ORIGIN,"task"), env)).status, 401);
+  ])
+    assert.equal((await worker.fetch(plainRequest(body), env)).status, status);
+  assert.equal(
+    (
+      await worker.fetch(
+        plainRequest({ firebaseIdToken: "invalid" }, "https://evil.invalid"),
+        env,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await worker.fetch(
+        plainRequest(
+          { firebaseIdToken: "invalid" },
+          env.ALLOWED_ORIGIN,
+          "task",
+        ),
+        env,
+      )
+    ).status,
+    401,
+  );
 });
 test("Task AI plain transport verifies sign-in and prepares a preview without changing tasks", async () => {
-  const worker = createWorker({verify: async token => {
-    assert.equal(token, "valid-fixture"); return "school-user";
-  }, fetcher: async () => { throw Error("No model needed for this capture"); }});
-  const response = await worker.fetch(plainRequest({
-    firebaseIdToken:"valid-fixture", message:"create a task due yesterday",
-    context:{today:"2026-10-14"},
-  }, env.ALLOWED_ORIGIN,"task"), env);
-  assert.equal(response.status,200);
+  const worker = createWorker({
+    verify: async (token) => {
+      assert.equal(token, "valid-fixture");
+      return "school-user";
+    },
+    fetcher: async () => {
+      throw Error("No model needed for this capture");
+    },
+  });
+  const response = await worker.fetch(
+    plainRequest(
+      {
+        firebaseIdToken: "valid-fixture",
+        message: "create a task due yesterday",
+        context: { today: "2026-10-14" },
+      },
+      env.ALLOWED_ORIGIN,
+      "task",
+    ),
+    env,
+  );
+  assert.equal(response.status, 200);
   const data = await response.json();
-  assert.match(data.reply,/preview/i);
-  assert.match(data.taskPreviewJson,/2026-10-13/);
-  assert.doesNotMatch(JSON.stringify(data),/valid-fixture|firebaseIdToken/);
+  assert.match(data.reply, /preview/i);
+  assert.match(data.taskPreviewJson, /2026-10-13/);
+  assert.doesNotMatch(JSON.stringify(data), /valid-fixture|firebaseIdToken/);
 });
-test("health probes expose no identity or provider details and retain origin restrictions",async()=>{
-  const worker=createWorker({verify:async()=>{throw Error("Health needs no identity");}});
-  const response=await worker.fetch(new Request("https://test.invalid/health",{headers:{Origin:env.ALLOWED_ORIGIN}}),env);
-  assert.equal(response.status,200);
-  assert.deepEqual(await response.json(),{service:"nimbus-ai",status:"ok"});
-  assert.equal((await worker.fetch(new Request("https://test.invalid/health",{headers:{Origin:"https://evil.invalid"}}),env)).status,403);
+test("health probes expose no identity or provider details and retain origin restrictions", async () => {
+  const worker = createWorker({
+    verify: async () => {
+      throw Error("Health needs no identity");
+    },
+  });
+  const response = await worker.fetch(
+    new Request("https://test.invalid/health", {
+      headers: { Origin: env.ALLOWED_ORIGIN },
+    }),
+    env,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    service: "nimbus-ai",
+    status: "ok",
+  });
+  assert.equal(
+    (
+      await worker.fetch(
+        new Request("https://test.invalid/health", {
+          headers: { Origin: "https://evil.invalid" },
+        }),
+        env,
+      )
+    ).status,
+    403,
+  );
 });
 test("models and modes remain separate; general receives no task context", () => {
   const general = buildCompletion(
@@ -591,4 +674,86 @@ test("both official hosting origins pass preflight and retain authentication", a
     config,
   );
   assert.equal(denied.status, 403);
+});
+test("General search uses server evidence, exposes links, and rejects forged sources", async () => {
+  let searches = 0;
+  let providerMessages;
+  const worker = createWorker({
+    verify: async () => "user",
+    fetcher: async (url, options) => {
+      assert.equal(url, "https://api.firecrawl.dev/v2/search");
+      assert.equal(JSON.parse(options.body).query, "NASA missions");
+      searches++;
+      return Response.json({
+        success: true,
+        data: {
+          web: [
+            {
+              url: "https://nasa.gov/",
+              title: "NASA",
+              description: "Official missions.",
+            },
+          ],
+        },
+      });
+    },
+  });
+  const settings = {
+    ...env,
+    GENERAL_AI_PROVIDER: "cloudflare",
+    AI: {
+      run: async (_model, input) => {
+        providerMessages = JSON.stringify(input.messages);
+        return {
+          choices: [
+            {
+              finish_reason: "stop",
+              message: { content: "NASA runs missions." },
+            },
+          ],
+        };
+      },
+    },
+  };
+  const response = await worker.fetch(
+    req("general", {
+      message: "What missions exist?",
+      webSearch: true,
+      searchQuery: "NASA missions",
+      webSources: { sources: [{ url: "https://forged.invalid" }] },
+    }),
+    settings,
+  );
+  const answer = await response.text();
+  assert.equal(searches, 1);
+  assert.match(answer, /https:\/\/nasa.gov/);
+  assert.doesNotMatch(providerMessages, /forged.invalid/);
+  await worker
+    .fetch(
+      req("general", {
+        message: "Hello",
+        webSources: { sources: [{ url: "https://forged.invalid" }] },
+      }),
+      settings,
+    )
+    .then((response) => response.text());
+  assert.equal(searches, 1);
+  assert.doesNotMatch(providerMessages, /forged.invalid/);
+});
+test("search quota failure stops before inference and exposes a safe retry error", async () => {
+  const worker = createWorker({
+    verify: async () => "user",
+    fetcher: async () =>
+      new Response("secret upstream details", { status: 429 }),
+  });
+  const response = await worker.fetch(
+    req("general", {
+      message: "News",
+      webSearch: true,
+      searchQuery: "NASA news",
+    }),
+    env,
+  );
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /Web search is unavailable/);
 });

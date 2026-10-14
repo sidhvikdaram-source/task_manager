@@ -9,6 +9,7 @@ import {
 } from "./generalInference.mjs";
 import { GENERAL_HARNESS_VERSION } from "./generalHarness.mjs";
 import { processRelay, scheduleRelay, pollRelay } from "./firebaseRelay.mjs";
+import { searchWeb } from "./webSearch.mjs";
 const jwksCache = new Map();
 export { GENERAL_MODEL, CLOUDFLARE_GENERAL_MODEL, GLM_MODEL };
 const JWKS_URL =
@@ -145,8 +146,11 @@ export function createWorker({
 } = {}) {
   return {
     async fetch(request, env) {
-      if(new URL(request.url).pathname==="/relay-poll" && request.method==="POST")
-        return pollRelay(request,env,{fetcher,verify});
+      if (
+        new URL(request.url).pathname === "/relay-poll" &&
+        request.method === "POST"
+      )
+        return pollRelay(request, env, { fetcher, verify });
       if (
         new URL(request.url).pathname === "/relay-process" &&
         request.method === "POST"
@@ -305,7 +309,17 @@ export function createWorker({
         if (body !== null && new TextEncoder().encode(body).length > maxBytes)
           return json({ error: "Request too large." }, 413);
         const input = transportInput || JSON.parse(body);
+        // Retrieved evidence is server-generated; client data cannot impersonate search results.
+        delete input.webSources;
         completion = buildCompletion(input, mode, generalProvider);
+        if (mode === "general" && input.webSearch === true) {
+          input.webSources = await searchWeb(input, {
+            fetcher,
+            signal: request.signal,
+            apiKey: env.FIRECRAWL_API_KEY,
+          });
+          completion = buildCompletion(input, mode, generalProvider);
+        }
         if (mode === "task") {
           const ctx = input.context ?? {};
           const subjects = (
@@ -333,7 +347,7 @@ export function createWorker({
           {
             error: error instanceof Error ? error.message : "Invalid request.",
           },
-          400,
+          error.status === 503 ? 503 : 400,
         );
       }
       try {
@@ -442,7 +456,7 @@ export default {
   fetch: worker.fetch,
   scheduled(_event, env, context) {
     context.waitUntil(
-      scheduleRelay(env).catch(() => {
+      scheduleRelay(env, fetch, { rounds: 6 }).catch(() => {
         console.error("Firebase relay scheduling unavailable");
       }),
     );

@@ -72,6 +72,7 @@ async function queryJobs(fetcher, token, status) {
     body: JSON.stringify({
       structuredQuery: {
         from: [{ collectionId: COLLECTION }],
+        select: { fields: [{ fieldPath: "__name__" }] },
         where: {
           fieldFilter: {
             field: { fieldPath: "status" },
@@ -97,26 +98,44 @@ async function patch(fetcher, token, document, values) {
     body: JSON.stringify({ fields: encode(values) }),
   });
 }
-// Cron only enumerates the queue and delegates each job to a separate Worker
-// invocation, keeping CPU work bounded. No user ID token is persisted in jobs.
-export async function scheduleRelay(env, fetcher = fetch) {
+// A bounded minute window starts queued requests without waiting for inference.
+export async function scheduleRelay(
+  env,
+  fetcher = fetch,
+  {
+    rounds = 1,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  } = {},
+) {
   const token = await relayIdentity(env, fetcher);
   if (!token || !env.RELAY_PROCESSOR) return;
-  const jobs = await queryJobs(fetcher, token, "pending");
-  const outcomes = await Promise.allSettled(
-    jobs.map((document) =>
-      env.RELAY_PROCESSOR.fetch(
-        new Request("https://nimbus-ai.internal/relay-process", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ id: document.name.split("/").pop() }),
-        }),
-      ).then(response => {if(!response.ok)throw Error("Relay dispatch failed");}),
-    ),
-  );
+  const dispatched = new Set();
+  const pending = [];
+  for (let scan = 0; scan < Math.min(rounds, 6); scan++) {
+    if (scan) await sleep(10000);
+    const jobs = await queryJobs(fetcher, token, "pending");
+    for (const document of jobs) {
+      const id = document.name.split("/").pop();
+      if (dispatched.has(id)) continue;
+      dispatched.add(id);
+      pending.push(
+        env.RELAY_PROCESSOR.fetch(
+          new Request("https://nimbus-ai.internal/relay-process", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ id }),
+          }),
+        ).then(
+          (response) => response.ok,
+          () => false,
+        ),
+      );
+    }
+  }
+  const outcomes = await Promise.all(pending);
   // Bounded cleanup avoids storing submitted prompts indefinitely. At most ten
   // completed/expired queue documents are removed per scheduled invocation.
   const stale = await rest(fetcher, token, ":runQuery", {
@@ -124,6 +143,7 @@ export async function scheduleRelay(env, fetcher = fetch) {
     body: JSON.stringify({
       structuredQuery: {
         from: [{ collectionId: COLLECTION }],
+        select: { fields: [{ fieldPath: "__name__" }] },
         where: {
           fieldFilter: {
             field: { fieldPath: "createdAt" },
@@ -149,21 +169,40 @@ export async function scheduleRelay(env, fetcher = fetch) {
         ),
       ),
   );
-  const failed=outcomes.filter(result=>result.status==="rejected").length;
-  if(failed)console.error("Firebase relay dispatch unavailable",failed);
-  return {dispatched:jobs.length,failed};
+  const failed = outcomes.filter((result) => !result).length;
+  if (failed) console.error("Firebase relay dispatch unavailable", failed);
+  return { dispatched: dispatched.size, failed };
 }
 
-export async function pollRelay(request,env,{fetcher=fetch,verify}={}){
-  const token=request.headers.get("Authorization")?.match(/^Bearer (.+)$/i)?.[1];
-  try{
-    if(!token || !env.FIREBASE_RELAY_UID || await verify(token,"nimbusdo",fetcher)!==env.FIREBASE_RELAY_UID)
-      return Response.json({error:"Not authorized"},{status:401});
-  }catch{return Response.json({error:"Not authorized"},{status:401});}
-  try{
-    const result=await scheduleRelay(env,fetcher);
-    return Response.json(result||{error:"Relay inactive"},{status:result?200:503});
-  }catch{return Response.json({error:"Relay polling unavailable"},{status:502});}
+export async function pollRelay(
+  request,
+  env,
+  { fetcher = fetch, verify } = {},
+) {
+  const token = request.headers
+    .get("Authorization")
+    ?.match(/^Bearer (.+)$/i)?.[1];
+  try {
+    if (
+      !token ||
+      !env.FIREBASE_RELAY_UID ||
+      (await verify(token, "nimbusdo", fetcher)) !== env.FIREBASE_RELAY_UID
+    )
+      return Response.json({ error: "Not authorized" }, { status: 401 });
+  } catch {
+    return Response.json({ error: "Not authorized" }, { status: 401 });
+  }
+  try {
+    const result = await scheduleRelay(env, fetcher);
+    return Response.json(result || { error: "Relay inactive" }, {
+      status: result ? 200 : 503,
+    });
+  } catch {
+    return Response.json(
+      { error: "Relay polling unavailable" },
+      { status: 502 },
+    );
+  }
 }
 
 export async function processRelay(
@@ -197,11 +236,16 @@ export async function processRelay(
   try {
     const document = await rest(fetcher, token, `/${COLLECTION}/${id}`);
     const job = decode(document.fields);
-    if (job.status !== "pending")
-      return reply({ status: "skipped" }, 200);
-    if (!Number.isFinite(Date.parse(job.createdAt)) || Date.parse(job.createdAt) < Date.now() - 180000) {
-      await patch(fetcher,token,document,{status:"failed",error:"This queued request expired. Please send it again."});
-      return reply({status:"expired"},200);
+    if (job.status !== "pending") return reply({ status: "skipped" }, 200);
+    if (
+      !Number.isFinite(Date.parse(job.createdAt)) ||
+      Date.parse(job.createdAt) < Date.now() - 180000
+    ) {
+      await patch(fetcher, token, document, {
+        status: "failed",
+        error: "This queued request expired. Please send it again.",
+      });
+      return reply({ status: "expired" }, 200);
     }
     if (
       !["task", "general"].includes(job.mode) ||

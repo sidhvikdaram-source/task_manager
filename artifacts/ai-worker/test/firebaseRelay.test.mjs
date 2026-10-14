@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { processRelay, scheduleRelay, pollRelay } from "../src/firebaseRelay.mjs";
+import {
+  processRelay,
+  scheduleRelay,
+  pollRelay,
+} from "../src/firebaseRelay.mjs";
 const env = { FIREBASE_RELAY_UID: "processor" };
 const id = "ABCDEFGHIJKLMNOPQRST";
 const request = () =>
@@ -70,7 +74,7 @@ test("already claimed, expired, and conflicting jobs never call AI", async () =>
       verify: async () => "processor",
       fetcher: async (_url, options) => {
         if (options.method === "PATCH" && scenario === "expired")
-          return Response.json({name:`queue/${id}`,updateTime:"fixture"});
+          return Response.json({ name: `queue/${id}`, updateTime: "fixture" });
         if (options.method === "PATCH")
           return new Response("conflict", { status: 409 });
         return Response.json({
@@ -99,29 +103,104 @@ test("missing relay credentials leave the scheduler inactive", async () => {
     throw Error("No requests while inactive");
   });
 });
-test("scheduler uses the built-in status index and delegates authenticated jobs",async()=>{
-  let queries=0,dispatches=0;
-  const result=await scheduleRelay({
-    FIREBASE_RELAY_UID:"schedule-fixture",FIREBASE_RELAY_REFRESH_TOKEN:"fixture-refresh",FIREBASE_PUBLIC_API_KEY:"fixture-public",
-    RELAY_PROCESSOR:{fetch:async request=>{
-      assert.equal(request.headers.get("Authorization"),"Bearer fixture-id-token");
-      assert.equal((await request.json()).id,id);dispatches++;return Response.json({status:"done"});
-    }},
-  },async(url,options)=>{
-    if(url.includes("securetoken"))return Response.json({user_id:"schedule-fixture",id_token:"fixture-id-token",expires_in:"3600"});
-    const query=JSON.parse(options.body).structuredQuery;
-    if(++queries===1){
-      assert.equal(query.where.fieldFilter.field.fieldPath,"status");
-      assert.equal(query.orderBy,undefined);
-      return Response.json([{document:{name:`queue/${id}`}}]);
-    }
-    return Response.json([]);
-  });
-  assert.equal(dispatches,1);assert.deepEqual(result,{dispatched:1,failed:0});
+test("scheduler uses the built-in status index and delegates authenticated jobs", async () => {
+  let queries = 0,
+    dispatches = 0;
+  const result = await scheduleRelay(
+    {
+      FIREBASE_RELAY_UID: "schedule-fixture",
+      FIREBASE_RELAY_REFRESH_TOKEN: "fixture-refresh",
+      FIREBASE_PUBLIC_API_KEY: "fixture-public",
+      RELAY_PROCESSOR: {
+        fetch: async (request) => {
+          assert.equal(
+            request.headers.get("Authorization"),
+            "Bearer fixture-id-token",
+          );
+          assert.equal((await request.json()).id, id);
+          dispatches++;
+          return Response.json({ status: "done" });
+        },
+      },
+    },
+    async (url, options) => {
+      if (url.includes("securetoken"))
+        return Response.json({
+          user_id: "schedule-fixture",
+          id_token: "fixture-id-token",
+          expires_in: "3600",
+        });
+      const query = JSON.parse(options.body).structuredQuery;
+      if (++queries === 1) {
+        assert.equal(query.where.fieldFilter.field.fieldPath, "status");
+        assert.equal(query.orderBy, undefined);
+        return Response.json([{ document: { name: `queue/${id}` } }]);
+      }
+      return Response.json([]);
+    },
+  );
+  assert.equal(dispatches, 1);
+  assert.deepEqual(result, { dispatched: 1, failed: 0 });
 });
-test("manual polling requires the dedicated identity and fails closed when inactive",async()=>{
-  const other=await pollRelay(request(),env,{verify:async()=>"other",fetcher:async()=>{throw Error("Must not query");}});
-  assert.equal(other.status,401);
-  const inactive=await pollRelay(request(),env,{verify:async()=>"processor"});
-  assert.equal(inactive.status,503);
+test("manual polling requires the dedicated identity and fails closed when inactive", async () => {
+  const other = await pollRelay(request(), env, {
+    verify: async () => "other",
+    fetcher: async () => {
+      throw Error("Must not query");
+    },
+  });
+  assert.equal(other.status, 401);
+  const inactive = await pollRelay(request(), env, {
+    verify: async () => "processor",
+  });
+  assert.equal(inactive.status, 503);
+});
+
+test("minute polling keeps scanning while inference runs and deduplicates claims", async () => {
+  let queries = 0,
+    dispatches = 0,
+    sleeps = 0;
+  const releases = [];
+  const result = await scheduleRelay(
+    {
+      FIREBASE_RELAY_UID: "window-fixture",
+      FIREBASE_RELAY_REFRESH_TOKEN: "fixture",
+      FIREBASE_PUBLIC_API_KEY: "public",
+      RELAY_PROCESSOR: {
+        fetch: () => {
+          dispatches++;
+          return new Promise((resolve) =>
+            releases.push(() => resolve(Response.json({ status: "done" }))),
+          );
+        },
+      },
+    },
+    async (url, options) => {
+      if (url.includes("securetoken"))
+        return Response.json({
+          user_id: "window-fixture",
+          id_token: "fixture",
+          expires_in: "3600",
+        });
+      const query = JSON.parse(options.body).structuredQuery;
+      if (query.where.fieldFilter.field.fieldPath === "createdAt")
+        return Response.json([]);
+      queries++;
+      if (queries === 2) {
+        assert.equal(dispatches, 1);
+        for (const release of releases) release();
+      }
+      return Response.json([{ document: { name: `queue/${id}` } }]);
+    },
+    {
+      rounds: 2,
+      sleep: async (ms) => {
+        assert.equal(ms, 10000);
+        sleeps++;
+      },
+    },
+  );
+  assert.equal(queries, 2);
+  assert.equal(sleeps, 1);
+  assert.deepEqual(result, { dispatched: 1, failed: 0 });
 });

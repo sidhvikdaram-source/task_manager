@@ -1,4 +1,5 @@
 import { firebaseAuth } from "@workspace/replit-auth-web";
+import { prefersRelay, rememberRelay } from "./aiRoutePreference";
 import { aiEndpoints, fetchAIResponse } from "./aiConnection";
 
 function endpoints() {
@@ -21,28 +22,44 @@ export async function aiRequest(
   if (!candidates.length)
     throw new Error("AI is not connected yet. Your chats can still be saved.");
   await firebaseAuth.authStateReady();
-  const token = await firebaseAuth.currentUser?.getIdToken();
-  if (!token) throw new Error("Sign in to use AI.");
-  let response: Response;
+  const uid = firebaseAuth.currentUser?.uid;
+  if (!uid) throw new Error("Sign in to use AI.");
+  let storage: Storage | undefined;
   try {
-    response = await fetchAIResponse(candidates, mode, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=UTF-8",
-      },
-      body: JSON.stringify({ ...input, firebaseIdToken: token }),
-      signal,
-    });
-  } catch (error) {
-    if (
-      !(error instanceof Error) ||
-      !/\[AI-(?:NETWORK|POST)\]/.test(error.message) ||
-      signal?.aborted
-    )
-      throw error;
+    storage = window.localStorage;
+  } catch {
+    /* Storage can be disabled by the browser. */
+  }
+  let response: Response | undefined;
+  if (storage && prefersRelay(storage, uid)) {
     const relay = await import("./aiFirebaseRelay");
-    if (!(await relay.firebaseRelayEnabled().catch(() => false))) throw error;
-    response = await relay.requestFirebaseRelay(mode, input, signal);
+    if (await relay.firebaseRelayEnabled().catch(() => false))
+      response = await relay.requestFirebaseRelay(mode, input, signal);
+  }
+  if (!response) {
+    const token = await firebaseAuth.currentUser?.getIdToken();
+    if (!token) throw new Error("Sign in to use AI.");
+    try {
+      response = await fetchAIResponse(candidates, mode, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=UTF-8",
+        },
+        body: JSON.stringify({ ...input, firebaseIdToken: token }),
+        signal,
+      });
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !/\[AI-(?:NETWORK|POST)\]/.test(error.message) ||
+        signal?.aborted
+      )
+        throw error;
+      const relay = await import("./aiFirebaseRelay");
+      if (!(await relay.firebaseRelayEnabled().catch(() => false))) throw error;
+      response = await relay.requestFirebaseRelay(mode, input, signal);
+      if (storage) rememberRelay(storage, uid);
+    }
   }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));

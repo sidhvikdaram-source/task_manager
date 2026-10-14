@@ -9,6 +9,7 @@ import {
   Maximize2,
   Minimize2,
   ImagePlus,
+  Globe,
   X,
 } from "lucide-react";
 import {
@@ -90,6 +91,8 @@ export default function GeneralAI({
   const [expanded, setExpanded] = useState(false);
   const [chat, setChat] = useState<Chat>(emptyChat);
   const [input, setInput] = useState("");
+  const [webSearch, setWebSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [requestError, setRequestError] = useState("");
@@ -187,6 +190,10 @@ export default function GeneralAI({
     event?.preventDefault();
     const text = input.trim() || (images.length ? "Describe this image." : "");
     if (!text || busyRef.current || saving || preparingImage) return;
+    if (webSearch && (!searchQuery.trim() || searchQuery.trim().length > 400)) {
+      setRequestError("Enter a short public query in the web search field.");
+      return;
+    }
     if (chat.messages.length >= 39) {
       setRequestError(
         "Start a new chat to keep conversations within the free limits.",
@@ -257,6 +264,8 @@ export default function GeneralAI({
         "general",
         {
           message: text,
+          webSearch,
+          ...(webSearch ? { searchQuery: searchQuery.trim() } : {}),
           history,
           assignmentPrompt: chat.assignmentPrompt,
           rubric: chat.rubric,
@@ -634,6 +643,38 @@ export default function GeneralAI({
                   <X className="h-4 w-4" />
                 </button>
               </div>
+            )}
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                aria-pressed={webSearch}
+                disabled={busy}
+                onClick={() => setWebSearch((value) => !value)}
+                className={cn(
+                  "inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-40",
+                  webSearch
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Globe className="h-4 w-4" /> Search web
+              </button>
+              {webSearch && (
+                <span className="text-xs text-muted-foreground">
+                  Only your search query is sent to the search provider.
+                </span>
+              )}
+            </div>
+            {webSearch && (
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                maxLength={400}
+                disabled={busy}
+                aria-label="Public web search query"
+                placeholder="Search query, e.g. latest NASA Mars mission news"
+                className="mb-3 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
             )}
             <div className="flex items-end gap-3 rounded-xl border border-border bg-background p-3 focus-within:border-primary">
               <input

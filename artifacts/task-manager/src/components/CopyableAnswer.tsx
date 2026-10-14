@@ -40,17 +40,29 @@ function CopyButton({
 function Inline({ text }: { text: string }) {
   return (
     <>
-      {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) =>
-        part.startsWith("**") ? (
-          <strong key={i}>{part.slice(2, -2)}</strong>
-        ) : part.startsWith("`") ? (
-          <code key={i} className="rounded bg-muted px-1 py-0.5 text-[0.9em]">
-            {part.slice(1, -1)}
-          </code>
-        ) : (
-          <span key={i}>{part}</span>
-        ),
-      )}
+      {text
+        .split(/(\[[^\]\n]+\]\(https?:\/\/[^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`)/g)
+        .map((part, i) =>
+          /^\[[^\]\n]+\]\(https?:\/\/[^\s)]+\)$/.test(part) ? (
+            <a
+              key={i}
+              href={part.slice(part.indexOf("](") + 2, -1)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="break-words text-primary underline underline-offset-4 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {part.slice(1, part.indexOf("]("))}
+            </a>
+          ) : part.startsWith("**") ? (
+            <strong key={i}>{part.slice(2, -2)}</strong>
+          ) : part.startsWith("`") ? (
+            <code key={i} className="rounded bg-muted px-1 py-0.5 text-[0.9em]">
+              {part.slice(1, -1)}
+            </code>
+          ) : (
+            <span key={i}>{part}</span>
+          ),
+        )}
     </>
   );
 }

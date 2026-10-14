@@ -1,3 +1,4 @@
+import { searchSourceFooter } from "./webSearch.mjs";
 import {
   buildGeneralHarness,
   wordConstraint,
@@ -200,11 +201,16 @@ async function rateLimitDetails(response) {
   try {
     const data = await response.clone().json();
     message = typeof data.error?.message === "string" ? data.error.message : "";
-  } catch { /* Some gateways return an empty or non-JSON rate-limit body. */ }
+  } catch {
+    /* Some gateways return an empty or non-JSON rate-limit body. */
+  }
   const seconds = Number(response.headers.get("retry-after"));
   return {
-    daily: /tokens per day|requests per day|\bTPD\b|\bRPD\b|daily/i.test(message),
-    retrySeconds: Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 0,
+    daily: /tokens per day|requests per day|\bTPD\b|\bRPD\b|daily/i.test(
+      message,
+    ),
+    retrySeconds:
+      Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 0,
   };
 }
 
@@ -250,7 +256,8 @@ async function generate(
         },
       );
     let response = await send();
-    let limit = response.status === 429 ? await rateLimitDetails(response) : null;
+    let limit =
+      response.status === 429 ? await rateLimitDetails(response) : null;
     const retrySeconds = limit?.retrySeconds || 0;
     if (
       response.status === 429 &&
@@ -337,9 +344,7 @@ export async function runGeneralInference(
   let answer = first.answer;
   let calls = 1;
   const usages = [first.usage];
-  if (
-    ["review", "writing", "code"].includes(completion.nimbus.intent)
-  ) {
+  if (["review", "writing", "code"].includes(completion.nimbus.intent)) {
     onStatus("checking");
     const data = {
       ...completion.nimbus.context,
@@ -562,7 +567,17 @@ export function generalResponseStream(completion, options) {
         );
         if (cancelled) return;
         controller.enqueue(
-          encode({ choices: [{ delta: { content: result.answer } }] }),
+          encode({
+            choices: [
+              {
+                delta: {
+                  content:
+                    result.answer +
+                    searchSourceFooter(completion.nimbus.context.webSources),
+                },
+              },
+            ],
+          }),
         );
         controller.enqueue(
           encode({ choices: [{ finish_reason: "stop", delta: {} }] }),
