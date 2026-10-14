@@ -1,0 +1,6 @@
+{
+  "name": "@workspace/nimbus-ai-netlify-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test test/*.test.mjs" }
+}

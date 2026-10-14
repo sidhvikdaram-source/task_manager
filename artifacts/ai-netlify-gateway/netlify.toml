@@ -1,0 +1,14 @@
+[build]
+  publish = "public"
+
+[[edge_functions]]
+  function = "nimbus-ai"
+  path = "/health"
+
+[[edge_functions]]
+  function = "nimbus-ai"
+  path = "/task"
+
+[[edge_functions]]
+  function = "nimbus-ai"
+  path = "/general"
