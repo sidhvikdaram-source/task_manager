@@ -23,14 +23,27 @@ export async function aiRequest(
   await firebaseAuth.authStateReady();
   const token = await firebaseAuth.currentUser?.getIdToken();
   if (!token) throw new Error("Sign in to use AI.");
-  const response = await fetchAIResponse(candidates, mode, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=UTF-8",
-    },
-    body: JSON.stringify({ ...input, firebaseIdToken: token }),
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetchAIResponse(candidates, mode, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=UTF-8",
+      },
+      body: JSON.stringify({ ...input, firebaseIdToken: token }),
+      signal,
+    });
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !/\[AI-(?:NETWORK|POST)\]/.test(error.message) ||
+      signal?.aborted
+    )
+      throw error;
+    const relay = await import("./aiFirebaseRelay");
+    if (!(await relay.firebaseRelayEnabled().catch(() => false))) throw error;
+    response = await relay.requestFirebaseRelay(mode, input, signal);
+  }
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.error || "AI is temporarily unavailable.");

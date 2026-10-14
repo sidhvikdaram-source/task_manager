@@ -9,6 +9,51 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // Replaced with the dedicated restricted identity only after authorization.
+    function relayProcessor() {
+      return signedIn() && request.auth.uid == 'N26IQE95a1cUVhHS34DS2QONdmB2';
+    }
+
+    match /aiRelayConfig/default {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /aiRelayLimits/{uid} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid) && !relayProcessor() &&
+        request.resource.data.keys().hasOnly(['jobId','updatedAt']) &&
+        request.resource.data.jobId is string &&
+        request.resource.data.updatedAt == request.time &&
+        (!exists(/databases/$(database)/documents/aiRelayLimits/$(uid)) ||
+          request.time >= resource.data.updatedAt + duration.value(10, 's'));
+      allow delete: if false;
+    }
+
+    match /aiRelayJobs/{jobId} {
+      allow read: if relayProcessor() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      allow create: if signedIn() && !relayProcessor() &&
+        get(/databases/$(database)/documents/aiRelayConfig/default).data.enabled == true &&
+        request.resource.data.keys().hasOnly(['ownerUid','mode','inputJson','status','createdAt']) &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.mode in ['task','general'] &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.createdAt == request.time &&
+        getAfter(/databases/$(database)/documents/aiRelayLimits/$(request.auth.uid)).data.jobId == jobId &&
+        getAfter(/databases/$(database)/documents/aiRelayLimits/$(request.auth.uid)).data.updatedAt == request.time &&
+        request.resource.data.inputJson is string &&
+        request.resource.data.inputJson.size() <= 450000;
+      allow update: if relayProcessor() &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.mode == resource.data.mode &&
+        request.resource.data.inputJson == resource.data.inputJson &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status','responseStatus','responseType','responseText','error'
+        ]) && request.resource.data.status in ['processing','done','failed'];
+      allow delete: if relayProcessor() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+    }
+
     function approvedAdmin() {
       return signedIn() && request.auth.token.email in [
         'sidhvik.daram@gmail.com',

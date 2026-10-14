@@ -249,7 +249,7 @@ export default function GeneralAI({
     let answerComplete = false;
     const abort = new AbortController();
     controller.current = abort;
-    const timer = window.setTimeout(() => abort.abort(), 120000);
+    const timer = window.setTimeout(() => abort.abort(), 240000);
     try {
       await save(next);
       if (owner.current !== expectedOwner) return;

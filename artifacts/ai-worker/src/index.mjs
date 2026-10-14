@@ -8,6 +8,7 @@ import {
   GLM_MODEL,
 } from "./generalInference.mjs";
 import { GENERAL_HARNESS_VERSION } from "./generalHarness.mjs";
+import { processRelay, scheduleRelay, pollRelay } from "./firebaseRelay.mjs";
 const jwksCache = new Map();
 export { GENERAL_MODEL, CLOUDFLARE_GENERAL_MODEL, GLM_MODEL };
 const JWKS_URL =
@@ -144,6 +145,28 @@ export function createWorker({
 } = {}) {
   return {
     async fetch(request, env) {
+      if(new URL(request.url).pathname==="/relay-poll" && request.method==="POST")
+        return pollRelay(request,env,{fetcher,verify});
+      if (
+        new URL(request.url).pathname === "/relay-process" &&
+        request.method === "POST"
+      )
+        return processRelay(request, env, {
+          fetcher,
+          verify,
+          run: (mode, input, ownerUid) =>
+            createWorker({ fetcher, verify: async () => ownerUid }).fetch(
+              new Request(`https://nimbus-ai.internal/${mode}`, {
+                method: "POST",
+                headers: {
+                  Authorization: "Bearer internal-queued-job",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(input),
+              }),
+              env,
+            ),
+        });
       const origin = request.headers.get("Origin");
       const allowedOrigins = (
         env.ALLOWED_ORIGINS ||
@@ -165,7 +188,10 @@ export function createWorker({
         Response.json(body, { status, headers: { ...headers, ...extra } });
       if (origin && !allowedOrigins.includes(origin))
         return json({ error: "Origin not allowed" }, 403);
-      if (request.method === "GET" && new URL(request.url).pathname === "/health")
+      if (
+        request.method === "GET" &&
+        new URL(request.url).pathname === "/health"
+      )
         return json({ service: "nimbus-ai", status: "ok" });
       if (request.method === "OPTIONS")
         return new Response(null, {
@@ -186,8 +212,11 @@ export function createWorker({
       let transportInput;
       // A CORS-safelisted POST avoids an extra OPTIONS exchange on managed
       // networks. This still requires the same signed Firebase identity token.
-      if (!token &&
-          request.headers.get("Content-Type")?.split(";")[0].trim() === "text/plain") {
+      if (
+        !token &&
+        request.headers.get("Content-Type")?.split(";")[0].trim() ===
+          "text/plain"
+      ) {
         const maxBytes = mode === "general" ? 450000 : 100000;
         if (Number(request.headers.get("Content-Length")) > maxBytes)
           return json({ error: "Request too large." }, 413);
@@ -196,7 +225,11 @@ export function createWorker({
           return json({ error: "Request too large." }, 413);
         try {
           transportInput = JSON.parse(raw);
-          if (!transportInput || typeof transportInput !== "object" || Array.isArray(transportInput))
+          if (
+            !transportInput ||
+            typeof transportInput !== "object" ||
+            Array.isArray(transportInput)
+          )
             return json({ error: "Invalid request." }, 400);
           token = transportInput.firebaseIdToken;
           delete transportInput.firebaseIdToken;
@@ -404,4 +437,14 @@ export function createWorker({
     },
   };
 }
-export default createWorker();
+const worker = createWorker();
+export default {
+  fetch: worker.fetch,
+  scheduled(_event, env, context) {
+    context.waitUntil(
+      scheduleRelay(env).catch(() => {
+        console.error("Firebase relay scheduling unavailable");
+      }),
+    );
+  },
+};
