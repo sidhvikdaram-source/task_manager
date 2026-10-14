@@ -456,7 +456,7 @@ export default {
   fetch: worker.fetch,
   scheduled(_event, env, context) {
     context.waitUntil(
-      scheduleRelay(env, fetch, { rounds: 6 }).catch(() => {
+      scheduleRelay(env, fetch, { rounds: 12 }).catch(() => {
         console.error("Firebase relay scheduling unavailable");
       }),
     );

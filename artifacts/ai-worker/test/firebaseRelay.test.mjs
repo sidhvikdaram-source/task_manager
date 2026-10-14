@@ -195,7 +195,7 @@ test("minute polling keeps scanning while inference runs and deduplicates claims
     {
       rounds: 2,
       sleep: async (ms) => {
-        assert.equal(ms, 10000);
+        assert.equal(ms, 5000);
         sleeps++;
       },
     },
@@ -203,4 +203,44 @@ test("minute polling keeps scanning while inference runs and deduplicates claims
   assert.equal(queries, 2);
   assert.equal(sleeps, 1);
   assert.deepEqual(result, { dispatched: 1, failed: 0 });
+});
+test("faster polling bounds scans and dispatches within the free subrequest budget", async () => {
+  let scans = 0,
+    dispatches = 0;
+  const result = await scheduleRelay(
+    {
+      FIREBASE_RELAY_UID: "budget-fixture",
+      FIREBASE_RELAY_REFRESH_TOKEN: "fixture",
+      FIREBASE_PUBLIC_API_KEY: "public",
+      RELAY_PROCESSOR: {
+        fetch: async () => {
+          dispatches++;
+          return Response.json({ status: "done" });
+        },
+      },
+    },
+    async (url, options) => {
+      if (url.includes("securetoken"))
+        return Response.json({
+          user_id: "budget-fixture",
+          id_token: "fixture",
+          expires_in: "3600",
+        });
+      const query = JSON.parse(options.body).structuredQuery;
+      if (query.where.fieldFilter.field.fieldPath === "createdAt")
+        return Response.json([]);
+      scans++;
+      return Response.json(
+        [0, 1, 2].map((n) => ({
+          document: {
+            name: `queue/${String(scans * 3 + n).padStart(20, "0")}`,
+          },
+        })),
+      );
+    },
+    { rounds: 100, sleep: async () => {} },
+  );
+  assert.equal(scans, 12);
+  assert.equal(dispatches, 15);
+  assert.deepEqual(result, { dispatched: 15, failed: 0 });
 });

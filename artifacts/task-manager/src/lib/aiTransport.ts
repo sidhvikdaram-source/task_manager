@@ -17,10 +17,12 @@ export async function aiRequest(
   mode: "task" | "general",
   input: Record<string, unknown>,
   signal?: AbortSignal,
+  onProgress?: (stage: "connecting" | "queued" | "processing") => void,
 ) {
   const candidates = endpoints();
   if (!candidates.length)
     throw new Error("AI is not connected yet. Your chats can still be saved.");
+  onProgress?.("connecting");
   await firebaseAuth.authStateReady();
   const uid = firebaseAuth.currentUser?.uid;
   if (!uid) throw new Error("Sign in to use AI.");
@@ -34,7 +36,13 @@ export async function aiRequest(
   if (storage && prefersRelay(storage, uid)) {
     const relay = await import("./aiFirebaseRelay");
     if (await relay.firebaseRelayEnabled().catch(() => false))
-      response = await relay.requestFirebaseRelay(mode, input, signal);
+      response = await relay.requestFirebaseRelay(
+        mode,
+        input,
+        signal,
+        onProgress,
+        true,
+      );
   }
   if (!response) {
     const token = await firebaseAuth.currentUser?.getIdToken();
@@ -57,7 +65,13 @@ export async function aiRequest(
         throw error;
       const relay = await import("./aiFirebaseRelay");
       if (!(await relay.firebaseRelayEnabled().catch(() => false))) throw error;
-      response = await relay.requestFirebaseRelay(mode, input, signal);
+      response = await relay.requestFirebaseRelay(
+        mode,
+        input,
+        signal,
+        onProgress,
+        true,
+      );
       if (storage) rememberRelay(storage, uid);
     }
   }

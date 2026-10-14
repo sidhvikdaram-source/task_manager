@@ -682,7 +682,7 @@ test("General search uses server evidence, exposes links, and rejects forged sou
     verify: async () => "user",
     fetcher: async (url, options) => {
       assert.equal(url, "https://api.firecrawl.dev/v2/search");
-      assert.equal(JSON.parse(options.body).query, "NASA missions");
+      assert.equal(JSON.parse(options.body).query, "What missions exist?");
       searches++;
       return Response.json({
         success: true,

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth, firebaseAuth } from "@workspace/replit-auth-web";
 import { toast } from "sonner";
+import { ThinkingIndicator } from "@/components/ThinkingIndicator";
 import { CopyableAnswer } from "@/components/CopyableAnswer";
 import { aiEndpoint, aiRequest, readGeneralStream } from "@/lib/aiTransport";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -92,7 +93,6 @@ export default function GeneralAI({
   const [chat, setChat] = useState<Chat>(emptyChat);
   const [input, setInput] = useState("");
   const [webSearch, setWebSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [requestError, setRequestError] = useState("");
@@ -190,10 +190,6 @@ export default function GeneralAI({
     event?.preventDefault();
     const text = input.trim() || (images.length ? "Describe this image." : "");
     if (!text || busyRef.current || saving || preparingImage) return;
-    if (webSearch && (!searchQuery.trim() || searchQuery.trim().length > 400)) {
-      setRequestError("Enter a short public query in the web search field.");
-      return;
-    }
     if (chat.messages.length >= 39) {
       setRequestError(
         "Start a new chat to keep conversations within the free limits.",
@@ -214,7 +210,7 @@ export default function GeneralAI({
     busyRef.current = true;
     setBusy(true);
     setRequestError("");
-    setResponseStage("Working…");
+    setResponseStage("Connecting…");
     setInput("");
     const sentImages = images;
     setImages([]);
@@ -265,7 +261,6 @@ export default function GeneralAI({
         {
           message: text,
           webSearch,
-          ...(webSearch ? { searchQuery: searchQuery.trim() } : {}),
           history,
           assignmentPrompt: chat.assignmentPrompt,
           rubric: chat.rubric,
@@ -273,6 +268,18 @@ export default function GeneralAI({
           images: sentImages,
         },
         abort.signal,
+        (stage) => {
+          if (owner.current !== expectedOwner) return;
+          setResponseStage(
+            stage === "queued"
+              ? "Waiting for Nimbus…"
+              : stage === "processing"
+                ? webSearch
+                  ? "Searching and thinking…"
+                  : "Thinking…"
+                : "Connecting…",
+          );
+        },
       );
       setChat({
         ...next,
@@ -577,12 +584,7 @@ export default function GeneralAI({
                         streaming={busy && i === chat.messages.length - 1}
                       />
                     ) : (
-                      <span
-                        role="status"
-                        className="text-sm text-muted-foreground"
-                      >
-                        {responseStage}
-                      </span>
+                      <ThinkingIndicator label={responseStage} />
                     )
                   ) : (
                     <div className="space-y-3">
@@ -606,6 +608,9 @@ export default function GeneralAI({
                   )}
                 </article>
               ))
+            )}
+            {busy && chat.messages.at(-1)?.role !== "assistant" && (
+              <ThinkingIndicator label={responseStage} />
             )}
           </div>
           <form
@@ -661,21 +666,10 @@ export default function GeneralAI({
               </button>
               {webSearch && (
                 <span className="text-xs text-muted-foreground">
-                  Only your search query is sent to the search provider.
+                  Search uses your message.
                 </span>
               )}
             </div>
-            {webSearch && (
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                maxLength={400}
-                disabled={busy}
-                aria-label="Public web search query"
-                placeholder="Search query, e.g. latest NASA Mars mission news"
-                className="mb-3 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            )}
             <div className="flex items-end gap-3 rounded-xl border border-border bg-background p-3 focus-within:border-primary">
               <input
                 ref={imageInput}

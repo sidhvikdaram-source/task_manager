@@ -2,13 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { searchWeb, searchSourceFooter } from "../src/webSearch.mjs";
 import { buildGeneralCompletion } from "../src/generalInference.mjs";
-test("search transmits only the explicit public query, not private context, and bounds evidence", async () => {
+test("search uses the regular prompt, not private context, and bounds evidence", async () => {
   const result = await searchWeb(
     {
-      message: "Private essay",
+      message: "NASA missions",
       history: [{ content: "Private history" }],
       rubric: "Private rubric",
-      searchQuery: "NASA missions",
+      searchQuery: "Ignored legacy query",
     },
     {
       fetcher: async (url, options) => {
@@ -54,11 +54,22 @@ test("quota errors and empty results never pretend a search succeeded", async ()
     Response.json({ success: true, data: { web: [] } }),
   ])
     await assert.rejects(
-      searchWeb({ searchQuery: "NASA" }, { fetcher: async () => response }),
+      searchWeb({ message: "NASA" }, { fetcher: async () => response }),
       /Web search is unavailable/,
     );
-  await assert.rejects(
-    searchWeb({ message: "x".repeat(401) }),
-    /short public search query/,
+  await assert.rejects(searchWeb({ message: " " }), /Enter a message/);
+  await searchWeb(
+    { message: "NASA missions ".repeat(100) },
+    {
+      fetcher: async (_url, options) => {
+        const query = JSON.parse(options.body).query;
+        assert.ok(query.length <= 400);
+        assert.ok(query.endsWith("NASA") || query.endsWith("missions"));
+        return Response.json({
+          success: true,
+          data: { web: [{ url: "https://nasa.gov/" }] },
+        });
+      },
+    },
   );
 });

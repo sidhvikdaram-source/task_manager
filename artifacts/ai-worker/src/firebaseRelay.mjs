@@ -111,12 +111,13 @@ export async function scheduleRelay(
   if (!token || !env.RELAY_PROCESSOR) return;
   const dispatched = new Set();
   const pending = [];
-  for (let scan = 0; scan < Math.min(rounds, 6); scan++) {
-    if (scan) await sleep(10000);
+  for (let scan = 0; scan < Math.min(rounds, 12); scan++) {
+    if (scan) await sleep(5000);
     const jobs = await queryJobs(fetcher, token, "pending");
     for (const document of jobs) {
       const id = document.name.split("/").pop();
-      if (dispatched.has(id)) continue;
+      // Stay below the free Worker subrequest budget even during a queue burst.
+      if (dispatched.has(id) || dispatched.size >= 15) continue;
       dispatched.add(id);
       pending.push(
         env.RELAY_PROCESSOR.fetch(

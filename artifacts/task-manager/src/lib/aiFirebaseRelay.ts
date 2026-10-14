@@ -19,12 +19,14 @@ export async function requestFirebaseRelay(
   mode: "task" | "general",
   input: Record<string, unknown>,
   signal?: AbortSignal,
+  onProgress?: (stage: "connecting" | "queued" | "processing") => void,
+  configConfirmed = false,
 ): Promise<Response> {
   signal?.throwIfAborted();
   const uid = firebaseAuth.currentUser?.uid;
   if (!uid) throw Error("Sign in to use AI.");
   // Server read prevents a cached configuration from activating an unavailable relay.
-  if (!(await firebaseRelayEnabled()))
+  if (!configConfirmed && !(await firebaseRelayEnabled()))
     throw Error(
       "The Firebase AI connection is not enabled yet. Your chat is saved.",
     );
@@ -48,6 +50,7 @@ export async function requestFirebaseRelay(
     createdAt: serverTimestamp(),
   });
   await batch.commit();
+  onProgress?.("queued");
   return new Promise<Response>((resolve, reject) => {
     let unsubscribe = () => {};
     let finished = false;
@@ -86,6 +89,7 @@ export async function requestFirebaseRelay(
         }
         if (!snapshot.exists()) return;
         const result = snapshot.data();
+        if (result.status === "processing") onProgress?.("processing");
         if (result.status === "failed")
           finish(new Error(String(result.error || "AI could not finish.")));
         if (result.status === "done") {

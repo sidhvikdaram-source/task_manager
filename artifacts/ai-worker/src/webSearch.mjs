@@ -2,12 +2,18 @@ export async function searchWeb(
   input,
   { fetcher = fetch, signal, apiKey } = {},
 ) {
-  const query = String(input.searchQuery || input.message || "").trim();
-  if (!query || query.length > 400)
-    throw Object.assign(
-      new Error("Enter a short public search query (up to 400 characters)."),
-      { status: 400 },
-    );
+  // Use the regular prompt; bound lengthy messages without another model call.
+  const message = String(input.message || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const query =
+    message.length <= 400
+      ? message
+      : message.slice(0, 400).replace(/\s+\S*$/, "");
+  if (!query)
+    throw Object.assign(new Error("Enter a message to search the web."), {
+      status: 400,
+    });
   let response;
   try {
     response = await fetcher("https://api.firecrawl.dev/v2/search", {
