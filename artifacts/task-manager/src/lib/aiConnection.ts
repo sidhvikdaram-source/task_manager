@@ -14,7 +14,7 @@ export async function fetchAIResponse(
   fetcher: typeof fetch = fetch,
 ) {
   let networkError: unknown;
-  const candidates = mode === "general" ? endpoints : endpoints.slice(0, 1);
+  const candidates = endpoints;
   for (const base of candidates) {
     init.signal?.throwIfAborted();
     try {
@@ -26,8 +26,25 @@ export async function fetchAIResponse(
       networkError = error;
     }
   }
+  // Probe without sign-in or prompt data. The response distinguishes endpoint
+  // reachability from a POST failure on the actual user's browser/network.
+  let reachable = false;
+  for (const base of candidates) {
+    init.signal?.throwIfAborted();
+    try {
+      const response = await fetcher(`${base}/health`, {
+        method: "GET", cache: "no-store",
+        signal: AbortSignal.any([...(init.signal ? [init.signal] : []), AbortSignal.timeout(4000)]),
+      });
+      if (response.ok) { reachable = true; break; }
+    } catch {
+      init.signal?.throwIfAborted();
+    }
+  }
   throw new Error(
-    `Nimbus could not connect to AI. The connection may be blocked by your browser or network. Please retry.${mode === "general" ? " Your chat is saved." : ""}`,
+    reachable
+      ? `Nimbus can reach AI, but this browser could not send the prompt. [AI-POST]${mode === "general" ? " Your chat is saved." : " No task was changed."}`
+      : `This browser could not reach either Nimbus AI endpoint. [AI-NETWORK]${mode === "general" ? " Your chat is saved." : " No task was changed."}`,
     { cause: networkError },
   );
 }

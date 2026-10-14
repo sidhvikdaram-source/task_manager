@@ -165,6 +165,8 @@ export function createWorker({
         Response.json(body, { status, headers: { ...headers, ...extra } });
       if (origin && !allowedOrigins.includes(origin))
         return json({ error: "Origin not allowed" }, 403);
+      if (request.method === "GET" && new URL(request.url).pathname === "/health")
+        return json({ service: "nimbus-ai", status: "ok" });
       if (request.method === "OPTIONS")
         return new Response(null, {
           status: 204,
@@ -184,12 +186,13 @@ export function createWorker({
       let transportInput;
       // A CORS-safelisted POST avoids an extra OPTIONS exchange on managed
       // networks. This still requires the same signed Firebase identity token.
-      if (!token && mode === "general" &&
+      if (!token &&
           request.headers.get("Content-Type")?.split(";")[0].trim() === "text/plain") {
-        if (Number(request.headers.get("Content-Length")) > 450000)
+        const maxBytes = mode === "general" ? 450000 : 100000;
+        if (Number(request.headers.get("Content-Length")) > maxBytes)
           return json({ error: "Request too large." }, 413);
         const raw = await request.text();
-        if (new TextEncoder().encode(raw).length > 450000)
+        if (new TextEncoder().encode(raw).length > maxBytes)
           return json({ error: "Request too large." }, 413);
         try {
           transportInput = JSON.parse(raw);

@@ -49,8 +49,27 @@ test("cancelled and non-network errors do not retry", async () => {
   await assert.rejects(() => fetchAIResponse(aiEndpoints(true), "general", { ...init, signal: abort.signal }, async () => { calls++; return new Response(); }), { name: "AbortError" });
   assert.equal(calls, 0);
 });
-test("Task AI keeps its existing single-endpoint behavior", async () => {
+test("Task AI also retries an initial network failure through the existing Worker", async () => {
   let calls = 0;
-  await assert.rejects(() => fetchAIResponse(aiEndpoints(true), "task", init, async () => { calls++; throw new TypeError("Offline"); }), /could not connect/);
-  assert.equal(calls, 1);
+  const response = await fetchAIResponse(aiEndpoints(true), "task", init, async () => {
+    if (++calls === 1) throw new TypeError("Offline");
+    return Response.json({reply:"Preview ready"});
+  });
+  assert.equal(response.status, 200);
+  assert.equal(calls, 2);
+});
+test("network diagnosis sends no identity or prompt data and distinguishes POST failure", async () => {
+  for (const reachable of [true, false]) {
+    const seen = [];
+    await assert.rejects(() => fetchAIResponse(aiEndpoints(true), "general", init, async (url, options) => {
+      seen.push(url);
+      if (url.endsWith("/general")) throw new TypeError("Blocked");
+      assert.equal(options.method, "GET");
+      assert.equal(options.body, undefined);
+      assert.equal(options.headers, undefined);
+      if (!reachable) throw new TypeError("Blocked");
+      return Response.json({status:"ok"});
+    }), error => error.message.includes(reachable ? "[AI-POST]" : "[AI-NETWORK]"));
+    assert.equal(seen.filter(url => url.endsWith("/general")).length, 2);
+  }
 });

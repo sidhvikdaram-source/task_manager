@@ -56,7 +56,7 @@ test("managed-browser transport verifies the same Firebase token and never forwa
   assert.ok(seen.length > 0);
   assert.doesNotMatch(JSON.stringify(seen), /private-fixture-identity|firebaseIdToken/);
 });
-test("plain transport retains authentication, size, origin, and task restrictions", async () => {
+test("plain transport retains authentication, size, and origin restrictions", async () => {
   const worker = createWorker({ verify: async () => { throw Error("Invalid identity"); } });
   for (const [body, status] of [
     [{ message: "Hello" }, 401],
@@ -67,6 +67,27 @@ test("plain transport retains authentication, size, origin, and task restriction
   ]) assert.equal((await worker.fetch(plainRequest(body), env)).status, status);
   assert.equal((await worker.fetch(plainRequest({firebaseIdToken:"invalid"},"https://evil.invalid"), env)).status, 403);
   assert.equal((await worker.fetch(plainRequest({firebaseIdToken:"invalid"},env.ALLOWED_ORIGIN,"task"), env)).status, 401);
+});
+test("Task AI plain transport verifies sign-in and prepares a preview without changing tasks", async () => {
+  const worker = createWorker({verify: async token => {
+    assert.equal(token, "valid-fixture"); return "school-user";
+  }, fetcher: async () => { throw Error("No model needed for this capture"); }});
+  const response = await worker.fetch(plainRequest({
+    firebaseIdToken:"valid-fixture", message:"create a task due yesterday",
+    context:{today:"2026-10-14"},
+  }, env.ALLOWED_ORIGIN,"task"), env);
+  assert.equal(response.status,200);
+  const data = await response.json();
+  assert.match(data.reply,/preview/i);
+  assert.match(data.taskPreviewJson,/2026-10-13/);
+  assert.doesNotMatch(JSON.stringify(data),/valid-fixture|firebaseIdToken/);
+});
+test("health probes expose no identity or provider details and retain origin restrictions",async()=>{
+  const worker=createWorker({verify:async()=>{throw Error("Health needs no identity");}});
+  const response=await worker.fetch(new Request("https://test.invalid/health",{headers:{Origin:env.ALLOWED_ORIGIN}}),env);
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{service:"nimbus-ai",status:"ok"});
+  assert.equal((await worker.fetch(new Request("https://test.invalid/health",{headers:{Origin:"https://evil.invalid"}}),env)).status,403);
 });
 test("models and modes remain separate; general receives no task context", () => {
   const general = buildCompletion(

@@ -25,13 +25,10 @@ export async function aiRequest(
   if (!token) throw new Error("Sign in to use AI.");
   const response = await fetchAIResponse(candidates, mode, {
     method: "POST",
-    headers: mode === "general" ? {
+    headers: {
       "Content-Type": "text/plain;charset=UTF-8",
-    } : {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
     },
-    body: JSON.stringify(mode === "general" ? { ...input, firebaseIdToken: token } : input),
+    body: JSON.stringify({ ...input, firebaseIdToken: token }),
     signal,
   });
   if (!response.ok) {
