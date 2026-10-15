@@ -91,7 +91,7 @@ export const GENERAL_MODE_EXAMPLES = {
   ],
 };
 
-export const GENERAL_HARNESS_VERSION = "nimbus-general-v3.11";
+export const GENERAL_HARNESS_VERSION = "nimbus-general-v3.12";
 export const GENERAL_INTENTS = [
   "review",
   "writing",
@@ -233,6 +233,23 @@ For drafts: preserve the requested stance, supplied numbers, qualifications, and
 For images: use the attached image, distinguish visible geometric ratios from numerical-value ratios, report unreadable/absent labels honestly, and do not invent values. A visible-height ratio can be estimated even when the numerical scale is absent; clearly label that estimate.
 For code: preserve the API and requested input behavior. Check empty inputs, negative values, equality boundaries, strict parsing and mutation. Keep code fenced and copyable. Never claim it ran.
 For other requests: retain useful concise explanations, actual context and honest uncertainty. Follow visible word/format limits. Correct the answer itself; never return private reasoning or the checking process.`;
+
+// Keep every common accuracy rule and the complete checks for this intent.
+export function verificationInstructions(intent) {
+  const section = {
+    review: "For essay reviews:",
+    writing: "For drafts:",
+    code: "For code:",
+    vision: "For images:",
+  }[intent];
+  return VERIFY_SYSTEM.split("\n")
+    .filter(
+      (paragraph) =>
+        !/^For (essay reviews|drafts|images|code):/.test(paragraph) ||
+        paragraph.startsWith(section || "__none__"),
+    )
+    .join("\n");
+}
 
 export const VERIFIED_ANSWER_SCHEMA = {
   type: "object",

@@ -4,7 +4,7 @@ import {
   wordConstraint,
   countWords,
   draftText,
-  VERIFY_SYSTEM,
+  verificationInstructions,
   AUDIT_SYSTEM,
   REVIEW_COVERAGE_CHECK,
   VISION_CHECK,
@@ -120,9 +120,15 @@ export function buildGeneralCompletion(input, provider = "groq") {
   let selectedImages = images;
   if (
     !images.length &&
-    /\b(image|screenshot|chart|photo|picture|graph|diagram|that|this|it)\b/i.test(
+    (/\b(image|screenshot|chart|photo|picture|graph|diagram)\b/i.test(
       message,
-    ) &&
+    ) ||
+      /\b(?:explain|describe|analy[sz]e|interpret|read|look at)\s+(?:it|this|that)\b/i.test(
+        message,
+      ) ||
+      /\bwhat (?:does|is) (?:it|this|that) (?:show|mean|say)\b/i.test(
+        message,
+      )) &&
     !/\b(?:not|haven.t|have not|didn.t)\s+(?:yet\s+)?attached\b/i.test(message)
   ) {
     const previous = [...candidates]
@@ -196,7 +202,7 @@ function visibleWords(answer, completion) {
 }
 
 // Classify provider limits locally. Never expose the upstream body, account ID or key.
-async function rateLimitDetails(response) {
+export async function rateLimitDetails(response) {
   let message = "";
   try {
     const data = await response.clone().json();
@@ -204,7 +210,12 @@ async function rateLimitDetails(response) {
   } catch {
     /* Some gateways return an empty or non-JSON rate-limit body. */
   }
-  const seconds = Number(response.headers.get("retry-after"));
+  const duration = message.match(
+    /try again in\s+(?:(\d+(?:\.\d+)?)m)?(?:(\d+(?:\.\d+)?)s)/i,
+  );
+  const seconds =
+    Number(response.headers.get("retry-after")) ||
+    (duration ? Number(duration[1] || 0) * 60 + Number(duration[2] || 0) : 0);
   return {
     daily: /tokens per day|requests per day|\bTPD\b|\bRPD\b|daily/i.test(
       message,
@@ -408,7 +419,7 @@ export async function runGeneralInference(
       {
         role: "system",
         content:
-          VERIFY_SYSTEM +
+          verificationInstructions(completion.nimbus.intent) +
           format +
           (completion.nimbus.intent === "review"
             ? "\n" + REVIEW_COVERAGE_CHECK

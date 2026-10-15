@@ -272,11 +272,20 @@ test("empty, truncated, malformed check and provider quota fail without exposing
 test("writing uses a grounded final edit without the separate review audit", async () => {
   const bodies = [];
   const result = await runGeneralInference(
-    buildGeneralCompletion({ message: "Write a paragraph", evidence: "The club has $18." }),
-    { env, provider: "groq", fetcher: async (_url, options) => {
-      bodies.push(JSON.parse(options.body));
-      return reply(bodies.length === 1 ? "An unsupported draft" : "A grounded paragraph");
-    } },
+    buildGeneralCompletion({
+      message: "Write a paragraph",
+      evidence: "The club has $18.",
+    }),
+    {
+      env,
+      provider: "groq",
+      fetcher: async (_url, options) => {
+        bodies.push(JSON.parse(options.body));
+        return reply(
+          bodies.length === 1 ? "An unsupported draft" : "A grounded paragraph",
+        );
+      },
+    },
   );
   assert.equal(result.calls, 2);
   assert.equal(result.answer, "A grounded paragraph");
@@ -286,29 +295,67 @@ test("writing uses a grounded final edit without the separate review audit", asy
   assert.doesNotMatch(bodies[1].messages[1].content, /errorReport/);
 });
 test("ordinary questions stay on one call", async () => {
-  const result = await runGeneralInference(buildGeneralCompletion({ message: "What is a percentage point?" }), {
-    env, provider: "groq", fetcher: async () => reply("A difference between percentages."),
-  });
+  const result = await runGeneralInference(
+    buildGeneralCompletion({ message: "What is a percentage point?" }),
+    {
+      env,
+      provider: "groq",
+      fetcher: async () => reply("A difference between percentages."),
+    },
+  );
   assert.equal(result.calls, 1);
 });
 
 test("daily limit is identified without retrying or exposing provider credentials", async () => {
   let calls = 0;
-  const stream = generalResponseStream(buildGeneralCompletion({ message: "hello" }), {
-    env, provider: "groq", fetcher: async () => {
-      calls++;
-      return new Response(JSON.stringify({error:{message:"tokens per day (TPD) reached for org_private test-secret"}}),{status:429,headers:{"retry-after":"1","Content-Type":"application/json"}});
+  const stream = generalResponseStream(
+    buildGeneralCompletion({ message: "hello" }),
+    {
+      env,
+      provider: "groq",
+      fetcher: async () => {
+        calls++;
+        return new Response(
+          JSON.stringify({
+            error: {
+              message:
+                "tokens per day (TPD) reached for org_private test-secret",
+            },
+          }),
+          {
+            status: 429,
+            headers: { "retry-after": "1", "Content-Type": "application/json" },
+          },
+        );
+      },
     },
-  });
+  );
   const text = await new Response(stream).text();
   assert.equal(calls, 1);
   assert.match(text, /daily free AI allowance is exhausted/);
   assert.doesNotMatch(text, /org_private|test-secret/);
 });
 test("minute limit names the cooldown and does not promise a daily reset", async () => {
-  const stream = generalResponseStream(buildGeneralCompletion({ message: "hello" }), {
-    env, provider: "groq", fetcher: async () => new Response(JSON.stringify({error:{message:"tokens per minute (TPM) org_private"}}),{status:429,headers:{"retry-after":"70","Content-Type":"application/json"}}),
-  });
+  const stream = generalResponseStream(
+    buildGeneralCompletion({ message: "hello" }),
+    {
+      env,
+      provider: "groq",
+      fetcher: async () =>
+        new Response(
+          JSON.stringify({
+            error: { message: "tokens per minute (TPM) org_private" },
+          }),
+          {
+            status: 429,
+            headers: {
+              "retry-after": "70",
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+    },
+  );
   const text = await new Response(stream).text();
   assert.match(text, /Try again in 70 seconds/);
   assert.doesNotMatch(text, /daily|org_private/);
@@ -316,25 +363,129 @@ test("minute limit names the cooldown and does not promise a daily reset", async
 test("a short minute cooldown retries once, announces waiting and preserves the answer", async () => {
   let calls = 0;
   const statuses = [];
-  const result = await runGeneralInference(buildGeneralCompletion({message:"hello"}), {
-    env, provider:"groq", fetcher: async () => ++calls === 1
-      ? new Response(JSON.stringify({error:{message:"tokens per minute (TPM)"}}),{status:429,headers:{"retry-after":"0.01","Content-Type":"application/json"}})
-      : reply("Hello."),
-  }, status=>statuses.push(status));
-  assert.equal(calls,2);
-  assert.equal(result.answer,"Hello.");
-  assert.deepEqual(statuses,["working","waiting"]);
+  const result = await runGeneralInference(
+    buildGeneralCompletion({ message: "hello" }),
+    {
+      env,
+      provider: "groq",
+      fetcher: async () =>
+        ++calls === 1
+          ? new Response(
+              JSON.stringify({ error: { message: "tokens per minute (TPM)" } }),
+              {
+                status: 429,
+                headers: {
+                  "retry-after": "0.01",
+                  "Content-Type": "application/json",
+                },
+              },
+            )
+          : reply("Hello."),
+    },
+    (status) => statuses.push(status),
+  );
+  assert.equal(calls, 2);
+  assert.equal(result.answer, "Hello.");
+  assert.deepEqual(statuses, ["working", "waiting"]);
 });
 test("ordinary prompts omit essay-specific instructions and retain honesty and context", () => {
-  const completion=buildGeneralCompletion({message:"hello",history:[{role:"user",content:"My name is Example."}]});
-  const system=completion.messages[0].content;
-  assert.doesNotMatch(system,/control group|staffing|rubric asks for a limitation/);
-  assert.match(system,/Never invent evidence/);
-  assert.match(JSON.stringify(completion.messages),/My name is Example/);
+  const completion = buildGeneralCompletion({
+    message: "hello",
+    history: [{ role: "user", content: "My name is Example." }],
+  });
+  const system = completion.messages[0].content;
+  assert.doesNotMatch(
+    system,
+    /control group|staffing|rubric asks for a limitation/,
+  );
+  assert.match(system, /Never invent evidence/);
+  assert.match(JSON.stringify(completion.messages), /My name is Example/);
 });
 
 test("ambiguity guard rejects guessed actors inside Markdown criticism", () => {
- const unsafe='5. **Clear references:** The pronoun "they" in "they said their schedule would suffer" is ambiguous.\n * *Correction:* Clarify the actor: "the coaches said the schedule would suffer."';
- assert.equal(needsActorClarification(unsafe),true);
- assert.equal(needsActorClarification(unsafe.replace('"the coaches said the schedule would suffer."','"[speaker] said [owner]’s schedule would suffer."')),false);
+  const unsafe =
+    '5. **Clear references:** The pronoun "they" in "they said their schedule would suffer" is ambiguous.\n * *Correction:* Clarify the actor: "the coaches said the schedule would suffer."';
+  assert.equal(needsActorClarification(unsafe), true);
+  assert.equal(
+    needsActorClarification(
+      unsafe.replace(
+        '"the coaches said the schedule would suffer."',
+        '"[speaker] said [owner]’s schedule would suffer."',
+      ),
+    ),
+    false,
+  );
+});
+
+test("unrelated pronouns do not repeatedly charge for an old image", () => {
+  const history = [
+    {
+      role: "user",
+      content: "Read the chart",
+      images: [{ dataUrl: "data:image/png;base64,YWJj" }],
+    },
+  ];
+  for (const message of [
+    "What day is it?",
+    "Write a paragraph about this policy",
+    "Is that sentence clear?",
+  ])
+    assert.equal(
+      buildGeneralCompletion({ message, history }).nimbus.images.length,
+      0,
+    );
+  assert.equal(
+    buildGeneralCompletion({ message: "What does it show?", history }).nimbus
+      .images.length,
+    1,
+  );
+});
+test("intent-specific editor instructions retain common and relevant accuracy checks", async () => {
+  const { verificationInstructions, VERIFY_SYSTEM } =
+    await import("../src/generalHarness.mjs");
+  for (const [intent, section] of [
+    ["review", "For essay reviews:"],
+    ["writing", "For drafts:"],
+    ["code", "For code:"],
+  ]) {
+    const text = verificationInstructions(intent);
+    assert.ok(text.length < VERIFY_SYSTEM.length);
+    assert.ok(text.includes(section));
+    assert.ok(
+      text.includes(
+        "Never resolve an ambiguous speaker, owner or actor by guessing",
+      ),
+    );
+    assert.ok(text.includes("Follow visible word/format limits"));
+  }
+  assert.ok(!verificationInstructions("code").includes("For essay reviews:"));
+});
+test("provider cooldowns remain actionable when Retry-After is missing", async () => {
+  const { rateLimitDetails } = await import("../src/generalInference.mjs");
+  assert.deepEqual(
+    await rateLimitDetails(
+      Response.json(
+        {
+          error: {
+            message: "Tokens per minute reached. Please try again in 12.3s.",
+          },
+        },
+        { status: 429 },
+      ),
+    ),
+    { daily: false, retrySeconds: 13 },
+  );
+  assert.deepEqual(
+    await rateLimitDetails(
+      Response.json(
+        {
+          error: {
+            message: "Tokens per day reached. Please try again in 2m5.7s.",
+          },
+        },
+        { status: 429 },
+      ),
+    ),
+    { daily: true, retrySeconds: 126 },
+  );
 });
