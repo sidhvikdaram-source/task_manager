@@ -7,6 +7,7 @@ import {
   serverTimestamp,
   writeBatch,
 } from "firebase/firestore";
+import { relayCooldownMillis, waitForRelayCooldown } from "./aiRoutePreference";
 import { firebaseAuth, firebaseDb } from "@workspace/replit-auth-web";
 
 export async function firebaseRelayEnabled() {
@@ -36,6 +37,15 @@ export async function requestFirebaseRelay(
     (mode === "task" ? 100000 : 450000)
   )
     throw Error("AI request is too large.");
+  const limit = await getDocFromServer(doc(firebaseDb, "aiRelayLimits", uid));
+  const wait = relayCooldownMillis(limit.data()?.updatedAt?.toMillis?.() ?? 0);
+  if (wait > 0) {
+    onProgress?.("queued");
+    await waitForRelayCooldown(wait, signal);
+  }
+  signal?.throwIfAborted();
+  if (firebaseAuth.currentUser?.uid !== uid)
+    throw Error("Your account changed. Please reopen the chat.");
   const job = doc(collection(firebaseDb, "aiRelayJobs"));
   const batch = writeBatch(firebaseDb);
   batch.set(doc(firebaseDb, "aiRelayLimits", uid), {
@@ -49,7 +59,20 @@ export async function requestFirebaseRelay(
     status: "pending",
     createdAt: serverTimestamp(),
   });
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === "permission-denied")
+      throw Error(
+        "Nimbus could not queue this message. Wait ten seconds and retry; if it persists, refresh your sign-in. This is not the AI provider’s credit limit. [FIREBASE-QUEUE]",
+      );
+    if (code === "resource-exhausted")
+      throw Error(
+        "Nimbus’s Firebase allowance is currently exhausted. This is separate from the AI provider’s allowance. [FIREBASE-LIMIT]",
+      );
+    throw error;
+  }
   onProgress?.("queued");
   return new Promise<Response>((resolve, reject) => {
     let unsubscribe = () => {};

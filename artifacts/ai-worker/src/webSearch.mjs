@@ -34,6 +34,13 @@ export async function searchWeb(
         AbortSignal.timeout(12000),
       ]),
     });
+    if (response.status === 429)
+      throw Object.assign(
+        Error(
+          "Web search’s free rate limit was reached. Wait a minute or turn Search web off. This is separate from the chat model’s allowance. [SEARCH-LIMIT]",
+        ),
+        { searchLimit: true },
+      );
     if (!response.ok) throw Error("Search unavailable");
     const data = await response.json();
     if (data.success !== true) throw Error("Search unavailable");
@@ -60,9 +67,10 @@ export async function searchWeb(
     return { query, searchedAt: new Date().toISOString(), sources };
   } catch (error) {
     if (signal?.aborted) throw error;
+    if (error?.searchLimit) throw Object.assign(error, { status: 503 });
     throw Object.assign(
       new Error(
-        "Web search is unavailable or its free allowance is busy. Try again, or turn Search web off.",
+        "Web search is unavailable or its free allowance is busy. Try again, or turn Search web off. [SEARCH-UNAVAILABLE]",
       ),
       { status: 503 },
     );

@@ -261,7 +261,10 @@ export function createWorker({
       }
       if (env.AI_LIMITER && !(await env.AI_LIMITER.limit({ key: uid })).success)
         return json(
-          { error: "Please wait a minute before sending more messages." },
+          {
+            error:
+              "Nimbus’s message rate limit was reached. Wait a minute before sending more messages. [NIMBUS-LIMIT]",
+          },
           429,
           { "Retry-After": "60" },
         );

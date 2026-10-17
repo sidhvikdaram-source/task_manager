@@ -755,5 +755,5 @@ test("search quota failure stops before inference and exposes a safe retry error
     env,
   );
   assert.equal(response.status, 503);
-  assert.match((await response.json()).error, /Web search is unavailable/);
+  assert.match((await response.json()).error, /SEARCH-LIMIT/);
 });

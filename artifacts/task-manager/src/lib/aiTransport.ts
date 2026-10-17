@@ -1,5 +1,9 @@
 import { firebaseAuth } from "@workspace/replit-auth-web";
-import { prefersRelay, rememberRelay } from "./aiRoutePreference";
+import {
+  prefersRelay,
+  rememberRelay,
+  schoolRelayPreferred,
+} from "./aiRoutePreference";
 import { aiEndpoints, fetchAIResponse } from "./aiConnection";
 
 function endpoints() {
@@ -33,7 +37,11 @@ export async function aiRequest(
     /* Storage can be disabled by the browser. */
   }
   let response: Response | undefined;
-  if (storage && prefersRelay(storage, uid)) {
+  const schoolRoute = schoolRelayPreferred(
+    window.location.hostname,
+    import.meta.env.VITE_NIMBUS_AI_URL as string | undefined,
+  );
+  if (schoolRoute || (storage && prefersRelay(storage, uid))) {
     const relay = await import("./aiFirebaseRelay");
     if (await relay.firebaseRelayEnabled().catch(() => false))
       response = await relay.requestFirebaseRelay(
@@ -42,6 +50,10 @@ export async function aiRequest(
         signal,
         onProgress,
         true,
+      );
+    else if (schoolRoute)
+      throw new Error(
+        "Nimbus could not open its Firebase AI connection. This is a connection issue, not an AI credit limit. [FIREBASE-CONNECTION]",
       );
   }
   if (!response) {

@@ -300,8 +300,8 @@ async function generate(
       if (response.status === 429)
         throw new GeneralAIError(
           limit.daily
-            ? "The provider’s daily free AI allowance is exhausted. More messages cannot go through until it refills. Your chat is saved."
-            : `The provider’s free AI rate limit was reached. ${limit.retrySeconds ? `Try again in ${limit.retrySeconds} seconds.` : "Please wait a minute before retrying."} Your chat is saved.`,
+            ? "The provider’s daily free AI allowance is exhausted. More messages cannot go through until it refills. Your chat is saved. [AI-DAILY]"
+            : `The provider’s free AI rate limit was reached. ${limit.retrySeconds ? `Try again in ${limit.retrySeconds} seconds.` : "Please wait a minute before retrying."} Your chat is saved. [AI-MINUTE]`,
           429,
           limit.retrySeconds ? String(limit.retrySeconds) : null,
         );

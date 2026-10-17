@@ -55,7 +55,7 @@ test("quota errors and empty results never pretend a search succeeded", async ()
   ])
     await assert.rejects(
       searchWeb({ message: "NASA" }, { fetcher: async () => response }),
-      /Web search is unavailable/,
+      /Web search(?: is unavailable|’s free rate limit)/,
     );
   await assert.rejects(searchWeb({ message: " " }), /Enter a message/);
   await searchWeb(
